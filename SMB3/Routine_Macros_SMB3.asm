@@ -1,4 +1,6 @@
 
+fillbyte $FF
+
 ;#############################################################################################################
 ;#############################################################################################################
 
@@ -1539,7 +1541,11 @@ if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) != $00
 	STA.w $034D
 	STZ.w $0249
 ++:
+else
+	BRA AlignFixJumpA
+	fill $39
 endif
+AlignFixJumpA:
 	LDA.b #$A1
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
@@ -3795,25 +3801,9 @@ CODE_20A0D7:
 	JML.l SMB3_DisplayCopyDetectionErrorMessage_Main				; Note: Call to SMAS function
 
 SMASSMB3Reset:
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	SEI
-	CLC
-	XCE
-	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
-	STZ.w !REGISTER_DMAEnable
-	STZ.w !REGISTER_HDMAEnable
-	LDA.b #$80
-	STA.w !REGISTER_ScreenDisplayRegister
-	REP.b #$20
-	LDA.w #!RAM_SMB3_Global_StartOfStack
-	TCS
-	LDA.w #!RAM_SMB3_Global_ScratchRAM00
-	TCD
-	SEP.b #$20
-endif
-if !Define_SMAS_Global_DisableCopyDetection == !FALSE
-	NOP #2
-	LDA.b #$AA
+	JML AlignFixJumpB
+AlignFixJumpBA:
+;if !Define_SMAS_Global_DisableCopyDetection == !FALSE
 	STA.l !SRAM_SMAS_Global_CopyDetectionCheck2
 	CMP.l !SRAM_SMAS_Global_CopyDetectionCheck1
 	BNE.b CODE_20A0D7
@@ -3821,32 +3811,11 @@ if !Define_SMAS_Global_DisableCopyDetection == !FALSE
 	STA.l !SRAM_SMAS_Global_CopyDetectionCheck2
 	CMP.l !SRAM_SMAS_Global_CopyDetectionCheck1
 	BNE.b CODE_20A0D7
-endif
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	LDA.w !REGISTER_PPUStatusFlag2
-	BIT.b #!PPUStatusFlag2_ConsoleRegion
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_E) != $00
-	BNE.b +
-else
-	BEQ.b +
-endif
-	JML.l SMB3_DisplayRegionErrorMessage_Main
-
-+:
-	JSL.l SMB3_UploadSPCEngine_Main
-	JSL.l SMB3_InitializeRAMOnStartup_Main
-	JSL.l SMB3_VerifySaveDataIsValid_Main
-	JSL.l SMB3_UploadMainSampleData_Main
-	JSL.l SMB3_LoadSplashScreen_Main
-	JSL.l SMB3_UploadMusicBank_Level
-else
-	SEI
-	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
-	STZ.w !REGISTER_DMAEnable
-	STZ.w !REGISTER_HDMAEnable
-	LDA.b #$80
-	STA.w !REGISTER_ScreenDisplayRegister
-endif
+;endif
+	JSL AlignFixJumpC
+	BRA AlignFixJumpD
+	fill $09
+AlignFixJumpD:
 	REP.b #$20
 	PHD
 	LDA.w #!REGISTER_ScreenDisplayRegister
@@ -4076,7 +4045,8 @@ elseif !Define_Global_ROMToAssemble&(!ROM_SMAS_J2) != $00
 elseif !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMB3_E) != $00
 %FREE_BYTES(NULLROM, 146, $FF)
 else
-%FREE_BYTES(NULLROM, 149, $FF)
+;%FREE_BYTES(NULLROM, 149, $FF)
+%FREE_BYTES(NULLROM, 90, $FF)
 endif
 
 ;--------------------------------------------------------------------
@@ -4153,6 +4123,8 @@ if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_E|!ROM_SMASW_E|!ROM_SMAS_
 	JSR.w SMB3_DMADataToVRAM_Main
 else
 	JSR.w SMB3_DMADataToVRAM_Entry2
+	BRA $01
+	NOP
 endif
 	LDA.w #SMB3_Bank3DGraphics_Sprite_BattleMode2
 	STA.b $0D
@@ -4362,6 +4334,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	LDA.l !SRAM_SMAS_Global_RunningDemoFlag
 	BEQ.b CODE_20B553
 	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else
+	BRA CODE_20B553
+	fill $08
 endif
 
 CODE_20B553:
@@ -4393,6 +4368,9 @@ CODE_20B576:
 	AND.b #!Joypad_Y>>8
 	BEQ.b CODE_20B582
 	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else
+	BRA CODE_20B582
+	fill $16
 endif
 
 CODE_20B582:
@@ -4448,6 +4426,7 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 +:
 	JSL.l SMB3_LoadPlayerSelectMenu_Main
 	RTS
+	fill $08
 else
 	LDA.l !RAM_SMB3_Global_DisplayTitleScreenMenuOptionsIndex
 	BMI.b CODE_20B5E8
@@ -4677,6 +4656,7 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 +:
 	JSL.l SMB3_LoadPlayerSelectMenu_Main
 	RTS
+	fill $0F
 else
 	LDA.l !SRAM_SMAS_Global_RunningDemoFlag
 	BNE.b CODE_20B763
@@ -4729,11 +4709,12 @@ endif
 CODE_20B79B:
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	BNE.b +
+	BNE.b CODE_20B7B8
 	LDX.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
 	LDA.b !RAM_SMB3_TitleScreen_FileASelectedWorld,x
 	STA.l !SRAM_SMAS_Global_InitialSelectedWorld
-+:
+	BRA CODE_20B7B8
+	fill $0D
 else
 	LDA.b !RAM_SMB3_Global_ControllerHold1P2
 	AND.b #!Joypad_X|(!Joypad_Y>>8)|!Joypad_A|(!Joypad_B>>8)
@@ -4749,13 +4730,16 @@ CODE_20B7A8:
 	BNE.b CODE_20B7B8
 	LDA.b #$FF
 	STA.b !RAM_SMB3_TitleScreen_ResetTitleScreenFlag
-CODE_20B7B8:
 endif
+CODE_20B7B8:
 	JSR.w CODE_20C51D
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	LDA.l !SRAM_SMAS_Global_RunningDemoFlag
 	BEQ.b CODE_20B7C4
 	JMP.w CODE_20B839
+else
+	BRA $07
+	fill $07
 endif
 
 CODE_20B7C4:
@@ -4764,7 +4748,75 @@ CODE_20B7C4:
 	AND.b #(!Joypad_DPadU>>8)|(!Joypad_DPadD>>8)|(!Joypad_Select>>8)
 	BEQ.b CODE_20B81B
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	JSL.l SMB3_MoveTitleScreenMenuCursor_Main
+	;JSL.l SMB3_MoveTitleScreenMenuCursor_Main
+	
+;macro ROUTINE_CUSTOM_SMB3_MoveTitleScreenMenuCursor(Address)
+;namespace SMB3_MoveTitleScreenMenuCursor
+;%InsertMacroAtXPosition(<Address>)
+
+;Main:
+	STZ.b !RAM_SMB3_Global_ScratchRAM00
+	STA.b !RAM_SMB3_Global_ScratchRAM01
+-:
+	AND.b #$0C
+	BEQ.b .NoUpOrDown
+	LSR
+	LSR
+	;LSR;??
+	TAX
+	LDA.l AdditionTable,x
+	BRA.b +
+
+.NoUpOrDown:
+	INC
+	;LDA.b #$01
++:
+	CLC
+	ADC.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+	CMP.b #$FF
+	BEQ.b .FixUnderflow
+	CMP.b #$04
+	BCC.b +
+	LDA.b #$00
+	BRA.b .FixOverflow
+
+.FixUnderflow:
+	LDA.b #$03
++:
+.FixOverflow:
+	STA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+	LDA.b !RAM_SMB3_Global_ScratchRAM00
+	BNE.b .Return
+	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	BEQ.b .Return
+	INC.b !RAM_SMB3_Global_ScratchRAM00
+	LDA.l !RAM_SMB3_Global_DisplayTitleScreenMenuOptionsIndex
+	BMI.b .Return
+	;DEC
+	;TAX
+	;LDA.l BlankSettingLoc,x
+	AND #$01
+	CMP.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+	BNE.b .Return
+	LDA.b !RAM_SMB3_Global_ScratchRAM01
+	JMP.w -
+
+.Return:
+	LDA.b #!Define_SMAS_Sound0063_StepOnLevelTile
+	STA.w !RAM_SMB3_Global_SoundCh3
+	BRA CODE_20B81B
+	NOP
+	;NOP
+	;RTL
+
+AdditionTable:
+	db $00,$01,$FF,$00
+
+;BlankSettingLoc:
+;	db $01,$00
+
+;namespace off
+;endmacro
 else
 	LDX.b #!Define_SMAS_Sound0063_StepOnLevelTile
 	STX.w !RAM_SMB3_Global_SoundCh3
@@ -4840,23 +4892,32 @@ CODE_00B842:
 CODE_20B84D:
 	LDA.l !RAM_SMB3_Global_InitialWorld
 	STA.w !RAM_SMB3_Global_CurrentWorld
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	BEQ.b CODE_20B872
-endif
-	LDA.l !SRAM_SMAS_Global_Controller1PluggedInFlag
-	BNE.b CODE_20B872
+	JSL AlignFixJumpEA
+	BEQ CODE_20B872
+	;LDA.l !SRAM_SMAS_Global_Controller1PluggedInFlag
+	;BNE.b CODE_20B872
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	;LDA.b !RAM_SMB3_Global_ControllerPress1P2
+	;AND.b #!Joypad_Start>>8
+	;ORA.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	;ORA.l !SRAM_SMAS_Global_Controller2PluggedInFlag
+;else
 	LDA.l !SRAM_SMAS_Global_Controller2PluggedInFlag
 	BEQ.b CODE_20B872
+	
 	LDA.b !RAM_SMB3_Global_ControllerPress1P2
 	AND.b #!Joypad_Start>>8
+;endif
+
 	BEQ.b CODE_20B872
 	LDA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
 	BNE.b CODE_20B892
 	LDA.b #!Define_SMAS_Sound0063_Wrong
 	STA.w !RAM_SMB3_Global_SoundCh3
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	JMP.w CODE_20B8D7
+	RTS
+	NOP
+	;JMP.w CODE_20B8D7
 else
 	BRA.b CODE_20B8D7
 endif
@@ -4866,44 +4927,19 @@ CODE_20B872:
 	ORA.b !RAM_SMB3_Global_ControllerPress1P2
 	AND.b #!Joypad_Start>>8
 	BNE.b CODE_20B892
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	ORA.b !RAM_SMB3_TitleScreen_EraseFileProcess
-	BNE.b +
-	LDA.b !RAM_SMB3_Global_ControllerPress1P1
-	ORA.b !RAM_SMB3_Global_ControllerPress1P2
-	AND.b #(!Joypad_DPadL>>8)|(!Joypad_DPadR>>8)|(!Joypad_B>>8)
-	BEQ.b +
-	JSL.l SMB3_ChangeSelectedWorld_Main
-	RTS
-+:
-endif
-	LDA.b !RAM_SMB3_Global_ControllerHold2P1
-	ORA.b !RAM_SMB3_Global_ControllerHold2P2
+	JML AlignFixJumpE
+AlignFixJumpF:
 	AND.b #$40
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	BNE.b +
+	JML AlignFixJumpG
+AlignFixJumpGA:
 	RTS
+AlignFixJumpGB:
+	JSR.w CODE_20B5DA
+	BRA CODE_20B8A7
+	fill $09
 
-+:
-	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	BNE.b +
-	RTS
 
-+:
-	STZ.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	JSL.l SMB3_LoadFileSelectMenu_Main
-	DEC.b !RAM_SMB3_TitleScreen_CurrentState
-	STZ.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
-	LDA.b #$FF
-	STA.l !RAM_SMB3_Global_DisplayTitleScreenMenuOptionsIndex
-	BRA.b CODE_20B8A7
-else
-	BEQ.b CODE_20B886
-	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
-endif
-
-CODE_20B886:
+;CODE_20B886:
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	LDA.b !RAM_SMB3_Global_ControllerHold1P1
 	ORA.b !RAM_SMB3_Global_ControllerHold1P2
@@ -4913,55 +4949,8 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 endif
 
 CODE_20B892:
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	BNE.b +
-	LDA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
-	CMP.b #$03
-	BNE.b ++
-	LDA.b !RAM_SMB3_TitleScreen_EraseFileProcess
-	EOR.b #$01
-	STA.b !RAM_SMB3_TitleScreen_EraseFileProcess
-	JSL.l SMB3_LoadFileSelectMenu_Entry2
-	LDA.b #!Define_SMAS_Sound0063_Correct
-	STA.w !RAM_SMB3_Global_SoundCh3
-	RTS
-
-++:
-	LDA.b !RAM_SMB3_TitleScreen_EraseFileProcess
-	BEQ.b +++
-	JSL.l SMB3_ClearSaveData_Main
-	JSL.l SMB3_LoadFileSelectMenu_Entry2
-	LDA.b #!Define_SMAS_Sound0063_1up
-	STA.w !RAM_SMB3_Global_SoundCh3
-	RTS
-
-+++:
-	INC.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	JSL.l SMB3_LoadSaveFileData_Main
--:
-	DEC.b !RAM_SMB3_TitleScreen_CurrentState
-	JSR.w CODE_20B5DA
-	BRA.b CODE_20B8A7
-
-+:
-	LDA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
-	CMP.b #$03
-	BNE.b +
-	LDA.l !SRAM_SMAS_Global_ControllerTypeX
-	EOR.b #$01
-	AND.b #$01
-	STA.l !SRAM_SMAS_Global_ControllerTypeX
-	LDA.b #!Define_SMAS_Sound0063_Coin
-	STA.w !RAM_SMB3_Global_SoundCh3
-	JSL.l SMB3_LoadPlayerSelectMenu_Entry2
-	RTS
-
-+:
-else
-	LDA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
-endif
-	CMP.b #$02
+	JML AlignFixJumpH
+AlignFixJumpI:
 	BNE.b CODE_20B8A7
 	LDA.l !SRAM_SMAS_Global_Controller1PluggedInFlag
 	BNE.b CODE_20B8D8
@@ -4977,6 +4966,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	LDA.l !SRAM_SMAS_Global_RunningDemoFlag
 	BEQ.b CODE_20B8BB
 	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else
+    BRA $08
+	fill $08
 endif
 
 CODE_20B8BB:
@@ -6731,10 +6723,10 @@ SMB3_ProcessPart1OfEnding:
 	LDY.w #SMB3_PaletteMirror[$10].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$10].LowByte>>16,DATA_3CA8C0>>16
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
 	LDA.w #$009F
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #DATA_3C8BE0
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #$001F
@@ -8053,6 +8045,9 @@ endif
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	dw SMB3_2PlayerGameStripeImage		; 5C
 	dw DATA_20DBF4				; 5D
+else
+	dw $0000
+	dw $0000
 endif
 
 TitleScreenCheckerFloorStripeImage:
@@ -8499,15 +8494,16 @@ DATA_20E060:
 ;--------------------------------------------------------------------
 
 	%ROUTINE_SMB3_SetPointersForCutscenePlayerGraphics(NULLROM)				; $20E061
-if !Define_Global_ROMToAssemble&(!ROM_SMAS_U) != $00
+	;TEMP
+;if !Define_Global_ROMToAssemble&(!ROM_SMAS_U) != $00
 	%FREE_BYTES(NULLROM, 94, $FF)
-elseif !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2) != $00
-	%FREE_BYTES(NULLROM, 74, $FF)
-elseif !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
-	%FREE_BYTES(NULLROM, 154, $FF)
-else
-	%FREE_BYTES(NULLROM, 97, $FF)
-endif
+;elseif !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2) != $00;
+;	%FREE_BYTES(NULLROM, 74, $FF)
+;elseif !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
+;	%FREE_BYTES(NULLROM, 154, $FF)
+;else
+;	%FREE_BYTES(NULLROM, 97, $FF)
+;endif
 
 ;--------------------------------------------------------------------
 
@@ -10329,9 +10325,9 @@ CODE_20EFE5:
 	SEP.b #$10
 	RTS
 
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 %FREE_BYTES(NULLROM, 24, $FF)
-endif
+;endif
 
 ;--------------------------------------------------------------------
 
@@ -11578,14 +11574,17 @@ CODE_20FF6A:
 
 ;--------------------------------------------------------------------
 
-if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) != $00
-%FREE_BYTES(NULLROM, 136, $FF)
-elseif !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E) != $00
-%FREE_BYTES(NULLROM, 125, $FF)
+;%FREE_BYTES(NULLROM, 72, $FF)
+;if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) != $00
+
+if !Define_Global_ROMToAssemble&(!ROM_SMB3_U) != $00
+%FREE_BYTES(NULLROM, 72, $FF) ; 136
+elseif !Define_Global_ROMToAssemble&(!ROM_SMB3_E) != $00
+%FREE_BYTES(NULLROM, 73, $FF) ; 125
 elseif !Define_Global_ROMToAssemble&(!ROM_SMB3_J) != $00
-%FREE_BYTES(NULLROM, 41, $FF)
+;%FREE_BYTES(NULLROM, 41, $FF) ;41 	;TODO
 else
-%FREE_BYTES(NULLROM, 135, $FF)
+%FREE_BYTES(NULLROM, 999, $FF) ; 135 ;TODO
 endif
 %BANK_END(<EndBank>)
 endmacro
@@ -20122,7 +20121,7 @@ DATA_21EF09:
 	dw RegularLuigiPalette
 	dw TanookiSuitPalette
 	dw HammerSuitPalette
-	dw SMB3_GlobalSpritePalette_Row08To0C
+	dw SMB3TitleScreenPalette_Row08To0C
 	dw RegularMarioPalette
 
 	dw RegularLuigiPalette
@@ -20132,7 +20131,7 @@ DATA_21EF09:
 	dw RegularLuigiPalette
 	dw TanookiSuitPalette
 	dw HammerSuitPalette
-	dw SMB3_GlobalSpritePalette_Row08To0C
+	dw SMB3TitleScreenPalette_Row08To0C
 	dw RegularLuigiPalette
 
 ;--------------------------------------------------------------------
@@ -21166,14 +21165,19 @@ DATA_21FD5B:
 	db $FF,$FF,$11,$11,$FC,$FC,$00,$0F
 	db $FB,$FB,$FA,$FA,$FA,$FA,$FD,$FD
 	db $FD,$FE,$03,$03,$03,$02
-
-if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
-%FREE_BYTES(NULLROM, 653, $FF)
-elseif !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
-%FREE_BYTES(NULLROM, 144, $FF)
-else
+	
+if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) != $00
 %FREE_BYTES(NULLROM, 655, $FF)
+elseif !Define_Global_ROMToAssemble&(!ROM_SMB3_U) != $00
+%FREE_BYTES(NULLROM, 655, $FF)
+elseif !Define_Global_ROMToAssemble&(!ROM_SMB3_E) != $00
+%FREE_BYTES(NULLROM, 653, $FF)
+elseif !Define_Global_ROMToAssemble&(!ROM_SMB3_J) != $00
+;TODO
+else
+;TODO
 endif
+
 %BANK_END(<EndBank>)
 endmacro
 
@@ -26747,7 +26751,7 @@ CODE_22F004:
 	LSR
 	BNE.b CODE_22F068
 	LDX.b #$00
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$81
 	STA.w $05F3
 	LDA.b #$20
@@ -40194,7 +40198,7 @@ CODE_23D54A:
 	RTS
 
 CODE_23D553:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$04
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
@@ -64341,8 +64345,7 @@ CODE_27945B:
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_U) != $00
 	ORA.w $05F5,y
 else
-	CLC
-	ADC.w $05F5,x
+	JSR AlignFixJumpP
 endif
 	CMP.b #!Define_SMAS_Sound0060_Stomp7
 	BCC.b CODE_27947A
@@ -65510,7 +65513,8 @@ CODE_279C91:
 
 ;--------------------------------------------------------------------
 
-CODE_279C97:
+;CODE_279C97
+Level_PrepareNewObject:
 	STZ.w $0691,x
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07F_GiantPiranhaPlantInGiantPipe
@@ -67520,16 +67524,16 @@ CODE_27AA8E:
 DATA_27AA9E:
 	db $00,$01,$02,$01
 
-if !Define_Global_ROMToAssemble&(!ROM_SMAS_U) != $00
+;if !Define_Global_ROMToAssemble&(!ROM_SMAS_U) != $00
 %FREE_BYTES(NULLROM, 1375, $FF)
-else
-%FREE_BYTES(NULLROM, 1374, $FF)
-endif
+;else
+;%FREE_BYTES(NULLROM, 1374, $FF)
+;endif
 
 ;--------------------------------------------------------------------
 
 ; Note: Some sort of player to level collision routine.
-
+;db $A5;??
 CODE_27B000:
 	LDA.b !RAM_SMB3_Level_Player_DeathState
 	BNE.b CODE_27B07F
@@ -71460,7 +71464,7 @@ CODE_27DC8A:
 	RTS
 
 CODE_27DC97:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	RTS
@@ -71590,11 +71594,7 @@ CODE_27DD67:
 	STA.w $0230
 	CLC
 	ADC.w #$0040
-	STA.w $0232
-if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_E|!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) == $00
-	STA.w $0234
-	STA.w $0236
-endif
+		JSR AlignFixJumpR;;
 	SEP.b #$20
 	LDA.b #SMB3_Bank42Graphics_Sprite_DynamicDoorAndLetters>>16
 	STA.w $0239
@@ -71942,16 +71942,34 @@ DATA_27DFF2:
 	%ROUTINE_SMB3_ExtSpr17_PodobooFire(NULLROM)				; $27DFF5
 	%ROUTINE_SMB3_ExtSpr18_LavaSplash(NULLROM)				; $27E064
 	%ROUTINE_SMB3_DrawLoadingLetters(NULLROM)				; $27E17C
+AlignFixJumpP:
+		CLC
+	ADC.w $05F5,x
+	RTS
+AlignFixJumpQ:
+	LDA.b $9B
+if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) == $00
+	AND.w #$00FF
+endif
+	TAX
+	RTS
+AlignFixJumpR:
+	STA.w $0232
+;if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_E|!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) == $00
+	STA.w $0234
+	STA.w $0236
+;endif
+	RTS
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) != $00
-	%FREE_BYTES(NULLROM, 953, $FF)
+	%FREE_BYTES(NULLROM, 953-(6+7), $FF)
 elseif !Define_Global_ROMToAssemble&(!ROM_SMAS_E) != $00
-	%FREE_BYTES(NULLROM, 933, $FF)
+	%FREE_BYTES(NULLROM, 933-(6+7), $FF)
 elseif !Define_Global_ROMToAssemble&(!ROM_SMAS_J2|!ROM_SMB3_J) != $00
-	%FREE_BYTES(NULLROM, 950, $FF)
+	%FREE_BYTES(NULLROM, 950-(6+7), $FF)
 elseif !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMB3_E) != $00
-	%FREE_BYTES(NULLROM, 927, $FF)
+	%FREE_BYTES(NULLROM, 927-(6+7), $FF)
 else
-	%FREE_BYTES(NULLROM, 944, $FF)						; $27E200
+	%FREE_BYTES(NULLROM, 944-(6+7), $FF)						; $27E200
 endif
 	%DATATABLE_RT08_SMB3_LevelData(NULLROM)				; $27E5B0
 	%FREE_BYTES(NULLROM, 3, $FF)							; $27FFFD
@@ -74244,7 +74262,7 @@ CODE_289E2C:
 CODE_289E35:
 	TYA
 	TAX
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDX.b $9B
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -79480,7 +79498,7 @@ CODE_299CC0:
 	JMP.w CODE_299D24
 
 CODE_299CCB:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b $08
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	LDA.b $09
@@ -79763,7 +79781,7 @@ CODE_29A0F0:
 ;--------------------------------------------------------------------
 
 CODE_29A0F6:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	RTS
@@ -85080,10 +85098,10 @@ CODE_29C82B:
 	MVN SMB3_PaletteMirror[$00].LowByte>>16,UnknownPaletteData01_Row00>>16
 	PLB
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
 	LDA.w #$009F
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	PLB
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	AND.w #$00FF
@@ -85579,10 +85597,10 @@ CODE_29CCB6:
 CODE_29CCF8:
 	REP.b #$30
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
 	LDA.w #$009F
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #DATA_3C8BE0
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #$001F
@@ -85736,10 +85754,10 @@ CODE_29CE95:
 	LDY.w #$7F9400
 	LDA.w #$00FF
 	MVN $7F9400>>16,DATA_3CAC00>>16
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #$7F9500
 	LDA.w #$007F
-	MVN $7F9500>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN $7F9500>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #DATA_3C8A20
 	LDY.w #$7F9580
 	LDA.w #$001F
@@ -85858,10 +85876,10 @@ CODE_29CF82:
 CODE_29CFB6:
 	REP.b #$30
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C+$40
+	LDX.w #SMB3TitleScreenPalette_Row08To0C+$40
 	LDY.w #$7F9540
 	LDA.w #$001F
-	MVN $7F9540>>16,SMB3_GlobalSpritePalette_Row08To0C+$40>>16
+	MVN $7F9540>>16,SMB3TitleScreenPalette_Row08To0C+$40>>16
 	PLB
 	STZ.w $02B3
 	LDA.w #$0000
@@ -90249,7 +90267,7 @@ CODE_29FAA1:
 CODE_29FAAA:
 	TYA
 	TAX
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr075_BossProjectile
@@ -93775,7 +93793,7 @@ LoadLayer2BG1A_ScrewedPanels:
 .Main:
 ;$2A95FA
 	SEP.b #$10
-	LDA.b #$3A
+	LDA.b #$3A;row1
 	STA.b $00
 	LDA.b #$01
 	STA.b $01
@@ -93783,21 +93801,21 @@ LoadLayer2BG1A_ScrewedPanels:
 	STA.b $04
 	LDX.b #$E0
 	JSR.w CODE_2A973A
-	LDA.b #$02
+	LDA.b #$02;row2
 	STA.b $00
 	LDA.b #$03
 	STA.b $01
 	LDA.b #$08
 	STA.b $04
 	JSR.w CODE_2A973A
-	LDA.b #$04
+	LDA.b #$04;row3
 	STA.b $00
 	LDA.b #$05
 	STA.b $01
 	LDA.b #$08
 	STA.b $04
 	JSR.w CODE_2A974B
-	LDA.b #$0B
+	LDA.b #$0B;row4
 	STA.b $00
 	LDA.b #$0C
 	STA.b $01
@@ -93821,8 +93839,8 @@ CODE_2A9650:
 	INX
 	DEC.b $04
 	BNE.b CODE_2A9650
-	JSR.w CODE_2A96ED
-	JSR.w CODE_2A96AD
+	JSR.w CODE_2A96ED;draw bushes
+	JSR.w CODE_2A96AD;draw blocks
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	CMP.b #$1A
 	BNE.b CODE_2A96AB
@@ -98160,7 +98178,7 @@ CODE_2AB5FB:
 	STA.b $09
 	REP.b #$10
 	LDX.w #$0000
-CODE_2AB60D:
+CODE_2AB60D:;;
 	LDY.b $09
 	LDA.b [$0D],y
 	AND.w #$00FF
@@ -98191,7 +98209,7 @@ CODE_2AB623:
 	INX
 	INX
 	DEC.b $00
-	BPL.b CODE_2AB60D
+	BPL.b CODE_2AB60D;;
 	SEP.b #$30
 	LDX.b $25
 	LDA.w $024B
@@ -101523,6 +101541,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	LDA.l !SRAM_SMAS_Global_RunningDemoFlag
 	BEQ.b CODE_20B1D0
 	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else 
+	BRA CODE_20B1D0
+	fill $08
 endif
 
 CODE_20B1D0:
@@ -101550,6 +101571,9 @@ CODE_20B1ED:
 	AND.b #!Joypad_Y>>8
 	BEQ.b CODE_20B1F9
 	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else
+	BRA CODE_20B1F9
+	fill $16
 endif
 
 CODE_20B1F9:
@@ -101584,6 +101608,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	LDA.l !SRAM_SMAS_Global_RunningDemoFlag
 	BEQ.b CODE_20B236
 	JML.l SMAS_CopyOfResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else
+	BRA CODE_20B236
+	fill $08
 endif
 
 CODE_20B236:
@@ -101909,29 +101936,11 @@ namespace SMB3_VBlankRoutine
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	SEI
-	REP.b #$30
-	PHA
-	PHX
-	PHY
-	PHD
-	LDA.w #!RAM_SMB3_Global_ScratchRAM00
-	TCD
-	PHB
-	PHK
-	PLB
-	LDA.b !RAM_SMB3_Global_ScratchRAM00
-	PHA
-	LDA.b !RAM_SMB3_Global_ScratchRAM02
-	PHA
-	SEP.b #$30
-	LDA.w !REGISTER_NMIEnable
-else
-	LDA.w !REGISTER_NMIEnable
-	LDA.b $02
-	PHA
-endif
+	JML AlignFixJumpJ
+EndofVBlank:;;second?
+	RTI
+	NOP
+AlignFixJumpK:
 	LDA.b #$80
 	STA.w !REGISTER_ScreenDisplayRegister
 	STZ.w !REGISTER_HDMAEnable
@@ -102028,25 +102037,9 @@ CODE_20F0BA:
 	STA.w !REGISTER_HDMAEnable
 CODE_20F0C7:
 	JSL.l CODE_22E677
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	REP.b #$30
-endif
-	PLA
-	STA.b !RAM_SMB3_Global_ScratchRAM02
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	PLA
-	STA.w !RAM_SMB3_Global_ScratchRAM00
-	PLB
-	PLD
-	PLY
-	PLX
-	PLA
-EndofVBlank:
-	RTI
-else
-EndofVBlank:
-	RTL
-endif
+	;;;
+	JML AlignFixJumpL
+	;;;
 
 CODE_20F0CF:
 	JSR.w CODE_20F651
@@ -102299,24 +102292,10 @@ namespace SMB3_IRQRoutine
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	REP.b #$30
-	PHA
-	PHX
-	PHY
-	PHD
-	LDA.w #!RAM_SMB3_Global_ScratchRAM00
-	TCD
-	PHB
-	PHK
-	PLB
-	SEP.b #$30
-endif
-	LDA.w !REGISTER_IRQEnable
-	BMI.b CODE_20F30C
-	JMP.w CODE_20F38E
-
+	JML AlignFixJumpM
+	fill $04
 CODE_20F30C:
+;CODE_20F30C:
 	LDA.b #!REGISTER_ScreenDisplayRegister>>8
 	XBA
 	LDA.b #!REGISTER_ScreenDisplayRegister
@@ -102394,20 +102373,7 @@ CODE_20F381:
 	STA.b !REGISTER_ScreenDisplayRegister
 	INC.w $021C
 CODE_20F38E:
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	REP.b #$30
-	PLB
-	PLD
-	PLY
-	PLX
-	PLA
-	RTI
-else
-	RTL
-endif
-
-CODE_20F38F:
-	JMP.w CODE_20F38E
+	JML AlignFixJumpN
 
 CODE_20F392:
 	LDX.w $037C
@@ -102533,18 +102499,9 @@ CODE_20F495:
 	BVC.b CODE_20F495
 	LDA.w !RAM_SMB3_Global_SpecialLayerBGModeAndTileSizeSettingMirror
 	STA.b !REGISTER_BGModeAndTileSizeSetting
-	LDA.w $020F
-	STA.b !REGISTER_MainScreenLayers
-if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) == $00
-	STZ.b !REGISTER_BG1HorizScrollOffset
-	LDA.b #$01
-	STA.b !REGISTER_BG1HorizScrollOffset
-	STZ.b !REGISTER_BG1VertScrollOffset
-	STA.b !REGISTER_BG1VertScrollOffset
-CODE_20F4AE:
-	BIT.w !REGISTER_HVBlankFlagsAndJoypadStatus
-	BVC.b CODE_20F4AE
-endif
+	
+	JSL AlignFixJumpO
+	NOP
 	LDA.b #$20
 	STA.b !REGISTER_ColorMathSelectAndEnable
 	STZ.b !REGISTER_BG1And2WindowMaskSettings
@@ -102556,6 +102513,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) != $00
 	STA.w !REGISTER_BG1HorizScrollOffset
 	STZ.w !REGISTER_BG1VertScrollOffset
 	STA.w !REGISTER_BG1VertScrollOffset
+else
+	BRA $0C
+	fill $0C
 endif
 	INC.w $021C
 	JMP.w CODE_20F38E
@@ -103803,6 +103763,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	LDA.l !SRAM_SMAS_Global_RunningDemoFlag
 	BEQ.b CODE_20B3F0
 	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else
+	BRA CODE_20B3F0
+	fill $08
 endif
 
 CODE_20B3F0:
@@ -103831,6 +103794,9 @@ CODE_20B40B:
 	AND.b #!Joypad_Y>>8
 	BEQ.b CODE_20B417
 	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+else
+	BRA CODE_20B417
+	fill $16
 endif
 CODE_20B417:
 	RTS
@@ -104134,10 +104100,10 @@ namespace SMB3_BufferTitleScreenSpritePalettes
 Main:
 	REP.b #$30
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
-	LDA.w #SMB3_GlobalSpritePalette_Row08To0CEnd-SMB3_GlobalSpritePalette_Row08To0C-$01
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	LDA.w #SMB3TitleScreenPalette_Row08To0CEnd-SMB3TitleScreenPalette_Row08To0C-$01
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #SMB3TitleScreenPalette_Row0DTo0E
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #SMB3TitleScreenPalette_Row0DTo0EEnd-SMB3TitleScreenPalette_Row0DTo0E-$01
@@ -104212,7 +104178,7 @@ Main:
 	RTS
 
 Sub:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	INC.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	JSL.l CODE_279BB8
 	PHX
@@ -112385,7 +112351,7 @@ CODE_28BF6A:
 	BMI.b CODE_28BFAF						; Note: This will always branch.
 
 CODE_28BF74:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$06
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr072_Goomba
@@ -112436,7 +112402,7 @@ CODE_28C603:
 	BEQ.b CODE_28C617
 	LSR
 	BNE.b CODE_28C634
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	JMP.w CODE_28C5C4
@@ -114040,7 +114006,7 @@ CODE_28B34E:
 	BMI.b CODE_28B3A3					; Note: This will always branch.
 
 CODE_28B358:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDY.b $9B
 	LDA.b #$00
 	STA.w !RAM_SMB3_NorSpr040_BusterBeetle_HoldingBlockFlag,y
@@ -117495,7 +117461,7 @@ CODE_28E223:
 CODE_28E22C:
 	TYA
 	TAX
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDX.b $9B
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -118638,7 +118604,7 @@ CODE_22BC11:
 	LDA.w !RAM_SMB3_NorSpr083_Lakitu_InitialYPosHi,x
 	PHA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	PLA
 	STA.w !RAM_SMB3_NorSpr083_Lakitu_InitialYPosHi,x
 	PLA
@@ -118816,7 +118782,7 @@ CODE_22BD76:
 CODE_22BD7F:
 	STY.b $00
 	LDX.b $00
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDX.b $9B
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -123083,11 +123049,7 @@ CODE_27D13A:
 	STA.w SMB3_OAMTileSizeBuffer[$01].Slot,y
 	PLY
 	REP.b #$20
-	LDA.b $9B
-if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) == $00
-	AND.w #$00FF
-endif
-	TAX
+		JSR AlignFixJumpQ;;
 	SEP.b #$20
 	LDA.w $06C7,x
 	BEQ.b CODE_27D173
@@ -125649,11 +125611,11 @@ incbin "Graphics/GFX_FG_EndOfLevelDecor.bin"
 
 BG_ToadHouse:
 ;$3AB000
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/Layer2/GFX_BG_ToadHouse_, USA.bin, )
-else
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	;%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/Layer2/GFX_BG_ToadHouse_, USA.bin, )
+;else
 	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/Layer2/GFX_BG_ToadHouse_, SMASU.bin, )
-endif
+;endif
 
 BG_TitleScreen:
 ;$3AB800
@@ -126257,11 +126219,11 @@ incbin "Graphics/GFX_UnknownEndingGraphics.bin"
 
 TitleScreen:
 ;$47C000
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/GFX_TitleScreen_, USA.bin, )
-else
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	;%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/GFX_TitleScreen_, USA.bin, )
+;else
 	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/GFX_TitleScreen_, SMASU.bin, )
-endif
+;endif
 TitleScreenEnd:
 
 FG_WorldRollCallMiniMap:
@@ -126503,10 +126465,10 @@ macro DATATABLE_RT00_SMB3_Palettes(Address)
 
 SMB3_Palettes_Main:
 
-SMB3_GlobalSpritePalette_Row08To0C:
+SMB3TitleScreenPalette_Row08To0C:
 ;$3C8800
 	incbin "Palettes/GlobalSpritePalette_Row08To0C.bin"
-SMB3_GlobalSpritePalette_Row08To0CEnd:
+SMB3TitleScreenPalette_Row08To0CEnd:
 
 RegularMarioPalette:
 ;$3C88A0
@@ -127268,6 +127230,282 @@ Main:
 	incbin "../SMAS/Graphics/SplashScreenGFX.bin"
 End:
 namespace off
+endmacro
+
+;#############################################################################################################
+;#############################################################################################################
+
+macro DATATABLE_CUSTOM_SMB3_AlignmentFixes(Address)
+;namespace SMB3_SplashScreenGFX
+%InsertMacroAtXPosition(<Address>)
+;;TEMP
+;TEMP
+	
+	
+AlignFixJumpB:
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	SEI
+	CLC
+	XCE
+	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
+	STZ.w !REGISTER_DMAEnable
+	STZ.w !REGISTER_HDMAEnable
+	LDA.b #$80
+	STA.w !REGISTER_ScreenDisplayRegister
+	REP.b #$20
+	LDA.w #!RAM_SMB3_Global_StartOfStack
+	TCS
+	LDA.w #!RAM_SMB3_Global_ScratchRAM00
+	TCD
+	SEP.b #$20
+;endif
+	;NOP #2
+	;%PrintLabelLocation(AlignFixJumpC)
+	LDA.b #$AA
+	JML AlignFixJumpBA
+
+AlignFixJumpC:
+;	if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	LDA.w !REGISTER_PPUStatusFlag2
+	BIT.b #!PPUStatusFlag2_ConsoleRegion
+if !Define_Global_ROMToAssemble&(!ROM_SMB3_E) != $00
+	BNE.b +
+else
+	BEQ.b +
+endif
+	JML.l SMB3_DisplayRegionErrorMessage_Main
+
++:
+	JSL.l SMB3_UploadSPCEngine_Main
+	JSL.l SMB3_InitializeRAMOnStartup_Main
+	JSL.l SMB3_VerifySaveDataIsValid_Main
+	JSL.l SMB3_UploadMainSampleData_Main
+	JSL.l SMB3_LoadSplashScreen_Main
+	JSL.l SMB3_UploadMusicBank_Level
+	RTL
+
+;else;
+;	SEI
+;	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
+;	STZ.w !REGISTER_DMAEnable
+;	STZ.w !REGISTER_HDMAEnable
+;	LDA.b #$80
+;	STA.w !REGISTER_ScreenDisplayRegister
+;endif
+AlignFixJumpEA:
+	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	BEQ.b +
+	LDA.l !SRAM_SMAS_Global_Controller1PluggedInFlag
+	EOR #$01
+	;BNE.b CODE_20B872
++:
+	RTL
+AlignFixJumpE:
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	ORA.b !RAM_SMB3_TitleScreen_EraseFileProcess
+	BNE.b +
+	LDA.b !RAM_SMB3_Global_ControllerPress1P1
+	ORA.b !RAM_SMB3_Global_ControllerPress1P2
+	AND.b #(!Joypad_DPadL>>8)|(!Joypad_DPadR>>8)|(!Joypad_B>>8)
+	BEQ.b +
+	JSL.l SMB3_ChangeSelectedWorld_Main
+	BRA ++++;RTS
++:
+	LDA.b !RAM_SMB3_Global_ControllerHold2P1
+	ORA.b !RAM_SMB3_Global_ControllerHold2P2
+	JML AlignFixJumpF
+	
+AlignFixJumpG:
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	BNE.b +
+	BRA ++++;RTS
+
++:
+	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	BNE.b +
+	BRA ++++;RTS
+
++:
+	STZ.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	JSL.l SMB3_LoadFileSelectMenu_Main
+	DEC.b !RAM_SMB3_TitleScreen_CurrentState
+	STZ.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+	LDA.b #$FF
+	STA.l !RAM_SMB3_Global_DisplayTitleScreenMenuOptionsIndex
+	JML CODE_20B8A7
+++++:	
+----:
+	JML AlignFixJumpGA;RTS
+AlignFixJumpH:
+	;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	BNE.b +
+	LDA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+	CMP.b #$03
+	BNE.b ++
+	LDA.b !RAM_SMB3_TitleScreen_EraseFileProcess
+	EOR.b #$01
+	STA.b !RAM_SMB3_TitleScreen_EraseFileProcess
+	JSL.l SMB3_LoadFileSelectMenu_Entry2
+	LDA.b #!Define_SMAS_Sound0063_Correct
+	STA.w !RAM_SMB3_Global_SoundCh3
+	BRA ----;RTS
+
+++:
+	LDA.b !RAM_SMB3_TitleScreen_EraseFileProcess
+	BEQ.b +++
+	JSL.l SMB3_ClearSaveData_Main
+	JSL.l SMB3_LoadFileSelectMenu_Entry2
+	LDA.b #!Define_SMAS_Sound0063_1up
+	STA.w !RAM_SMB3_Global_SoundCh3
+	BRA ----;RTS
+
++++:
+	INC.b !RAM_SMB3_TitleScreen_FileSelectProcess
+	JSL.l SMB3_LoadSaveFileData_Main
+-:
+	DEC.b !RAM_SMB3_TitleScreen_CurrentState
+	JML AlignFixJumpGB
+
++:
+	LDA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+	CMP.b #$03
+	BNE.b +
+	LDA.l !SRAM_SMAS_Global_ControllerTypeX
+	EOR.b #$01
+	AND.b #$01
+	STA.l !SRAM_SMAS_Global_ControllerTypeX
+	LDA.b #!Define_SMAS_Sound0063_Coin
+	STA.w !RAM_SMB3_Global_SoundCh3
+	JSL.l SMB3_LoadPlayerSelectMenu_Entry2
+	BRA ----;RTS
+
++:
+;else
+	;LDA.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+;endif
+	CMP.b #$02
+	JML AlignFixJumpI
+	;BRA.b CODE_20B8A7
+;else
+	;BEQ.b CODE_20B886
+;	JML.l SMAS_ResetToSMASTitleScreen_Main				; Note: Call to SMAS function
+;endif
+;endif
+
+;if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
+;%FREE_BYTES(NULLROM, 653, $FF)
+;elseif !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
+;%FREE_BYTES(NULLROM, 144, $FF)
+;else
+;%FREE_BYTES(NULLROM, 655, $FF)
+;endif
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+AlignFixJumpJ:
+	SEI
+	REP.b #$30
+	PHA
+	PHX
+	PHY
+	PHD
+	LDA.w #!RAM_SMB3_Global_ScratchRAM00
+	TCD
+	PHB
+	;PHK
+	;PLB
+	LDA.b !RAM_SMB3_Global_ScratchRAM00
+	PHA
+	LDA.b !RAM_SMB3_Global_ScratchRAM02
+	PHA
+	SEP.b #$30
+	LDA #$00
+	PHA
+	PLB
+	LDA.w !REGISTER_NMIEnable
+	JML SMB3_VBlankRoutine_AlignFixJumpK
+AlignFixJumpL:
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	REP.b #$30
+;endif
+	PLA
+	STA.b !RAM_SMB3_Global_ScratchRAM02
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	PLA
+	STA.w !RAM_SMB3_Global_ScratchRAM00
+	PLB
+	PLD
+	PLY
+	PLX
+	PLA
+EndofVBlank:
+	RTI
+
+AlignFixJumpM:	
+;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	REP.b #$30
+	PHA
+	PHX
+	PHY
+	PHD
+	LDA.w #!RAM_SMB3_Global_ScratchRAM00
+	TCD
+	PHB
+	;PHK
+	;PLB
+	SEP.b #$30
+	LDA #$00
+	PHA
+	PLB
+;endif
+	LDA.w !REGISTER_IRQEnable
+	BMI.b +
+	JML SMB3_IRQRoutine_CODE_20F38E
++
+	JML SMB3_IRQRoutine_CODE_20F30C
+	
+	;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+AlignFixJumpN:
+	REP.b #$30
+	PLB
+	PLD
+	PLY
+	PLX
+	PLA
+	RTI
+;else
+	;RTL
+;endif
+
+;CODE_20F38F:
+	;JMP.w CODE_20F38E
+;else
+;EndofVBlank:
+	;RTL
+;endif
+;else
+	;LDA.w !REGISTER_NMIEnable
+	;LDA.b $02
+	;PHA
+;endif
+AlignFixJumpO:
+LDA.w $020F
+	STA.b !REGISTER_MainScreenLayers
+;if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) == $00
+	STZ.b !REGISTER_BG1HorizScrollOffset
+	LDA.b #$01
+	STA.b !REGISTER_BG1HorizScrollOffset
+	STZ.b !REGISTER_BG1VertScrollOffset
+	STA.b !REGISTER_BG1VertScrollOffset
+-:
+	BIT.w !REGISTER_HVBlankFlagsAndJoypadStatus
+	BVC.b -
+	RTL
+
+;Main:
+;	incbin "../SMAS/Graphics/SplashScreenGFX.bin"
+;End:
+;namespace off
 endmacro
 
 ;#############################################################################################################
@@ -128512,8 +128750,7 @@ Main:
 	PHA
 	LDY.w $072B
 	LDA.w !RAM_SMB3_TitleScreen_FileAMaxWorld,y
-	CMP.b #$01
-	BCS.b +
+	BNE.b +
 	PLA
 	LDA.b #!Define_SMAS_Sound0063_Wrong
 	STA.w !RAM_SMB3_Global_SoundCh3
@@ -128562,69 +128799,6 @@ endmacro
 ;#############################################################################################################
 ;#############################################################################################################
 
-macro ROUTINE_CUSTOM_SMB3_MoveTitleScreenMenuCursor(Address)
-namespace SMB3_MoveTitleScreenMenuCursor
-%InsertMacroAtXPosition(<Address>)
-
-Main:
-	STZ.b !RAM_SMB3_Global_ScratchRAM00
-	STA.b !RAM_SMB3_Global_ScratchRAM01
--:
-	BIT.b #$0C
-	BEQ.b .NoUpOrDown
-	AND.b #$0C
-	LSR
-	LSR
-	LSR
-	TAX
-	LDA.l AdditionTable,x
-	BRA.b +
-
-.NoUpOrDown:
-	LDA.b #$01
-+:
-	CLC
-	ADC.w $072B
-	CMP.b #$FF
-	BEQ.b .FixUnderflow
-	CMP.b #$04
-	BCC.b +
-	LDA.b #$00
-	BRA.b .FixOverflow
-
-.FixUnderflow:
-	LDA.b #$03
-+:
-.FixOverflow:
-	STA.w $072B
-	LDA.b !RAM_SMB3_Global_ScratchRAM00
-	BNE.b .Return
-	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
-	BEQ.b .Return
-	INC.b !RAM_SMB3_Global_ScratchRAM00
-	LDA.l !RAM_SMB3_Global_DisplayTitleScreenMenuOptionsIndex
-	BMI.b .Return
-	DEC
-	TAX
-	LDA.l BlankSettingLoc,x
-	CMP.w $072B
-	BNE.b .Return
-	LDA.b !RAM_SMB3_Global_ScratchRAM01
-	JMP.w -
-
-.Return:
-	LDA.b #!Define_SMAS_Sound0063_StepOnLevelTile
-	STA.w !RAM_SMB3_Global_SoundCh3
-	RTL
-
-AdditionTable:
-	db $01,$FF,$01
-
-BlankSettingLoc:
-	db $01,$00
-
-namespace off
-endmacro
 
 ;#############################################################################################################
 ;#############################################################################################################
