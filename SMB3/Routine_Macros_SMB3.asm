@@ -26,7 +26,7 @@ endif
 
 ; Note: Overworld/Levels Main loop?
 
-CODE_20801F:
+GraphicsBuf_Prep_And_WaitVSync: ; CODE_20801F
 	LDA.b $28
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
 	ASL
@@ -48,14 +48,14 @@ CODE_20801F:
 	STA.b $1C
 	STZ.w !RAM_SMB3_Global_WaitForVBlankFlag
 CODE_208044:
-	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag
+	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag	;spinning
 	BPL.b CODE_208044
 	STZ.b $1C
 	CLI
 	RTS
 
-CODE_20804D:
-	JSR.w CODE_20801F
+GraphicsBuf_Prep_And_WaitVSync_Long: ; CODE_20804D
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	RTL
 
 ;--------------------------------------------------------------------
@@ -104,23 +104,32 @@ endif
 	JMP.w SMB3_BattleMode_BootUpBattleMode_Main
 
 CODE_2080B9:
-	JSL.l CODE_29A700
+;PRG030_84A0
+	JSL.l Map_Init
+	
 	STZ.w !RAM_SMB3_Overworld_CurrentProcess
 	STZ.w !RAM_SMB3_NorSprXXX_GiantQuestionMarkBlock_BlockHitFlags
 	STZ.w $1F2F
 	LDA.b #$00
 	STA.l $7E396E
 	STA.l !RAM_SMB3_Overworld_UsedReserveAnchorFlag
+	
+	; Map_UnusedGOFlag = $F8?
 	LDA.b #$F8
 	STA.b $95
+	
+	; Stop Update_Select activity temporarily while we initialize
 	LDA.l $7E3955
 	INC
 	STA.l $7E3955
+	
 	LDX.b #$7F
 CODE_2080DF:
 	STZ.w !RAM_SMB3_Overworld_LevelsClearedBits,x
 	DEX
 	BPL.b CODE_2080DF
+	
+;SNES: new (upload music bank)
 CODE_2080E5:
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	LDA.w !RAM_SMB3_Global_LoadOverworldMusicBank
@@ -128,16 +137,21 @@ CODE_2080E5:
 	JSL.l SMB3_UploadMusicBank_Overworld
 CODE_2080F1:
 	STZ.w !RAM_SMB3_Global_LoadOverworldMusicBank
+;/	
+	
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 	JSR.w CODE_20F9EC
 	LDA.b #$FF
 	STA.b $00
 	STZ.b $01
 	JSR.w CODE_20FA0B
-	LDA.b #$0B
+	
+		; Init for lost bonus game??
+	LDA.b #$0B ; changed from 2B in NES to 0B?
 	STA.w $070B
 	LDA.b #$35
 	STA.w $070C
+	
 	STZ.w !RAM_SMB3_Global_TilesetFromHeader
 	STZ.w $072C
 	STZ.w $053C
@@ -182,6 +196,7 @@ CODE_20816F:
 	INX
 	CPX.b #$03
 	BNE.b CODE_20816F
+	
 	LDX.w !RAM_SMB3_Global_TwoPlayerGameFlag
 	DEX
 CODE_20817F:
@@ -323,7 +338,7 @@ CODE_20829A:
 	LDA.w $0722,y
 	STA.b $B7
 	LDA.w $0724,y
-	JSL.l CODE_2097BA
+	JSL.l Scroll_Update_Ranges
 	STZ.b $25
 	LDA.b $24
 	STA.b $23
@@ -338,7 +353,7 @@ CODE_20829A:
 	JSL.l SMB3_DrawWorldNumberOnStatusBar_Main
 	LDA.b #$00
 	JSR.w CODE_2095D5
-	JSR.w CODE_209C85
+	JSR.w Scroll_Dirty_Update
 	JSR.w CODE_20957E
 	JSL.l CODE_2A8B4B
 	LDY.b #$0D
@@ -375,16 +390,20 @@ CODE_20831A:
 	JSL.l CODE_238036
 	LDA.b #$00
 	JSR.w CODE_2095D5
+	
 	LDX.w !RAM_SMB3_Global_CurrentWorld
 	LDY.w SMB3_InitialWorldMapMusic,x
 	CPX.b #$04
 	BNE.b CODE_20833C
+	
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.b !RAM_SMB3_Overworld_Mario_XPosHi,x
 	BEQ.b CODE_20833C
+	
 	LDY.b #!Define_SMB3_OverworldMusic_CloudBonusRoom
 	BRA.b CODE_208343
-
+	
+;PRG030_8698
 CODE_20833C:
 	LDA.w !RAM_SMB3_Overworld_ActiveMusicBoxFlag
 	BEQ.b CODE_208343
@@ -394,7 +413,7 @@ CODE_208343:
 CODE_208346:
 	STZ.w !RAM_SMB3_Global_OpenReserveBoxFlag
 	LDA.b #$EF
-	STA.w $0216
+	STA.w !Vert_Scroll
 	STZ.w $021A
 	STZ.w $021B
 	LDA.b #$C0
@@ -402,7 +421,7 @@ CODE_208346:
 	JSL.l SMB3_OverworldTileAnimations_Main
 	LDA.b #$00
 	STA.l $7E3955
-	JSL.l CODE_29C794
+	JSL.l SNES_Setup_PalData ; get palettes
 	PHB
 	REP.b #$30
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
@@ -504,7 +523,7 @@ CODE_20843B:
 	BNE.b CODE_208452
 	JSL.l SMB3_UpdateDarknessCircleWindowPos_Main
 CODE_208452:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync ;overworld spinning
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 	JSL.l SMB3_OverworldTileAnimations_Main
 	LDA.w !RAM_SMB3_Global_ReserveBoxState
@@ -540,7 +559,7 @@ CODE_208491:
 	BEQ.b CODE_208516
 CODE_2084A1:
 	JSL.l CODE_29E2B6
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	STZ.w !RAM_SMB3_Global_HDMAEnableMirror
@@ -588,8 +607,10 @@ CODE_208504:
 	STZ.w $078C
 	JMP.w CODE_2080E5
 
+;PRG030_87BD
 CODE_208516:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
+	
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $0210
 	STA.w $0722,x
@@ -603,11 +624,15 @@ CODE_208516:
 	STA.l $7E3979,x
 	LDA.b !RAM_SMB3_Overworld_Mario_UnusedRAM2,x
 	STA.l $7E397B,x
+	
 	STZ.b $20
 	STZ.w $104F
 	STZ.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
 	STZ.w $0728
-	JSR.w CODE_20966F
+	
+	JSR.w CODE_20966F ; Clear entrance transition memory
+	
+	;SNES: new (replace old window code)
 	LDA.b #$03
 	STA.w $1047
 	STA.w $1049
@@ -626,6 +651,9 @@ CODE_208516:
 	STA.w $104C
 	LDA.b #$17
 	STA.w $1046
+	;/ 
+	
+	; Top 0, bottom 1, right 2, left 3
 	LDX.b #$03
 CODE_20857D:
 	LDA.b $24
@@ -642,6 +670,7 @@ CODE_20857D:
 	STA.w $1047,x
 	DEX
 	BPL.b CODE_20857D
+	
 	LDX.b #$03
 	LDA.b $24
 	TAY
@@ -660,13 +689,17 @@ CODE_2085A8:
 	AND.b #$1F
 	ORA.b #$E0
 	STA.w $104D
+	
 CODE_2085BA:
 	LDA.b #$30
-	STA.w $1050
+	STA.w $1050 ; Map_EntTran_Cnt = $30
+	
 	LDA.b #!Define_SMAS_Sound0063_EnterLevel
 	STA.w !RAM_SMB3_Global_SoundCh3
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
+	
+	;SNES: new
 	LDY.b #$01
 	LDA.w !RAM_SMB3_Overworld_EnableDarknessFlag
 	BEQ.b CODE_2085D2
@@ -675,14 +708,16 @@ CODE_2085D2:
 	STY.w $0291
 	JSL.l CODE_2AF9A9
 CODE_2085D9:
+
 	LDA.b #$01
-	STA.b $20
+	STA.b $20 ; Map_EnterLevelFX	
+	
 	JSL.l CODE_2AFA63
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.w $1050
 	BPL.b CODE_2085D9
 CODE_2085E9:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	SEC
 	SBC.b #$02
@@ -707,7 +742,11 @@ CODE_2085E9:
 	LDA.b #$80
 	STA.w !REGISTER_ScreenDisplayRegister
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
-	JSR.w CODE_20801F
+	
+
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
+	
+;SNES: check if level music bank needs to be uploaded to SPC
 	LDA.w !RAM_SMB3_Overworld_OWSprIDBeingEntered
 if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMB3_E) != $00
 	CMP.b #!Define_SMB3_SpriteID_OWSpr02_Airship
@@ -753,17 +792,21 @@ CODE_208651:
 CODE_208660:
 	LDA.w !RAM_SMB3_Overworld_EnableDarknessFlag
 	BEQ.b CODE_20866D
+	
 	LDX.b #$2C
 CODE_208667:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	DEX
 	BNE.b CODE_208667
+	
 CODE_20866D:
-	JSL.l CODE_2A82EA
-	JSR.w CODE_20801F
+	JSL.l SNES_DisplayLevelStartLetters
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
+	
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	JSL.l SMB3_UploadMusicBank_Level
 	INC.w !RAM_SMB3_Global_LoadOverworldMusicBank
+	
 	BRA.b CODE_208683
 
 CODE_208680:
@@ -774,12 +817,14 @@ CODE_208683:
 	LDA.l $7E3955
 	INC
 	STA.l $7E3955
+	
+;PRG030_88C8
 CODE_208691:
 	STZ.b $12
 	STZ.w $0210
 	STZ.w $0211
 	STZ.b $13
-	STZ.w $0216
+	STZ.w !Vert_Scroll
 	STZ.w $0217
 	STZ.b $23
 	STZ.b $24
@@ -791,17 +836,22 @@ CODE_208691:
 	STZ.b $00
 	LDX.b #$0500>>8
 	STX.b $01
+	
+	; Going to clear memory from $9D to $01
 	LDY.b #$9D
 CODE_2086BD:
 	STA.b ($00),y
 	DEY
 	BNE.b CODE_2086BD
+	
 	STA.b ($00),y
 	LDA.b !RAM_SMB3_Overworld_Load2PlayerBattleFlag
 	BEQ.b CODE_2086F7
+;SNES: new \ 
 	LDA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
 	CMP.b #$BC
 	BEQ.b CODE_2086F7
+;/
 	LDA.b #$12
 	STA.w !RAM_SMB3_Global_TilesetFromHeader
 	JSR.w CODE_2095D4
@@ -822,6 +872,7 @@ CODE_2086E5:
 	STA.b !RAM_SMB3_Level_LevelDataPtrBank
 	BRA.b CODE_2086FB
 
+;PRG030_891A
 CODE_2086F7:
 	JSL.l CODE_29BF84
 CODE_2086FB:
@@ -834,7 +885,7 @@ CODE_2086FB:
 	STA.w !RAM_SMB3_Global_CurrentWorld
 	JMP.w CODE_2080B9
 
-CODE_208710:
+CODE_208710: ; PRG030_893F
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
 	LDA.w DATA_21C975,y
 	STA.w $0739
@@ -853,13 +904,15 @@ CODE_208710:
 	LDA.b #SMB3_LevelData_ToadHouse_Sprite_Main>>16
 	STA.b !RAM_SMB3_Level_SpriteDataPtrBank
 	STA.w !RAM_SMB3_Level_PreviousSpriteDataBank
-CODE_20873C:
+	
+CODE_20873C: ; PRG030_8964
 	LDY.b #$7F
 	LDA.b #$00
 CODE_208740:
 	STA.w !RAM_SMB3_Level_ItemMemoryBits,y
 	DEY
 	BPL.b CODE_208740
+	
 	LDY.b #$80
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_DisableScrollingFlag
@@ -867,21 +920,28 @@ CODE_20874D:
 	STA.w !RAM_SMB3_Level_Player_XPosHi,y
 	DEY
 	BNE.b CODE_20874D
-CODE_208753:
+	
+CODE_208753: ; PRG030_897B
 	STZ.w !RAM_SMB3_Level_ShakeLayer1YOffset
+	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	CMP.b #$10
 	BEQ.b CODE_208777
 	CMP.b #$11
 	BEQ.b CODE_208777
-	JSL.l SMB3_LoadLevelRoutine_Main
+	
+	JSL.l SMB3_LoadLevelRoutine_Main ; LevelLoad_ByTileset
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 	JSR.w SMB3_SetMap16TileAttributeDataTable_Main
+	
 	LDA.b #$26
 	STA.w $0612
+	
+;SNES: new \ 
 	STZ.b $01
 	LDA.b #$FF
 	STA.b $00
+;/
 CODE_208777:
 	JSR.w CODE_20FA18
 	JSL.l SMB3_ResetSpriteOAMRt_Main
@@ -918,11 +978,11 @@ CODE_20878C:							; Note: Sliding Picture spade game code start
 	LDA.b #$00
 	STA.l $7E3955
 	STA.w !RAM_SMB3_SlidingPictureGame_CurrentState
-	JSL.l CODE_29C794
+	JSL.l SNES_Setup_PalData
 	JSL.l CODE_29E29D
 	LDA.b #$02
 	STA.w $0427
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.b #$C0
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
 	JMP.w CODE_208F6A
@@ -965,12 +1025,12 @@ CODE_208811:
 	STA.w $021B
 	LDA.b #$00
 	STA.l $7E3955
-	JSL.l CODE_29C794
+	JSL.l SNES_Setup_PalData
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	JSL.l CODE_29E29D
 CODE_20885B:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l SMB3_ProcessCardFlipSpadeGame_Main
 	JSL.l CODE_29EAA5
 	LDA.b $14
@@ -1001,13 +1061,17 @@ CODE_208889:
 	STA.w !RAM_SMB3_Global_ColorMathInitialSettingsMirror
 	LDA.b #$20
 	STA.w !RAM_SMB3_Global_ColorMathSelectAndEnableMirror
-	LDX.b #$17
-	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
+	
+; bg3 settings begin
+	
+	LDX.b #$17		
+	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader 
 	CMP.b #$01
 	BEQ.b CODE_2088AD
 	CMP.b #$07
 	BNE.b CODE_2088C3
 CODE_2088AD:
+;L3 BG1,7
 	STX.w !RAM_SMB3_Global_MainScreenLayersMirror
 	JSL.l CODE_22E134
 	STZ.w $021A
@@ -1017,16 +1081,22 @@ CODE_2088AD:
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
 	BRA.b CODE_2088DD
 
+;;;
+	
 CODE_2088C3:
 	CMP.b #$06
 	BNE.b CODE_2088D0
+;L3 BG6
 	STX.w !RAM_SMB3_Global_MainScreenLayersMirror
 	JSL.l CODE_22E499
 	BRA.b CODE_2088DD
 
+;;;
+	
 CODE_2088D0:
 	CMP.b #$05
 	BNE.b CODE_2088F6
+;L3 BG5
 	LDX.b #$17
 	STX.w !RAM_SMB3_Global_MainScreenLayersMirror
 	JSL.l CODE_22E483
@@ -1042,36 +1112,49 @@ CODE_2088EE:
 	LDA.b #$13
 	STA.w !RAM_SMB3_Global_SubScreenLayersMirror
 	JMP.w CODE_208982
+	
+;;;
 
 CODE_2088F6:
 	CMP.b #$02
 	BNE.b CODE_208901
+;L3 BG2: clouds for overworld
 	JSL.l CODE_22E2E4
 	JMP.w CODE_208982
+	
+;;;
 
 CODE_208901:
 	CMP.b #$0E
 	BNE.b CODE_20890B
 	JSL.l CODE_22E5AC
 	BRA.b CODE_208982
+	
+;;;
 
 CODE_20890B:
 	CMP.b #$09
 	BNE.b CODE_208915
 	JSL.l CODE_22E4D1
 	BRA.b CODE_208935
+	
+;;;
 
 CODE_208915:
 	CMP.b #$0F
 	BNE.b CODE_20891F
 	JSL.l CODE_22E64D
 	BRA.b CODE_208935
+	
+;;;
 
 CODE_20891F:
 	CMP.b #$0A
 	BNE.b CODE_208929
 	JSL.l CODE_22E3E5
 	BRA.b CODE_208935
+	
+;;;
 
 CODE_208929:
 	CMP.b #$0C
@@ -1085,6 +1168,8 @@ CODE_208935:
 	LDA.b #$06
 	STA.w !RAM_SMB3_Global_SubScreenLayersMirror
 	BRA.b CODE_208982
+	
+;;;
 
 CODE_208941:
 	CMP.b #$0D
@@ -1094,6 +1179,8 @@ CODE_208941:
 	LDA.b #$01
 	STA.w $021B
 	BRA.b CODE_208982
+	
+;;;
 
 CODE_208953:
 	CMP.b #$03
@@ -1102,14 +1189,16 @@ CODE_208953:
 	BEQ.b CODE_20896F
 	CMP.b #$08
 	BNE.b CODE_208982
-	JSL.l CODE_22E4B1
+;L3 BG8
+	JSL.l CODE_22E4B1 
 	LDA.b #$24
 	STA.w !RAM_SMB3_Global_ColorMathSelectAndEnableMirror
 	LDA.b #$13
 	STA.w !RAM_SMB3_Global_SubScreenLayersMirror
 	BRA.b CODE_208982
-
+	
 CODE_20896F:
+;L3 BG3,4, airship clouds (layer 2)
 	JSL.l CODE_22E338
 	LDA.b #$22
 	STA.w !RAM_SMB3_Global_ColorMathSelectAndEnableMirror
@@ -1117,6 +1206,10 @@ CODE_20896F:
 	STA.w !RAM_SMB3_Global_MainScreenLayersMirror
 	LDA.b #$15
 	STA.w !RAM_SMB3_Global_SubScreenLayersMirror
+
+;;;
+;end layer 3 background check	
+
 CODE_208982:
 	LDA.b #$02
 	JSR.w CODE_2095D5
@@ -1130,60 +1223,64 @@ CODE_208982:
 	INC.b $24
 	DEC.b $23
 	DEC.b $23
-	JSR.w CODE_209C85
+	JSR.w Scroll_Dirty_Update
 	LDA.b #$40
 	STA.w $0612
-	JSL.l CODE_2AB48E
+	JSL.l CODE_2AB48E ; Background copy to VRAM
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	CMP.b #$0F
 	BNE.b CODE_2089BA
 	JMP.w CODE_208A48
 
 CODE_2089BA:
-	JSL.l SMB3_BufferSpriteListData_Main
+	JSL.l SMB3_BufferSpriteListData_Main ; 
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $073D,x
 	BNE.b CODE_2089D6
 	LDA.w !RAM_SMB3_Global_OpenReserveBoxFlag
 	BNE.b CODE_2089D9
-	LDA.w $0414
+	LDA.w !Level_JctCtl
 	BNE.b CODE_2089D9
 	LDA.w DATA_21C976
 	STA.w $0739
 CODE_2089D6:
 	JMP.w CODE_208A48
 
-CODE_2089D9:
+CODE_2089D9: ; PRG030_8B51
 	LDA.l $7E398C
 	STA.w $0210
 	STA.w $0212
 	LDA.l $7E398B
 	STA.b $12
 	STA.w $0211
+	
 	LSR
 	STA.w $0213
 	ROR.w $0212
 	LDA.l $7E398E
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDA.l $7E398D
 	STA.b $13
 	STA.w $0217
 	REP.b #$20
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
 	SEP.b #$20
+	
 	STZ.w !RAM_SMB3_Global_OpenReserveBoxFlag
-	STZ.w $0414
+	STZ.w !Level_JctCtl
+	
+;SNES: new \ 
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
-	CMP.b #$02
+	CMP.b #$02 ; airship clouds
 	BEQ.b CODE_208A2A
-	CMP.b #$23
+	CMP.b #$23 ; airship clouds
 	BNE.b CODE_208A2F
 CODE_208A2A:
 	LDA.b #$40
@@ -1199,9 +1296,12 @@ CODE_208A37:
 CODE_208A3D:
 	LDA.w $034F
 	BEQ.b CODE_208A48
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $0218
 CODE_208A48:
+;/
+
+;PRG030_8B6D
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $073D,x
 	BEQ.w CODE_208A53
@@ -1211,7 +1311,7 @@ CODE_208A53:
 	STZ.w !RAM_SMB3_Global_CurrentRasterEffect
 	LDA.b #$00
 	STA.l $7E3955
-	JSL.l CODE_29C794
+	JSL.l SNES_Setup_PalData
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	LDA.w $0713
@@ -1231,20 +1331,20 @@ CODE_208A75:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_208A94
 	LDY.w $0376
-	LDA.w DATA_21823C,y
+	LDA.w Tile_Mem_AddrVL,y
 	STA.b $2E
-	LDA.w DATA_21824C,y
+	LDA.w Tile_Mem_AddrVH,y
 	STA.b $2F
 	JMP.w CODE_208A9E
 
 CODE_208A94:
-	LDA.w DATA_218200
+	LDA.w Tile_Mem_Addr
 	STA.b $2E
-	LDA.w DATA_218200+$01
+	LDA.w Tile_Mem_Addr+$01
 	STA.b $2F
 CODE_208A9E:
 	STZ.w $1044
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	BEQ.b CODE_208AB0
 	LDA.b $2E
 	CLC
@@ -1254,7 +1354,7 @@ CODE_208A9E:
 CODE_208AB0:
 	LDY.b #$04
 CODE_208AB2:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CMP.w DATA_21CDDE,y
 	BEQ.b CODE_208ABD
 	DEY
@@ -1366,7 +1466,7 @@ CODE_208B93:
 	CMP.b #$25
 	BNE.b CODE_208BAB
 CODE_208BAB:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	INC.w !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	INC.w !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	LDA.w !RAM_SMB3_Global_ScreenDisplayRegisterMirror
@@ -1376,7 +1476,7 @@ CODE_208BAB:
 	LDA.b #$0F
 	STA.w !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 CODE_208BC3:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l CODE_2AFA63
 	JSL.l CODE_239344
 	LDA.w $1050
@@ -1395,6 +1495,7 @@ CODE_208BE0:
 	BEQ.b CODE_208BED
 	JMP.w CODE_208CC0
 
+;PRG030_8CDE
 CODE_208BED:								; Note: Spade game intro code start
 	STZ.w $0211
 	LDA.b #$15
@@ -1414,8 +1515,10 @@ endif
 	STA.w $070B
 	LDA.b #$35
 	STA.w $070C
+	
 	LDA.b #$A0
 	STA.b $97
+	
 	LDA.b #$78
 	STA.b $95
 	STA.b $96
@@ -1427,8 +1530,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) == $00
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 endif
+;BonusGame_Loop
 CODE_208C2B:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l SMB3_ProcessSpadeGameIntro_Main
 	JSL.l CODE_29E7AA
 	LDA.b $14
@@ -1450,7 +1554,7 @@ CODE_208C50:
 	JSL.l CODE_29E2B6
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	LDA.w $069A
 	BEQ.b CODE_208CBA
@@ -1496,7 +1600,7 @@ CODE_208CAF:
 	DEY
 	CPY.b #$FF
 	BNE.b CODE_208CAF
-	JMP.w CODE_208753
+	JMP.w CODE_208753 ;
 
 CODE_208CBA:
 	STZ.w $069A
@@ -1545,16 +1649,17 @@ endif
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
 	CPY.b #$05
 	BNE.b CODE_208CE5
-	LDA.w DATA_21C98E
+	LDA.w PlantInfest_ACnt_MaxConst
 	STA.w $1E9F
 CODE_208CE5:
 if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) == $00
 	LDA.w $034D
-	BEQ.b CODE_208CEE
+	BEQ.b Level_MainLoop
 	JSL.l CODE_2A841C
 endif
-CODE_208CEE:
-	JSR.w CODE_20801F
+Level_MainLoop:
+;level spinning
+	JSR.w GraphicsBuf_Prep_And_WaitVSync	;enter spinning
 	LDA.w $1206
 	CMP.b #!Define_SMB3_LevelMusic_ToadHouse
 	BEQ.b CODE_208D05
@@ -1567,7 +1672,10 @@ CODE_208D05:
 	STZ.w !RAM_SMB3_Global_MusicRegisterBackup
 CODE_208D08:
 	LDA.w !RAM_SMB3_Level_FreezeTimeLimitFlag
-	BMI.b CODE_208D4F
+	BMI.b CODE_208D4F	
+	
+	;begin animations
+	
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
 	CPY.b #$05
 	BNE.b CODE_208D36
@@ -1582,7 +1690,7 @@ CODE_208D08:
 	STA.b $1B
 CODE_208D27:
 	TAY
-	LDA.w DATA_21C98F,y
+	LDA.w PlantInfest_PatTablePerACnt,y
 	STA.w $0245
 	STZ.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 CODE_208D31:
@@ -1592,6 +1700,9 @@ CODE_208D31:
 CODE_208D36:
 	CPY.b #$07
 	BEQ.b CODE_208D4F
+	
+	; NOT TOAD HOUSE
+	
 	LDA.w !RAM_SMB3_Level_PSwitchTimer
 	BEQ.b CODE_208D51
 	BPL.b CODE_208D49
@@ -1599,7 +1710,7 @@ CODE_208D36:
 	LDA.b #$7F
 	STA.w !RAM_SMB3_Level_PSwitchTimer
 CODE_208D49:
-	STZ.w $0245
+	STZ.w $0245	; do pswitch frame
 	JSR.w SMB3_LevelTileAnimations_Main
 CODE_208D4F:
 	BRA.b CODE_208D90
@@ -1607,8 +1718,11 @@ CODE_208D4F:
 CODE_208D51:
 	CPY.b #$0A
 	BNE.b CODE_208D77
+	
+	; AIRSHIP ONLY
+	
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
-	CMP.b #$15
+	CMP.b #$15	;if airship?
 	BNE.b CODE_208D90
 	LDY.w $0246
 	LDA.b !RAM_SMB3_Global_FrameCounter
@@ -1626,20 +1740,28 @@ CODE_208D72:
 	BRA.b CODE_208D90
 
 CODE_208D77:
+
+	; REGULAR LEVEL ANIMATIONS
+
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$18
 	LSR
 	LSR
 	LSR
 	TAX
-	LDA.w DATA_21C9DF,x
+	LDA.w PT2_Anim,x
+;SNES: new \ 
 	CMP.w $0245
 	BEQ.b CODE_208D8A
 	STZ.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 CODE_208D8A:
+; /
 	STA.w $0245
-	JSR.w SMB3_LevelTileAnimations_Main
+	JSR.w SMB3_LevelTileAnimations_Main ; SNES: new
 CODE_208D90:
+
+	; End of animations...
+
 	LDA.l !SRAM_SMAS_Global_EnableSMASDebugModeFlag
 	BEQ.b CODE_208DB3
 	LDA.b !RAM_SMB3_Global_ControllerPress2P1
@@ -1717,24 +1839,34 @@ CODE_208E25:
 	JSL.l CODE_29EBF7
 	JMP.w CODE_208CE5
 
+;PRG030_8EAD
 CODE_208E35:
+	; Not paused!
+	
 	LDA.b !RAM_SMB3_Level_Player_DeathState
 	BNE.b CODE_208E5F
+	
 	LDY.b $25
+	
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_208E4B
-	LDA.w $0216
+	
+	LDA.w !Vert_Scroll
 	AND.b #$F0
 	ORA.b $13
 	STA.b $B7
+	
 	BRA.b CODE_208E52
 
 CODE_208E4B:
 	LDA.w $0210
 	STA.b $B7
 	LDA.b $12
+	
 CODE_208E52:
-	JSL.l CODE_2097BA
+	JSL.l Scroll_Update_Ranges
+	
+;SNES: new \
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BNE.b CODE_208E5F
 	DEC.b $24
@@ -1757,10 +1889,17 @@ CODE_208E73:
 CODE_208E7B:
 	PLA
 	STA.b $B7
-	LDA.w $0414
+	
+; SNES: new/
+	
+	LDA.w !Level_JctCtl
 	BEQ.b CODE_208EE6
+	
+	; Level junction!
+
+;SNES: new \ 
 	LDA.w $034E
-	BEQ.b CODE_208EDB
+	BEQ.b CODE_208EDB			
 	LDY.b #$08
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	BNE.b CODE_208E90
@@ -1772,7 +1911,7 @@ CODE_208E90:
 	STZ.w $0781
 	STZ.w $0780
 CODE_208E9C:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JMP.w CODE_208EBA
 
 CODE_208EA2:
@@ -1791,10 +1930,10 @@ CODE_208EAB:
 
 CODE_208EBA:
 	JSL.l SMB3_ResetSpriteOAMRt_Main
-	JSL.l CODE_20E237
-	JSL.l CODE_278FC1
+	JSL.l Player_Draw
+	JSL.l Objects_HandleScrollAndUpdate
 	JSL.l CODE_27BE7E
-	JSL.l CODE_27B299
+	JSL.l Gameplay_UpdateAndDrawMisc
 	JSL.l CODE_27DCA1
 	LDA.w $034E
 	CMP.b #$20
@@ -1802,25 +1941,29 @@ CODE_208EBA:
 	STZ.b $9C
 CODE_208EDB:
 	STZ.w $034E
-	JSL.l CODE_29C794
-	JML.l CODE_29DFAD
+	JSL.l SNES_Setup_PalData
+;/
+	JML.l HandleLevelJunction
 
 CODE_208EE6:
+
+;	; Not junctioning...
+
 	JSL.l SMB3_ResetSpriteOAMRt_Main
-	JSL.l CODE_209D1F
+	JSL.l Scroll_Update
 	STZ.w $0781
 	STZ.w $0780
-	JSL.l CODE_23BFA7
+	JSL.l Player_DoGameplay
 	LDA.b !RAM_SMB3_Level_Player_DeathState
 	CMP.b #$03
 	BEQ.b CODE_208F17
-	JSL.l CODE_278FC1
+	JSL.l Objects_HandleScrollAndUpdate
 	JSL.l CODE_27BE7E
-	JSL.l CODE_27B299
+	JSL.l Gameplay_UpdateAndDrawMisc
 	JSL.l CODE_27DCA1
 	LDA.w !RAM_SMB3_Level_RunScrollSpritesFlag
 	BEQ.b CODE_208F17
-	JSL.l CODE_278500
+	JSL.l AutoScroll_Do
 CODE_208F17:
 	LDA.b $14
 	BEQ.b CODE_208F26
@@ -1829,7 +1972,7 @@ CODE_208F17:
 	STA.w $0747,x
 	STZ.w $07BE
 CODE_208F26:
-	JSL.l CODE_278000
+	JSL.l BlockChange_Do
 	LDA.w $0380
 	CMP.b #$FF
 	BNE.b CODE_208F51
@@ -1857,7 +2000,7 @@ CODE_208F57:
 	LDA.b #$01
 	STA.w $074A,x
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 endif
 	JSL.l CODE_29E2B6
 CODE_208F6A:
@@ -1865,7 +2008,7 @@ CODE_208F6A:
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 CODE_208F76:
 	STZ.w $0728
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
@@ -1918,7 +2061,7 @@ CODE_208FC2:
 	JSL.l CODE_29C6FA
 	LDA.b #$00
 	STA.l $7E3955
-	JSL.l CODE_29C794
+	JSL.l SNES_Setup_PalData
 	LDA.b #$80
 	STA.w !REGISTER_ScreenDisplayRegister
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
@@ -1962,7 +2105,7 @@ CODE_208FC2:
 	SEP.b #$20
 	JSL.l CODE_29E29D
 CODE_209053:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l CODE_29C280
 	LDA.b $14
 	BEQ.b CODE_209053
@@ -1971,7 +2114,7 @@ CODE_209053:
 	LDA.b #$03
 	STA.w !RAM_SMB3_Global_MosaicSizeAndBGEnableMirror
 CODE_209068:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$06
 	BNE.b CODE_20907B
@@ -2043,32 +2186,43 @@ CODE_2090D8:
 	LDA.w !RAM_SMB3_Overworld_ActiveMusicBoxFlag
 	BEQ.b CODE_2090EC
 	DEC.w !RAM_SMB3_Overworld_ActiveMusicBoxFlag
-CODE_2090EC:
+CODE_2090EC: ; PRG030_90C4:
 	LDY.b #$06
 	LDA.w $0713
 	BNE.b CODE_20914A
+	
+		; Player did not die...
+	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	CMP.b #$0F
 	BCS.b CODE_209142
 	CMP.b #$07
 	BEQ.b CODE_209142
+	
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
+	
 	LDA.l $7E397D,x
 	STA.l $7E396A
 	LDA.l $7E397F,x
 	STA.l $7E396B
 	LDA.l $7E3981,x
 	STA.l $7E396C
+	
 	LDA.l $7E3975,x
 	STA.l $7E397D,x
+	
 	LDA.l $7E3977,x
 	STA.l $7E397F,x
+	
 	LDA.l $7E3979,x
 	STA.l $7E3981,x
+	
 	LDA.w $0722,x
 	STA.l $7E3985,x
+	
 	LDA.w $0724,x
 	STA.l $7E3987,x
+	
 	JMP.w CODE_209164
 
 CODE_209142:
@@ -2222,7 +2376,7 @@ CODE_2092A2:
 	LDA.w $0722,y
 	STA.b $B7
 	LDA.w $0724,y
-	JSL.l CODE_2097BA
+	JSL.l Scroll_Update_Ranges
 	LDA.b $24
 	STA.b $23
 	STZ.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
@@ -2238,7 +2392,7 @@ CODE_2092A2:
 	JSR.w CODE_2095D5
 	LDA.w !RAM_SMB3_Overworld_EnableDarknessFlag
 	BNE.b CODE_2092E2
-	JSR.w CODE_209C85
+	JSR.w Scroll_Dirty_Update
 CODE_2092E2:
 	JSR.w CODE_20957E
 	JSL.l CODE_2A8B4B
@@ -2249,7 +2403,7 @@ CODE_2092E2:
 	LDA.w $0724,y
 	STA.b $12
 	STA.w $0211
-	JSL.l CODE_2097BA
+	JSL.l Scroll_Update_Ranges
 	LDA.w $0728
 	BNE.b CODE_209347
 	JSL.l CODE_238000
@@ -2281,11 +2435,11 @@ CODE_20933F:
 	JSL.l CODE_2AF867
 CODE_209347:
 	LDA.b #$EF
-	STA.w $0216
+	STA.w !Vert_Scroll
 	STZ.w $021B
 	LDA.b #$C0
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
-	JSL.l CODE_29C794
+	JSL.l SNES_Setup_PalData
 	LDA.b #$01
 	STA.w !RAM_SMB3_Global_SpecialLayerBGModeAndTileSizeSettingMirror
 	LDA.b #$11
@@ -2354,7 +2508,7 @@ CODE_2093BE:
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	STA.w !REGISTER_ScreenDisplayRegister
 CODE_2093DD:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 	JSL.l CODE_23840D
 	LDA.w $0728
@@ -2436,7 +2590,7 @@ CODE_209473:
 	LDA.b #$20
 	STA.w !RAM_SMB3_Global_ColorMathSelectAndEnableMirror
 	JSL.l SMB3_BattleMode_LoadSpriteGFX_Main
-	JSR.w CODE_209C85
+	JSR.w Scroll_Dirty_Update
 	JSL.l CODE_2AB48E
 	LDA.b #$C0
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
@@ -2444,14 +2598,14 @@ CODE_209473:
 	STA.w !RAM_SMB3_Global_CurrentRasterEffect
 	LDA.b #!Define_SMB3_LevelMusic_HammerBroEncounter
 	STA.w !RAM_SMB3_Global_MusicRegisterBackup
-	JSL.l CODE_29C794
+	JSL.l SNES_Setup_PalData
 	LDA.b #$00
 	STA.l $7E3955
 	JSL.l CODE_29E29D
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 CODE_2094AF:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.w !RAM_SMB3_Global_MusicRegisterBackup
 	BEQ.b CODE_2094BD
 	STA.w !RAM_SMB3_Global_MusicCh1
@@ -2466,7 +2620,7 @@ CODE_2094BD:
 	STA.w !RAM_SMB3_Global_MusicCh1
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDX.w $078C
 	DEX
 	CPX.w !RAM_SMB3_Level_Player_CurrentCharacter
@@ -2822,7 +2976,8 @@ CODE_209737:
 
 ;--------------------------------------------------------------------
 
-CODE_209744:
+;CODE_209744
+BoxOut_PutPatternInStrip:
 	JSR.w CODE_2096BC
 	JSR.w CODE_2096E8
 	LDA.b #$7E2000>>16
@@ -2830,16 +2985,16 @@ CODE_209744:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_209763
 	LDY.w $0376
-	LDA.w DATA_21823C,y
+	LDA.w Tile_Mem_AddrVL,y
 	STA.b $2E
-	LDA.w DATA_21824C,y
+	LDA.w Tile_Mem_AddrVH,y
 	STA.b $2F
 	JMP.w CODE_20976D
 
 CODE_209763:
-	LDA.w DATA_218200
+	LDA.w Tile_Mem_Addr
 	STA.b $2E
-	LDA.w DATA_218200+$01
+	LDA.w Tile_Mem_Addr+$01
 	STA.b $2F
 CODE_20976D:
 	LDA.w $1051
@@ -2847,27 +3002,32 @@ CODE_20976D:
 	BEQ.b CODE_209776
 	INC.b $2F
 CODE_209776:
+
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAY
-	LDA.w CODE_21CE5A,y
+	LDA.w TileLayout_ByTileset,y
 	STA.b $0C
-	LDA.w CODE_21CE5A+$01,y
+	LDA.w TileLayout_ByTileset+$01,y
 	STA.b $0D
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
-	LDA.w CODE_21CE80,y
+	LDA.w SNES_TileLayout_ByTileset_Bank,y
 	STA.b $0E
-	LDY.w $1054
-	LDA.b [$2E],y
+	
+	LDY.w $1054	
+	LDA.b [$2E],y ; tile
+	
 	REP.b #$30
 	AND.w #$00FF
 	ASL
 	ASL
 	ASL
 	TAY
+	
 	TXA
 	AND.w #$00FF
 	TAX
+	
 	LDA.w $1055
 	AND.w #$00FF
 	ASL
@@ -2876,6 +3036,7 @@ CODE_209776:
 	CLC
 	ADC.b $00
 	TAY
+	
 	LDA.b [$0C],y
 	STA.w $0382,x
 	STY.b $00
@@ -2885,7 +3046,8 @@ CODE_209776:
 
 ;--------------------------------------------------------------------
 
-CODE_2097BA:
+;CODE_2097BA
+Scroll_Update_Ranges:
 	LDY.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BNE.b CODE_2097D1
 	LDX.b #$03
@@ -3034,17 +3196,20 @@ CODE_20986D:
 
 ;--------------------------------------------------------------------
 
-CODE_209B2A:
+;CODE_209B2A
+LoadLevel_Set_TileMemAddr:
 	LDA.b $0E
 	ASL
 	ASL
 	ASL
 	ASL
 	STA.b $06
+	
 	LDA.b $0F
 	AND.b #$0F
 	ORA.b $06
 	STA.w $0700
+	
 	LDA.b $0F
 	AND.b #$F0
 	LSR
@@ -3053,12 +3218,13 @@ CODE_209B2A:
 	TAX
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_209B57
+	
 	TXA
 	LSR
 	TAX
-	LDA.w DATA_21823C,x
+	LDA.w Tile_Mem_AddrVL,x
 	STA.b $2E
-	LDA.w DATA_21824C,x
+	LDA.w Tile_Mem_AddrVH,x
 	STA.b $2F
 	BRA.b CODE_209B77
 
@@ -3071,9 +3237,9 @@ CODE_209B5C:
 CODE_209B5D:
 	LDA.b #$7E2000>>16
 	STA.w $0030
-	LDA.w DATA_218200,x
+	LDA.w Tile_Mem_Addr,x
 	STA.b $2E
-	LDA.w DATA_218200+$01,x
+	LDA.w Tile_Mem_Addr+$01,x
 	STA.b $2F
 	INC
 	STA.b $04
@@ -3172,7 +3338,7 @@ DATA_209C0C:
 
 ;--------------------------------------------------------------------
 
-SMB3_LoadStaticObjects:
+SMB3_LoadStaticObjects: ; LeveLoad_FixedSizeGens
 .Main:
 ;$209C45
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
@@ -3180,7 +3346,7 @@ SMB3_LoadStaticObjects:
 
 DATA_209C4C:
 	dl SMB3_ProcessOverworldStaticObjects_Main
-	dl CODE_2489EA
+	dl LeveLoad_FixedSizeGen_TS1
 	dl CODE_26895F
 	dl CODE_24AEF3
 	dl CODE_24E75A
@@ -3201,14 +3367,16 @@ DATA_209C4C:
 
 ;--------------------------------------------------------------------
 
-CODE_209C85:
+;CODE_209C85
+Scroll_Dirty_Update:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BNE.b CODE_209CC1
+	
 	LDX.b $25
 	LDA.w $0210
 	STA.b $26,x
 CODE_209C91:
-	JSR.w CODE_209D7A
+	JSR.w Scroll_DoColumn
 	JSL.l CODE_29E953
 	LDX.b $25
 	LDA.b $26,x
@@ -3234,16 +3402,21 @@ CODE_209CB5:
 
 CODE_209CC1:
 	STZ.b $25
+	
 	LDA.b #$E0
-	STA.w $0216
+	STA.w !Vert_Scroll
+	
 	CLC
 	ADC.b #$08
 	STA.b $26
+	
 	LDY.w $0376
 	DEY
 	TYA
 	ORA.b #$E0
-	STA.b $23
+	STA.b !Scroll_VOffsetT
+	
+;SNES:new\
 	LDA.w $0376
 	BEQ.b CODE_209CE8
 	ASL
@@ -3251,46 +3424,69 @@ CODE_209CC1:
 	ASL
 	ASL
 	STA.b $06
-	LDA.b $23
+	LDA.b !Scroll_VOffsetT
 	SEC
 	SBC.b $06
-	STA.b $23
+	STA.b !Scroll_VOffsetT
+;SNES:new/
+	
 CODE_209CE8:
-	JSR.w CODE_209E43
-	JSR.w CODE_209E73
-	JSL.l CODE_29EA32
-	LDA.w $0216
+	JSR.w VScroll_CalcPatternVRAMAddr
+	JSR.w VScroll_DoPatternAndAttrRow
+	JSL.l Scroll_ToVRAM_Apply
+	
+	LDA.w !Vert_Scroll
 	CLC
 	ADC.b #$08
-	STA.w $0216
+	STA.w !Vert_Scroll
+	
+;SNES:new, reordering logic\
+
+
 	AND.b #$08
-	BNE.b CODE_209D12
-	LDA.b $23
+	BNE.b CODE_209D12 ;  If only halfway vertically through tile row, jump to PRG030_9B66
+	
+	; Otherwise, go to next row
+	
+	LDA.b !Scroll_VOffsetT
 	CLC
 	ADC.b #$10
-	STA.b $23
-	AND.b #$F0
-	BNE.b CODE_209D12
-	INC.b $23
+	STA.b !Scroll_VOffsetT
+	
+	; SNES: dropping down for check?
+	
+	AND.b #$F0 ; not CMP 
+	BNE.b CODE_209D12 ; If not changing to new screen, jump to PRG030_9B59
+	
+	INC.b !Scroll_VOffsetT
+	
+	; Loop vertical offset to new screen
+	
 	LDA.b #$0F
-	AND.b $23
-	STA.b $23
+	AND.b !Scroll_VOffsetT
+	STA.b !Scroll_VOffsetT
+	
+;SNES:new/
+	
 CODE_209D12:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CMP.b #$D0
 	BNE.b CODE_209CE8
-	STZ.w $0216
+	
+	STZ.w !Vert_Scroll
 	STZ.b $26
+	
 	RTS
 
 ;--------------------------------------------------------------------
 
 ; Note: Seems scrolling related.
 
-CODE_209D1F:
+;CODE_209D1F
+Scroll_Update:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_209D28
-	JSR.w CODE_209D63
+	JSR.w CODE_209D63 ; f this is a vertical scroller world, jump to PRG030_9BB2
 	RTL
 
 CODE_209D28:
@@ -3299,51 +3495,71 @@ CODE_209D28:
 	AND.b #$F8
 	CMP.b $26,x
 	BEQ.b CODE_209D5A
+	
 	TAY
+	
 	LDA.w $0612
 	BNE.b CODE_209D4C
+	
 	LDA.w $0210
 	AND.b #$07
+	
 	CPX.b #$00
 	BNE.b CODE_209D48
+	
 	CMP.b #$02
 	BCS.b CODE_209D4C
+	
 	BRA.b CODE_209D5A
 
 CODE_209D48:
+
+
 	CMP.b #$05
 	BCS.b CODE_209D5A
+	
 CODE_209D4C:
 	STY.b $26,x
+	
 	LDA.b $25
 	EOR.b #$01
 	TAX
 	LDA.b #$FF
 	STA.b $26,x
-	JSR.w CODE_209D7A
+	
+	JSR.w Scroll_DoColumn
 CODE_209D5A:
-	LDA.w $0707
+	LDA.w !Scroll_UpdAttrFlag
 	BEQ.b CODE_209D62
+	
 	JSR.w CODE_209E42
 CODE_209D62:
 	RTL
 
+;PRG030_9BB2
 CODE_209D63:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	AND.b #$F8
 	CMP.b $26
 	BEQ.b CODE_209D79
-	LDA.w $0216
+	
+	LDA.w !Vert_Scroll
 	AND.b #$F8
 	STA.b $26
-	JSR.w CODE_209E43
-	JSR.w CODE_209E73
+;VScroll_PageAndDoPatAttrRow
+	JSR.w VScroll_CalcPatternVRAMAddr
+	JSR.w VScroll_DoPatternAndAttrRow
 CODE_209D79:
 	RTS
 
-CODE_209D7A:
-	LDA.b #$FF
+;CODE_209D7A
+Scroll_DoColumn:
+;SNES: new\
+	LDA.b #$FF ; trigger DMA update?
 	STA.l $7F2000
+;SNES: new/
+
+
 	LDX.b $25
 	LDA.b $26,x
 	AND.b #$08
@@ -3355,6 +3571,7 @@ CODE_209D7A:
 	AND.b #$0F
 	CPX.b #$00
 	BNE.b CODE_209D9A
+	
 	CMP.b #$04
 	BCS.b CODE_209D9E
 	BRA.b CODE_209DA3
@@ -3362,20 +3579,28 @@ CODE_209D7A:
 CODE_209D9A:
 	CMP.b #$0C
 	BCS.b CODE_209DA3
+	
 CODE_209D9E:
+
 	LDA.b #$01
-	STA.w $0707
+	STA.w !Scroll_UpdAttrFlag
+	
 CODE_209DA3:
+;SNES: new\
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
-	LDA.w CODE_21CE80,y
+	LDA.w SNES_TileLayout_ByTileset_Bank,y
 	STA.b $08
+;SNES: new/	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
-	TAY
-	LDA.w CODE_21CE5A,y
+	TAY	
+	
+	LDA.w TileLayout_ByTileset,y
 	STA.b $06
-	LDX.w CODE_21CE5A+$01,y
+	
+	LDX.w TileLayout_ByTileset+$01,y
 	STX.b $07
+	
 	LDX.b $25
 	LDA.b $23,x
 	AND.b #$F0
@@ -3383,84 +3608,111 @@ CODE_209DA3:
 	LSR
 	LSR
 	TAY
+	
+	; Set the address of the tiles we need to modify!
+; SNES:\ set high tile memory
 	LDA.b #$7E2000>>16
 	STA.b $0F
+;SNES:/
 	REP.b #$20
-	LDA.w DATA_218200,y
+	LDA.w Tile_Mem_Addr,y
 	STA.b $0D
-	LDA.w #$001A
+	
+	LDA.w #$001A ; Number of rows to update (NTSC res of 224, two screens tall, is 448 / 16px-per-tile = 26)
 	STA.b $00
 	LDA.b $23,x
 	AND.w #$000F
 	STA.b $09
+	
+	; ins
+	
 	REP.b #$10
 	LDX.w #$0000
+; loop
 CODE_209DE0:
 	LDY.b $09
-	LDA.b [$0D],y
+	LDA.b [$0D],y ; Get tile to display
+	
 	AND.w #$00FF
 	ASL
 	ASL
-	ASL
-	TAY
+	ASL 
+	TAY ; index = tile * 8
+	
+	; check if getting right half of tile instead
 	LDA.b $C2
 	AND.w #$00FF
 	BEQ.b CODE_209DF6
+	
 	INY
 	INY
 	INY
 	INY
+	
+;SNES\
 CODE_209DF6:
-	PHY
-	LDA.b $09
+	PHY ; index into tile8's
+	LDA.b $09 ; scroll value 
 	CLC
 	ADC.w #$2000
 	TAY
-	LDA.b [$0D],y
+	LDA.b [$0D],y ; high number of tile
 	AND.w #$00FF
-	BEQ.b CODE_209E0B
+	BEQ.b CODE_209E0B ; if tile is < $100, branch
 	PLA
 	CLC
 	ADC.w #$0800
 	PHA
 CODE_209E0B:
-	PLY
-	LDA.b [$06],y
+	PLY ; index into tile8's
+;SNES/
+
+	LDA.b [$06],y ; Store the top block for this tile
 	STA.w $0382,x
 	INY
 	INY
-	LDA.b [$06],y
+	LDA.b [$06],y ; Store the bottom block for this tile
 	STA.w $0384,x
+	
 	LDA.b $09
 	CLC
 	ADC.w #$0010
 	STA.b $09
+	
 	INX
 	INX
 	INX
 	INX
 	DEC.b $00
 	BPL.b CODE_209DE0
+	
 	SEP.b #$30
-	LDX.b $25
+;SNES: new/	
+	
+	LDX.b $25	; X = $25
 	LDA.b $23,x
 	AND.b #$0F
 	ASL
 	ORA.b $C2
 	STA.w $0381
+	
+;SNES: new\
 	LDA.b $23,x
 	AND.b #$10
 	BEQ.b CODE_209E3E
 	LDA.b #$04
 CODE_209E3E:
+;SNES: new/	
 	STA.w $0380
 	RTS
 
 CODE_209E42:
 	RTS
 
-CODE_209E43:
+;CODE_209E43
+VScroll_CalcPatternVRAMAddr:
 	REP.b #$20
+	
 	LDX.b $25
 	LDA.b $23,x
 	AND.w #$00F0
@@ -3468,17 +3720,21 @@ CODE_209E43:
 	ASL
 	XBA
 	STA.w $0380
+	
 	SEP.b #$20
+	
 	LDA.b $23,x
 	AND.b #$01
 	BEQ.b CODE_209E62
+	
 	LDA.w $0380
 	EOR.b #$08
 	STA.w $0380
 CODE_209E62:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	AND.b #$08
 	BEQ.b CODE_209E72
+	
 	LDA.w $0381
 	CLC
 	ADC.b #$20
@@ -3486,15 +3742,20 @@ CODE_209E62:
 CODE_209E72:
 	RTS
 
-CODE_209E73:
+;CODE_209E73
+VScroll_DoPatternAndAttrRow:
 	LDX.b $25
+	
 	LDA.b $23,x
 	AND.b #$0F
 	TAY
-	LDA.w DATA_21823C,y
+	
+	LDA.w Tile_Mem_AddrVL,y
 	STA.b $2E
-	LDA.w DATA_21824C,y
+	LDA.w Tile_Mem_AddrVH,y
 	STA.b $2F
+	
+	;SNES: new \
 	REP.b #$20
 	LDA.b $23,x
 	AND.w #$000F
@@ -3506,36 +3767,51 @@ CODE_209E73:
 	ADC.b $2E
 	STA.b $2E
 	SEP.b #$20
+	;SNES: new /
+	
 	LDA.b $23,x
 	AND.b #$F0
 	STA.b $06
+	;SNES: new \
 	STZ.b $07
 	STZ.b $08
 	STZ.b $09
 	REP.b #$30
+	;SNES: new /
+	
 CODE_209EA4:
 	LDY.b $06
-	LDA.b [$2E],y
+	LDA.b [$2E],y ; tile 
 	STA.b $0A
+	
 	INC.b $06
+	
 	SEP.b #$30
-	JSL.l CODE_209EFC
+	JSL.l TileLayout_GetBaseAddr
 	REP.b #$30
+	
+	;SNES: new\
 	TYA
 	AND.w #$00FF
 	ASL
 	ASL
 	ASL
 	TAY
+	;SNES: new/
+	
 	LDX.b $08
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	AND.w #$0008
 	BEQ.b CODE_209EC8
-	INY
+	
+	; next row
+	INY 
 	INY
 CODE_209EC8:
+
+; SNES: new \
 	PHY
-	LDA.b $06
+	LDA.b $06 ; scroll value 
 	DEC
 	CLC
 	ADC.w #$2000
@@ -3549,21 +3825,29 @@ CODE_209EC8:
 	PHA
 CODE_209EDE:
 	PLY
+; SNES: new /
+
 	LDA.b [$0C],y
 	STA.w $0382,x
+	
 	INY
 	INY
 	INY
 	INY
+	
 	LDA.b [$0C],y
 	STA.w $0384,x
+	
 	INX
 	INX
 	INX
 	INX
+	
 	STX.b $08
+	
 	CPX.w #$0040
 	BCC.b CODE_209EA4
+	
 	SEP.b #$30
 	RTS
 
@@ -3574,16 +3858,20 @@ CODE_209EFB:
 
 ;--------------------------------------------------------------------
 
-CODE_209EFC:
+;CODE_209EFC
+TileLayout_GetBaseAddr:
+;SNES: new\
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
-	LDA.w CODE_21CE80,y
+	LDA.w SNES_TileLayout_ByTileset_Bank,y
 	STA.b $0E
+;SNES: new/
+	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w CODE_21CE5A,x
+	LDA.w TileLayout_ByTileset,x
 	STA.b $0C
-	LDA.w CODE_21CE5A+$01,x
+	LDA.w TileLayout_ByTileset+$01,x
 	STA.b $0D
 	LDY.b $0A
 	RTL
@@ -3607,7 +3895,8 @@ CODE_209F16:
 
 ;--------------------------------------------------------------------
 
-CODE_209F2E:
+;CODE_209F2E
+Player_GetTileV:
 	LDA.b $0C
 	PHA
 	TAY
@@ -3615,10 +3904,10 @@ CODE_209F2E:
 	PHA
 	JSL.l CODE_209F86
 	STA.b $0D
-	LDA.w DATA_21823C,y
+	LDA.w Tile_Mem_AddrVL,y
 	STA.b $2E
 	STA.b $D8
-	LDA.w DATA_21824C,y
+	LDA.w Tile_Mem_AddrVH,y
 	STA.b $2F
 	CLC
 	ADC.b #$20
@@ -3639,15 +3928,16 @@ CODE_209F2E:
 	STA.b $0D
 	PLA
 	STA.b $0C
+;SNES: new\
 	LDA.b [$D8],y
 	BEQ.b CODE_209F81
 	PHX
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $DB
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $DC
 	LDA.b [$2E],y
 	TAY
@@ -3656,6 +3946,7 @@ CODE_209F2E:
 	BRA.b CODE_209F83
 
 CODE_209F81:
+;SNES: new/
 	LDA.b [$2E],y
 CODE_209F83:
 	STA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
@@ -3678,7 +3969,8 @@ CODE_209F98:
 
 ;--------------------------------------------------------------------
 
-CODE_209F99:
+;CODE_209F99
+LevelJct_GetVScreenH2:
 	CPY.b #$00
 	BMI.b CODE_209FA4
 	SEC
@@ -3690,90 +3982,126 @@ CODE_209FA4:
 
 ;--------------------------------------------------------------------
 
-CODE_209FA5:
+;CODE_209FA5
+Player_GetTileAndSlope_Normal:
+
+	; Temp_Var13 / Temp_Var14 -- Y Hi and Lo
+	; Temp_Var15 / Temp_Var16 -- X Hi and Lo
+
 	STZ.b $B4
 	STZ.b $B5
 	STZ.b $B6
+	
 	LDA.b $0F
 	LSR
 	LSR
 	LSR
 	LSR
 	STA.b $B2
+	
 	LDA.b $0E
 	AND.b #$0F
 	ASL
 	TAX
-	LDA.w DATA_218200,x
+	
+	; Set Map_Tile_AddrL/H to appropriate screen based on Player's position
+	LDA.w Tile_Mem_Addr,x
 	STA.b $2E
-	LDA.w DATA_218200+$01,x
+	LDA.w Tile_Mem_Addr+$01,x
 	STA.b $2F
-	LDA.w DATA_21821E,x
+	
+;SNES: new\	
+	LDA.w SNESTile_Mem_AddrHi,x
 	STA.b $D8
-	LDA.w DATA_21821E+$01,x
+	LDA.w SNESTile_Mem_AddrHi+$01,x
 	STA.b $D9
-	LDA.b #$7E4000>>16
+	LDA.b #$7E4000>>16 ; bank of high memory
 	STA.b $DA
+;SNES: new/	
+
 	LDA.b $0C
 	BEQ.b CODE_209FD9
+	
 	INC.b $2F
-	INC.b $D9
+	
+	INC.b $D9 ; SNES: new
+	
 CODE_209FD9:
 	LDA.b $0D
 	AND.b #$F0
 	ORA.b $B2
+	
 	STA.b $0B
+	
 	TAY
+	
+;SNES: new\
 	LDA.b [$D8],y
-	BEQ.b CODE_209FFC
+	BEQ.b CODE_209FFC ; for tiles in original range $00-$FF, do original routine
+	
+	; if this tile is >= $100
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $DB
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $DC
-	LDA.b [$2E],y
-	TAY
+	
+	LDA.b [$2E],y ; lower byte of tile
+	TAY ; use as index
 	LDA.b ($DB),y
 	BRA.b CODE_209FFE
+;SNES: new/
 
 CODE_209FFC:
 	LDA.b [$2E],y
 CODE_209FFE:
 	STA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
+	
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
 	CPY.b #$03
 	BEQ.b CODE_20A00B
+	
 	CPY.b #$0E
 	BNE.b CODE_20A039
+	
 CODE_20A00B:
+
 	STZ.b $00
-	LDA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
+	
+	LDA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo ; SNES: new - do not get tile from Map_Tile_Addr
 	STA.b $01
+	
 	AND.b #$C0
 	CLC
 	ROL
 	ROL
 	ROL
 	TAY
+	
 	LDA.b $01
 	CMP.w !RAM_SMB3_Global_Map16FloorTileAttributeTable,y
 	BCC.b CODE_20A039
+	
 	TYA
 	ASL
 	TAX
+	
 	LDA.w DATA_21AAD0,x
 	STA.b $02
 	LDA.w DATA_21AAD0+$01,x
 	STA.b $03
+	
 	LDX.b $00
 	LDA.b $01
 	SEC
 	SBC.w !RAM_SMB3_Global_Map16FloorTileAttributeTable,y
 	TAY
+	
 	LDA.b ($02),y
 	STA.b $B4,x
+	
 CODE_20A039:
 	LDA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
 	RTL
@@ -3937,7 +4265,7 @@ SMB3_BattleMode_BootUpBattleMode:
 	STZ.w $0210
 	STZ.w $0211
 	STZ.b $13
-	STZ.w $0216
+	STZ.w !Vert_Scroll
 	STZ.w $0217
 	STZ.b $23
 	STZ.b $24
@@ -3977,7 +4305,7 @@ CODE_20A2EC:
 	JSL.l SMB3_BattleMode_LoadSpriteGFX_Main
 	LDA.b #$26
 	STA.w $0612
-	JSR.w CODE_209C85
+	JSR.w Scroll_Dirty_Update
 	JSL.l SMB3_BattleMode_LoadGFXTilemapsAndPalette_Main
 	LDA.b #$00
 	STA.l $7E3955
@@ -3992,7 +4320,7 @@ CODE_20A345:
 CODE_20A34E:
 	STA.w !RAM_SMB3_Global_MusicCh1
 CODE_20A351:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 	JSL.l SMB3_BattleMode_ProcessBattleMode_Main
 	LDA.w $0014
@@ -4015,7 +4343,7 @@ CODE_20A37F:
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 CODE_20A387:
 	JSL.l SMB3_BattleMode_ScrollIntoResultsScreen_Main
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.w $0014
 	BNE.b CODE_20A387
 	REP.b #$20
@@ -4048,7 +4376,7 @@ CODE_20A387:
 	JSL.l SMB3_BattleMode_ProcessResultsScreen_Main
 	LDA.l !RAM_SMB3_BattleMode_ResultsScreenCursoPosLo
 	BEQ.b CODE_20A403
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	JML.l SMB3_ResetGame_Main
 else
@@ -4056,7 +4384,7 @@ else
 endif
 
 CODE_20A403:
-	JSR.w CODE_20801F
+	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l SMB3_BattleMode_ScrollIntoBattleScreen_Main
 	LDA.w $0014
 	BNE.b CODE_20A403
@@ -4399,7 +4727,7 @@ CODE_20B582:
 	RTS
 
 CODE_20B583:
-	STZ.w $0216
+	STZ.w !Vert_Scroll
 	STZ.w $0217
 	LDA.b #DATA_2AF1B1
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
@@ -4561,8 +4889,8 @@ CODE_20B687:
 CODE_20B688:
 	LDY.b #$04
 CODE_20B68A:
-	DEC.w $0216
-	LDA.w $0216
+	DEC.w !Vert_Scroll
+	LDA.w !Vert_Scroll
 	BEQ.b CODE_20B696
 	DEY
 	BPL.b CODE_20B68A
@@ -4576,20 +4904,20 @@ CODE_20B696:
 
 CODE_20B69D:
 	REP.b #$20
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w #$0002
-	STA.w $0216
+	STA.w !Vert_Scroll
 	SEP.b #$20
 	INC.b $BC
 	RTS
 
 CODE_20B6AE:
 	REP.b #$20
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CLC
 	ADC.w #$0002
-	STA.w $0216
+	STA.w !Vert_Scroll
 	SEP.b #$20
 	DEC.b $BC
 	DEC.b !RAM_SMB3_TitleScreen_ShakeLayer1Timer
@@ -5625,11 +5953,14 @@ CODE_20BD77:
 	ADC.b #$01
 	CMP.b #$03
 	BCC.b CODE_20BDA6
+	
 	LDA.b !RAM_SMB3_TitleScreen_Mario_MovementDirection,x
 	AND.b $B8,x
 	BEQ.b CODE_20BDA6
+	
 	LDY.b !RAM_SMB3_TitleScreen_Mario_GFXSet,x
 	BEQ.b CODE_20BDA1
+	
 	LDY.b #$01
 CODE_20BDA1:
 	LDA.w DATA_20BB31,y
@@ -6688,6 +7019,7 @@ CODE_20C5A5:
 
 ;--------------------------------------------------------------------
 
+;Rescue_Princess
 SMB3_ProcessPart1OfEnding:
 .Main:
 ;$20C614
@@ -6731,10 +7063,10 @@ SMB3_ProcessPart1OfEnding:
 	LDY.w #SMB3_PaletteMirror[$10].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$10].LowByte>>16,DATA_3CA8C0>>16
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
 	LDA.w #$009F
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #DATA_3C8BE0
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #$001F
@@ -6812,7 +7144,7 @@ CODE_20C749:
 	DEX
 	BNE.b CODE_20C749
 	LDA.b #$EF
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDA.b #$B0
 	STA.w $0218
 	JSR.w SMB3_UploadCurtainTilemap_Main
@@ -7706,7 +8038,7 @@ CODE_20D09D:
 	LSR
 	LSR
 	TAX
-	LDA.w DATA_21C9DF,x
+	LDA.w PT2_Anim,x
 	CMP.w $0245
 	BEQ.b CODE_20D0B0
 	STZ.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
@@ -7744,8 +8076,8 @@ CODE_20D0D7:
 CODE_20D0DC:
 	LDY.b #$01
 CODE_20D0DE:
-	INC.w $0216
-	LDA.w $0216
+	INC.w !Vert_Scroll
+	LDA.w !Vert_Scroll
 	CMP.b #$D0
 	BEQ.b CODE_20D0EC
 	DEY
@@ -7755,7 +8087,7 @@ CODE_20D0DE:
 CODE_20D0EC:
 	INC.b !RAM_SMB3_WorldRollcall_CurrentState
 	LDA.b #$10
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDA.b #$01
 	STA.w $0217
 	STZ.w $0218
@@ -8516,7 +8848,7 @@ endif
 DATA_20E230:
 	db $D0,$D2,$D2,$D4,$D6,$D6,$D2
 
-CODE_20E237:
+Player_Draw:
 	PHX
 	JSL.l CODE_22E000
 	PLX
@@ -8578,7 +8910,7 @@ CODE_20E2A0:
 	BNE.b CODE_20E2BB
 	LDY.w !RAM_SMB3_Level_PSwitchTimer
 	BNE.b CODE_20E2BB
-	LDY.w $1062
+	LDY.w !Level_MusicQueueRestore
 	STY.w !RAM_SMB3_Global_MusicCh1
 CODE_20E2BB:
 	BCS.b CODE_20E2BF
@@ -9204,6 +9536,7 @@ SMB3_GetToadHouseChestItem:
 	SBC.w $0602
 	CMP.b #$04
 	BCS.b CODE_20E853
+	
 	LDY.b #$00
 	LDA.b !RAM_SMB3_Level_Player_XPosLo
 	CMP.b #$60
@@ -9251,7 +9584,7 @@ CODE_20E856:
 	LDA.w !RAM_SMB3_Level_Player_FreezePlayerTimer
 	BEQ.b CODE_20E86C
 	DEC.w !RAM_SMB3_Level_Player_FreezePlayerTimer
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	LDA.w $05FC
 	BEQ.b CODE_20E86B
 	JSL.l CODE_23D10E
@@ -9285,7 +9618,7 @@ CODE_20E88D:
 	LDA.b #$D0
 	STA.w !RAM_SMB3_Level_WarpToCoinHeavenTimer
 	LDA.b #$03
-	STA.w $0414
+	STA.w !Level_JctCtl
 	RTL
 
 CODE_20E8A4:
@@ -9303,7 +9636,7 @@ CODE_20E8AD:
 	JMP.w CODE_20E8C4
 
 CODE_20E8BC:
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	DEC.w !RAM_SMB3_Level_Player_FireFlowerGetPaletteAnimationTimer
 	RTL
 
@@ -9330,7 +9663,7 @@ CODE_20E8D8:
 	PHA
 	LDA.b #$01
 	STA.b !RAM_SMB3_Level_Player_CurrentPowerUp
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	PLA
 	STA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	DEC.w !RAM_SMB3_Level_Player_SizeChangeAnimationTimer
@@ -9347,7 +9680,7 @@ CODE_20E8F3:
 CODE_20E905:
 	LDA.b #$41
 	STA.b $BD
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	LDA.b $A6
 	BNE.b CODE_20E928
 	DEC.w !RAM_SMB3_Level_Player_GoalWalkAnimationTimer
@@ -9392,7 +9725,7 @@ CODE_20E956:
 	CLC
 	ADC.w $055C
 	BCC.b CODE_20E970
-	INC.w $0216
+	INC.w !Vert_Scroll
 	LDA.b $75
 	SEC
 	SBC.b #$01
@@ -9454,7 +9787,7 @@ CODE_20E9BE:
 	LDY.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	LDA.w DATA_21E9E5,y
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	RTS
 
 CODE_20E9CA:
@@ -9468,11 +9801,11 @@ CODE_20E9CD:
 	LDA.b #$EC
 	STA.b !RAM_SMB3_Level_Player_YSpeed
 	JSR.w CODE_20EB60
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CMP.b #$70
 	BCC.b CODE_20E9E7
 	LDA.b #$03
-	STA.w $0414
+	STA.w !Level_JctCtl
 	INC.w !RAM_SMB3_Level_Player_BoardAirshipAnimationState
 CODE_20E9E7:
 	RTS
@@ -9514,7 +9847,7 @@ CODE_20EA22:
 	LDY.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	LDA.w DATA_21E9E5,y
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	JSR.w CODE_20EADC
 	RTL
 
@@ -9542,7 +9875,7 @@ CODE_20EA3F:
 CODE_20EA54:
 	LSR
 	LSR
-	STA.w $0414
+	STA.w !Level_JctCtl
 	CMP.b #$01
 	BNE.b CODE_20EA65
 	INC.b $14
@@ -9720,7 +10053,7 @@ CODE_20EB9D:
 	LDA.w DATA_21E958,y
 CODE_20EBA7:
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	RTS
 
 DATA_20EBAE:
@@ -9851,8 +10184,8 @@ CODE_20EC82:
 CODE_20EC8D:
 	STA.w $0780
 	CLC
-	ADC.w $0216
-	STA.w $0216
+	ADC.w !Vert_Scroll
+	STA.w !Vert_Scroll
 	STA.w $0543
 	LDY.b !RAM_SMB3_Level_Player_YSpeed
 	BPL.b CODE_20ECA4
@@ -9864,7 +10197,7 @@ CODE_20ECA4:
 	BCC.b CODE_20ECBF
 	LDA.b #$EF
 CODE_20ECAA:
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDA.b #$01
 	STA.w $0377
 	LDY.b !RAM_SMB3_Level_Player_YSpeed
@@ -9879,7 +10212,7 @@ CODE_20ECBF:
 	STA.b $09
 	LDA.b #$08
 	STA.b $0A
-	JSL.l CODE_23D2B6
+	JSL.l Player_GetTileAndSlope
 	SEC
 	SBC.b #$B3
 	CMP.b #$02
@@ -9897,17 +10230,17 @@ CODE_20ECDD:
 	BCC.b CODE_20ECE8
 	INC.b !RAM_SMB3_Level_Player_YPosHi
 CODE_20ECE8:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
 	LDA.w $034F
 	BEQ.b CODE_20ED05
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $0218
 CODE_20ED05:
 	RTS
@@ -9967,17 +10300,17 @@ CODE_20ED5A:
 	BCC.b CODE_20ED69
 	INC.w $0542
 CODE_20ED69:
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDY.w $0542
 	STY.w $0217
 	STY.b $13
 	STY.w $0219
 	REP.b #$20
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
@@ -9999,7 +10332,7 @@ CODE_20ED9F:
 	STA.b $09
 	LDA.w DATA_218ACD+$01,y
 	STA.b $0A
-	JSL.l CODE_23D2B6
+	JSL.l Player_GetTileAndSlope
 	STA.b $00
 	SEC
 	SBC.b #$92
@@ -10191,7 +10524,7 @@ CODE_20EEDF:
 CODE_20EEE9:
 	LDA.b #$96
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	RTS
 
 CODE_20EEF2:
@@ -10221,7 +10554,7 @@ CODE_20EF15:
 	STA.b !RAM_SMB3_Level_Player_YSpeed
 	JSL.l CODE_23DEA3
 	JSL.l CODE_23DDBB
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	RTS
 
 CODE_20EF2D:
@@ -10254,7 +10587,7 @@ CODE_20EF4E:
 	STA.w SMB3_OAMBuffer[$01].YDisp,y
 	LDA.w $0070
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	LDA.w $0055
 	SBC.w $0217
 	BPL.b CODE_20EF73
@@ -10462,7 +10795,9 @@ CODE_20F64D:
 
 ;--------------------------------------------------------------------
 
-CODE_20F651:
+;DMA transfers.
+
+SNES_DoGFXDMATransfers:
 	PHB
 	LDA.b #SMB3_MainDataBank_Main>>16
 	PHA
@@ -10477,40 +10812,52 @@ CODE_20F651:
 	REP.b #$10
 	LDX.w #(!REGISTER_WriteToVRAMPortLo&$0000FF<<8)+$01
 	STX.b DMA[$00].Parameters
+	
+;Mario GFX
+	
 	LDA.w $0238
 	BNE.b CODE_20F671
 	JMP.w CODE_20F704
 
 CODE_20F671:
+;first row
 	STA.b DMA[$00].SourceBank
 	LDX.w #$6000
 	STX.w !REGISTER_VRAMAddressLo
+	
 	LDX.w $0220
 	STX.b DMA[$00].SourceLo
 	LDY.w #$0040
 	STY.b DMA[$00].SizeLo
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
+	
 	LDX.w $0222
 	STX.b DMA[$00].SourceLo
 	STY.b DMA[$00].SizeLo
 	STA.w !REGISTER_DMAEnable
+	
 	LDX.w $0224
 	STX.b DMA[$00].SourceLo
 	STY.b DMA[$00].SizeLo
 	STA.w !REGISTER_DMAEnable
+	
 	LDX.w $0226
 	STX.b DMA[$00].SourceLo
 	STY.b DMA[$00].SizeLo
 	STA.w !REGISTER_DMAEnable
+	
 	LDX.w $0228
 	STX.b DMA[$00].SourceLo
 	STY.b DMA[$00].SizeLo
 	STA.w !REGISTER_DMAEnable
+	
 	LDX.w $022A
 	STX.b DMA[$00].SourceLo
 	STY.b DMA[$00].SizeLo
 	STA.w !REGISTER_DMAEnable
+	
+;second row
 	LDX.w #$6100
 	STX.w !REGISTER_VRAMAddressLo
 	LDX.w $0239
@@ -10540,6 +10887,8 @@ CODE_20F671:
 	STY.b DMA[$00].SizeLo
 	STA.w !REGISTER_DMAEnable
 	STZ.w $0238
+	
+;battle mode
 CODE_20F704:
 	LDA.w $072B
 	CMP.b #$03
@@ -10588,25 +10937,30 @@ CODE_20F755:
 CODE_20F777:
 	SEP.b #$20
 	REP.b #$10
+	
+; course clear tilemap
+	
 CODE_20F77B:
 	LDA.w $02D1
 	BPL.b CODE_20F7CD
+	
 	REP.b #$20
 	SEP.b #$10
 	STZ.w !REGISTER_VRAMAddressIncrementValue
-	LDA.w #$21FF
+	LDA.w #$21FF ; source 
 	STA.w $0002
-	LDA.w #$5000
+	LDA.w #$5000 ;dest
 	STA.w !REGISTER_VRAMAddressLo
 	LDA.w #(!REGISTER_WriteToVRAMPortLo&$0000FF<<8)+$08
 	STA.b DMA[$00].Parameters
-	STZ.b DMA[$00].SourceBank
+	STZ.b DMA[$00].SourceBank ;
 	LDA.w #$0002
 	STA.b DMA[$00].SourceLo
 	LDA.w #$0300
 	STA.b DMA[$00].SizeLo
 	LDY.b #$01
 	STY.w !REGISTER_DMAEnable
+	
 	LDX.b #$80
 	STX.w !REGISTER_VRAMAddressIncrementValue
 	STA.b DMA[$00].SizeLo
@@ -10620,10 +10974,12 @@ CODE_20F77B:
 	SEP.b #$20
 	LDA.b #$01
 	STA.w $02D1
-	JMP.w CODE_20F924
+	JMP.w CODE_20F924 ; skip the rest of the dmas
 
+; animations (regular)
+	
 CODE_20F7CD:
-	LDX.w $023E
+	LDX.w $023E ; check DMA buffer
 	BEQ.b CODE_20F7EF
 	STX.w !REGISTER_VRAMAddressLo
 	LDA.w $0242
@@ -10636,15 +10992,18 @@ CODE_20F7CD:
 	STA.w !REGISTER_DMAEnable
 	STZ.w $023E
 	STZ.w $023F
+
+;animation override (overworld)
+	
 CODE_20F7EF:
 	SEP.b #$10
 	LDA.w $02D3
 	BMI.b CODE_20F850
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
-	BNE.b CODE_20F82E
+	BNE.b CODE_20F82E	;if non-zero (non-world map)
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$02
-	BNE.b CODE_20F82B
+	BNE.b CODE_20F82B ; world 3
 	LDA.w $02D7
 	BNE.b CODE_20F82B
 	LDX.w !RAM_SMB3_Overworld_DrawbridgeState
@@ -10672,7 +11031,7 @@ CODE_20F82E:
 	BCC.b CODE_20F849
 	CMP.b #$11
 	BNE.b CODE_20F83D
-	JMP.w CODE_20F9C5
+	JMP.w CODE_20F9C5 ; do nspade copying instead
 
 CODE_20F83D:
 	CMP.b #$13
@@ -10685,9 +11044,14 @@ CODE_20F849:
 	LDX.b #$00
 	LDA.w !RAM_SMB3_Level_PSwitchTimer
 	BNE.b CODE_20F8A8
+	
+; animation override
 CODE_20F850:
+	
 	REP.b #$20
-	LDA.w #$2980
+	
+	;? blocks
+	LDA.w #$2980	
 	STA.w !REGISTER_VRAMAddressLo
 	SEP.b #$20
 	LDA.w !RAM_SMB3_Level_CoinAndQuestionBlockAnimationFrameIndex
@@ -10705,6 +11069,8 @@ CODE_20F850:
 	STY.b DMA[$00].SizeLo
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
+	
+	; coins
 	REP.b #$20
 	LDA.w #$2DC0
 	STA.w !REGISTER_VRAMAddressLo
@@ -10716,7 +11082,9 @@ CODE_20F850:
 	STY.b DMA[$00].SizeLo
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
-	INC.w !RAM_SMB3_Level_CoinAndQuestionBlockAnimationFrameIndex
+		
+	INC.w !RAM_SMB3_Level_CoinAndQuestionBlockAnimationFrameIndex	
+	
 	LDX.w $0245
 	BMI.b CODE_20F8C9
 	BEQ.b CODE_20F8A8
@@ -10726,12 +11094,15 @@ CODE_20F850:
 	STX.w $02B2
 CODE_20F8A5:
 	LDX.w $02B2
+	
+	;pile-driver's block
+	
 CODE_20F8A8:
 	REP.b #$20
 	LDA.w #$60C0
 	STA.w !REGISTER_VRAMAddressLo
 	SEP.b #$20
-	LDA.b #SMB3_Bank41Graphics_Sprite_LavaLotus>>16			; Note: Something related to the fake brick blocks
+	LDA.b #SMB3_Bank41Graphics_Sprite_LavaLotus>>16
 	STA.b DMA[$00].SourceBank
 	LDA.w DATA_21CA34,x
 	STA.b DMA[$00].SourceHi
@@ -10741,8 +11112,10 @@ CODE_20F8A8:
 	STY.b DMA[$00].SizeLo
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
+	
+	
 CODE_20F8C9:
-	LDX.b #$00
+	LDX.b #$00  ; first index
 	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
 	CMP.b #$01
 	BEQ.b CODE_20F8E4
@@ -10752,12 +11125,15 @@ CODE_20F8C9:
 	BEQ.b CODE_20F8E4
 	CMP.b #$07
 	BEQ.b CODE_20F8E4
-	LDX.b #$04
+	LDX.b #$04	; second index
 	CMP.b #$0D
 	BNE.b CODE_20F924
 CODE_20F8E4:
 	STX.w $0004
 	REP.b #$20
+	
+	;layer 3 water
+	
 	LDA.w #$5A00
 	STA.w !REGISTER_VRAMAddressLo
 	LDA.w #$0100
@@ -10785,6 +11161,10 @@ CODE_20F909:
 	STZ.b DMA[$00].SourceLo
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
+	
+	
+; fin animation override
+	
 CODE_20F924:
 	LDA.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 	BEQ.b CODE_20F94B
@@ -10876,7 +11256,7 @@ CODE_20F954:
 	LDA.w #$0220
 	STA.b DMA[$00].SizeLo
 	LDY.b #$01
-	STY.w !REGISTER_DMAEnable
+	STY.w !REGISTER_DMAEnable	;copy OAM
 	SEP.b #$20
 	PLD
 	RTS
@@ -10906,7 +11286,7 @@ CODE_20F9EC:
 	STZ.w $0210
 	STZ.w $0212
 	STZ.w $0214
-	STZ.w $0216
+	STZ.w !Vert_Scroll
 	STZ.w $0218
 	STZ.w $021A
 	SEP.b #$20
@@ -11007,7 +11387,7 @@ CODE_20FA98:
 
 CODE_20FAD7:
 	LDY.b #$04
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 CODE_20FADC:
 	CMP.w DATA_21CF33,y
 	BEQ.b CODE_20FAE4
@@ -11113,7 +11493,7 @@ CODE_20FBC6:
 	STA.w !REGISTER_BG1HorizScrollOffset
 	LDA.w $0211
 	STA.w !REGISTER_BG1HorizScrollOffset
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w !REGISTER_BG1VertScrollOffset
 	STA.b $02
 	LDA.w $0217
@@ -11142,10 +11522,10 @@ CODE_20FC04:
 	REP.b #$20
 	LDA.w #$0000
 	STA.w $02CC
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CMP.w #$0950
 	BCC.b CODE_20FC2C
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w #$0950
 	STA.w $02CC
@@ -11232,9 +11612,9 @@ CODE_20FCC0:
 	STA.w !REGISTER_BG1HorizScrollOffset
 	LDA.w $0211
 	STA.w !REGISTER_BG1HorizScrollOffset
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CLC
-	ADC.w !RAM_SMB3_Level_ShakeLayer1YOffset
+	ADC.w !RAM_SMB3_Level_ShakeLayer1YOffset ; 
 	STA.w !REGISTER_BG1VertScrollOffset
 	STA.b $02
 	LDA.w $0217
@@ -11273,7 +11653,7 @@ CODE_20FCF9:
 
 CODE_20FD26:
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
-	CMP.b #$12
+	CMP.b #$12 ; tower clouds
 	BNE.b CODE_20FD86
 	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
 	BEQ.b CODE_20FD6B
@@ -11635,13 +12015,14 @@ DATA_218000:
 
 ; Note: Indexes for the level RAM tables
 
-DATA_218200:
+Tile_Mem_Addr:
 	dw $7E2000,$7E21B0,$7E2360,$7E2510
 	dw $7E26C0,$7E2870,$7E2A20,$7E2BD0
 	dw $7E2D80,$7E2F30,$7E30E0,$7E3290
 	dw $7E3440,$7E35F0,$7E37A0
 
-DATA_21821E:
+;DATA_21821E
+SNESTile_Mem_AddrHi:
 	dw $7E4000,$7E41B0,$7E4360,$7E4510
 	dw $7E46C0,$7E4870,$7E4A20,$7E4BD0
 	dw $7E4D80,$7E4F30,$7E50E0,$7E5290
@@ -11649,11 +12030,11 @@ DATA_21821E:
 
 ;--------------------------------------------------------------------
 
-DATA_21823C:
+Tile_Mem_AddrVL:
 	db $7E2000,$7E20F0,$7E21E0,$7E22D0,$7E23C0,$7E24B0,$7E25A0,$7E2690
 	db $7E2780,$7E2870,$7E2960,$7E2A50,$7E2B40,$7E2C30,$7E2D20,$7E2E10
 
-DATA_21824C:
+Tile_Mem_AddrVH:
 	db $7E2000>>8,$7E20F0>>8,$7E21E0>>8,$7E22D0>>8,$7E23C0>>8,$7E24B0>>8,$7E25A0>>8,$7E2690>>8
 	db $7E2780>>8,$7E2870>>8,$7E2960>>8,$7E2A50>>8,$7E2B40>>8,$7E2C30>>8,$7E2D20>>8,$7E2E10>>8
 
@@ -11912,7 +12293,7 @@ DATA_2184E6:
 	db $D7,$89,$6B,$C8,$80,$E2,$5B,$66
 	db $40,$F2
 
-DATA_2184F8:
+TileChng_Pats:
 	db $05,$00,$07,$00,$06,$00,$08,$00
 	db $05,$00,$07,$00,$06,$00,$08,$00
 	db $B8,$14,$BA,$14,$B9,$14,$BB,$14
@@ -12049,7 +12430,7 @@ DATA_2186BF:
 
 ;--------------------------------------------------------------------
 
-DATA_2186CF:
+SPPF_Offsets:
 	dw $0000,$0006,$000C,$0012,$0018,$001E,$0024,$002A
 	dw $0030,$0036,$003C,$0042,$0048,$004E,$0054,$005A
 	dw $0060,$0066,$006C,$0072,$0078,$007E,$0084,$008A
@@ -12062,13 +12443,23 @@ DATA_2186CF:
 	dw $01B0,$01B6,$01BC,$01C2,$01C8,$01CE,$01D4,$01DA
 	dw $01E0,$01E6,$01EC,$01F2
 
-DATA_218777:
-	db $00,$02,$10,$04,$06,$08,$0A,$0C,$10,$0E,$28,$2A,$2C,$2E,$10,$18
-	db $1A,$1C,$2C,$2E,$10,$18,$1A,$08,$20,$20,$10,$22,$22,$10,$24,$24
-	db $10,$26,$26,$10,$00,$02,$10,$04,$06,$10,$30,$32,$10,$34,$36,$38
-	db $00,$02,$10,$04,$06,$38,$00,$02,$10,$04,$06,$08,$00,$02,$10,$04
-	db $06,$3A,$10,$10,$10,$3C,$3E,$10,$00,$02,$10,$04,$06,$10,$0A,$0C
-	db $10,$0E,$28,$10,$2C,$2E,$10,$18,$1A,$10,$30,$32,$10,$34,$36,$10
+SPPF_Table:
+	db $00,$02,$10,$04,$06,$08
+	db $0A,$0C,$10,$0E,$28,$2A
+	db $2C,$2E,$10,$18,$1A,$1C
+	db $2C,$2E,$10,$18,$1A,$08
+	db $20,$20,$10,$22,$22,$10
+	db $24,$24,$10,$26,$26,$10
+	db $00,$02,$10,$04,$06,$10
+	db $30,$32,$10,$34,$36,$38
+	db $00,$02,$10,$04,$06,$38
+	db $00,$02,$10,$04,$06,$08
+	db $00,$02,$10,$04,$06,$3A
+	db $10,$10,$10,$3C,$3E,$10
+	db $00,$02,$10,$04,$06,$10
+	db $0A,$0C,$10,$0E,$28,$10
+	db $2C,$2E,$10,$18,$1A,$10
+	db $30,$32,$10,$34,$36,$10
 	db $08,$12,$10,$1C,$1E,$10,$2C,$2E,$10,$38,$3A,$10,$30,$30,$10,$32
 	db $32,$10,$34,$34,$10,$36,$36,$10,$38,$38,$10,$3A,$3A,$10,$00,$02
 	db $10,$04,$06,$08,$0A,$0C,$10,$0E,$28,$2A,$2C,$2E,$10,$18,$1A,$1C
@@ -12096,7 +12487,7 @@ DATA_218777:
 	db $18,$1A,$10,$1C,$20,$22,$20,$22,$24,$26,$00,$00,$28,$2A,$2C,$2E
 	db $30,$00,$32,$34,$36,$38,$00,$00
 
-DATA_21896F:
+SNES_PlayerPose_HiOffset:
 	db $00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00
@@ -12127,7 +12518,7 @@ DATA_2189D5:
 	db SMB3_Bank2EGraphics_Luigi_Raccoon>>16,SMB3_Bank2EGraphics_Luigi_Frog>>16,SMB3_Bank2EGraphics_Luigi_Tanooki>>16
 	db SMB3_Bank2EGraphics_Luigi_Hammer>>16,SMB3_Bank3EGraphics_Mario_Raccoon>>16,SMB3_Bank42Graphics_BG_PeachsRoom1>>16
 
-DATA_2189E7:
+DATA_2189E7:;Player_FramePageOff
 	dw $0000,$0040,$0080,$00C0,$0100,$0140,$0180,$01C0
 	dw $0200,$0240,$0280,$02C0,$0300,$0340,$0380,$03C0
 	dw $0400,$0440,$0480,$04C0,$0500,$0540,$0580,$05C0
@@ -12257,6 +12648,7 @@ DATA_218B01:
 
 ; Note: This is the music set to play when loading a world after starting the game (ie. From leaving a level)
 
+;World_BGM
 WorldMapMusic:
 ;$218B03
 	db !Define_SMB3_OverworldMusic_World1
@@ -13491,7 +13883,7 @@ DATA_21A5CF:
 DATA_21A5D1:
 	db $F1,$C1
 
-DATA_21A5D3:
+LL_TopBlock:
 	db $E0,$DB,$DC,$DD,$D8,$F0,$7A,$49
 	db $01
 
@@ -13548,7 +13940,9 @@ DATA_21A660:
 
 UNK_21A66C:
 	db $C0,$C4,$C3,$C0,$C4,$C3,$C0,$C4
-	db $C3,$C0,$C4,$C3,$10,$11,$12
+	db $C3,$C0,$C4,$C3
+;LL_PUPClouds (unused)
+db $10,$11,$12
 
 DATA_21A67B:
 	db $57,$58,$F8,$F9
@@ -13568,7 +13962,9 @@ DATA_21A68D:
 	db $F7,$F5,$F9
 
 DATA_21A693:
-	db $00,$03,$1F,$22,$20,$23,$21,$24
+	db $00,$03
+;LL_Cloud (unused)
+db $1F,$22,$20,$23,$21,$24
 
 DATA_21A69B:
 	db $33,$A7,$F5,$35,$A9,$F7,$FF,$AC
@@ -13578,7 +13974,7 @@ DATA_21A69B:
 
 ; Note: Slope tile map16 tiles?
 
-DATA_21A6A7:
+LL_SlopeMidGround:
 	db $37,$AB,$AB
 
 DATA_21A6AA:
@@ -13593,10 +13989,10 @@ DATA_21A6B0:
 DATA_21A6B3:
 	db $FF,$A1,$EA
 
-DATA_21A6B6:
+LL_225SlopesT2B_Upper:
 	db $2A,$9E,$E7
 
-DATA_21A6B9:
+LL_225SlopesT2B_Lower:
 	db $2B,$9F,$E8
 
 DATA_21A6BC:
@@ -14038,23 +14434,25 @@ DATA_21AB3C:
 	db $03,$03,$08,$07,$04,$07,$04,$04
 	db $08,$08,$04
 
-DATA_21AB57:
+;DATA_21AB57
+;for tiles $100-?
+SNESTileActsLike_FromTileset:
 	dw DATA_21AB77
-	dw DATA_21AB77
+	dw DATA_21AB77 ; 01
 	dw DATA_21AB9A
 	dw DATA_21AB9F
 	dw DATA_21ABC5
 	dw DATA_21ABD1
-	dw DATA_21ABD7
+	dw DATA_21ABD7 ; incorrect pointer?
 	dw DATA_21ABD9
-	dw DATA_21ABD7
+	dw DATA_21ABD7 ; incorrect pointer?
 	dw DATA_21ABE5
 	dw DATA_21AC07
 	dw DATA_21ABD1
 	dw DATA_21ABC5
 	dw DATA_21ABD1
 	dw DATA_21AB9F
-	dw DATA_21AC0B
+	dw DATA_21AC0B ; 0F
 
 DATA_21AB77:
 	db $43,$DE,$93,$98,$AB,$93,$AB,$AB
@@ -14080,10 +14478,10 @@ DATA_21ABC5:
 DATA_21ABD1:
 	db $43,$DE,$57,$57,$57,$57
 
-DATA_21ABD7:
+DATA_21ABD7: 
 	db $43,$DE
 
-DATA_21ABD9:
+DATA_21ABD9: ; toad house
 	db $43,$00,$E6,$E6,$E6,$E6,$E6,$E6
 	db $E6,$E6,$E6,$E6
 
@@ -14200,7 +14598,7 @@ DATA_21ADCA:
 
 ;--------------------------------------------------------------------
 
-DATA_21AE38:
+Object_BoundBox:
 	db $02,$04,$02,$08
 	db $01,$0D,$02,$08
 	db $02,$0C,$02,$18
@@ -14218,7 +14616,7 @@ DATA_21AE38:
 	db $04,$08,$05,$28
 	db $02,$2B,$02,$0C
 
-DATA_21AE78:							; Note: Sprite property table
+Object_AttrFlags:							; Note: Sprite property table
 	db $00,$C1,$C1,$00,$02,$01,$C1,$E2,$E0,$C1,$C1,$CC,$CC,$CC,$89,$00
 	db $00,$00,$00,$00,$00,$00,$00,$01,$0D,$CC,$C1,$C1,$01,$00,$C1,$C0
 	db $00,$C1,$C1,$C1,$A8,$E0,$A8,$A8,$A8,$01,$02,$41,$A8,$07,$AB,$41
@@ -14265,16 +14663,16 @@ DATA_21AF6B:
 
 ;--------------------------------------------------------------------
 
-DATA_21AF6E:
-	db $80,$00,$D0,$01,$B0,$00,$A0,$01
-	db $E0,$00,$70,$01,$10,$01,$40,$01
-	db $80,$00,$D0,$01,$B0,$00,$A0,$01
-	db $E0,$00,$70,$01,$10
+SprRamOffsets:
+	dw $0080,$01D0,$00B0,$01A0
+	dw $00E0,$0170,$0110,$0140
+	dw $0080,$01D0,$00B0,$01A0
+	dw $00E0,$0170,$0110
 
 ;--------------------------------------------------------------------
 
 DATA_21AF8B:
-	db $01,$32,$05
+	db $32,$05
 
 ;--------------------------------------------------------------------
 
@@ -14403,10 +14801,10 @@ DATA_21AFFB:
 
 ;--------------------------------------------------------------------
 
-DATA_21B00A:
+Object_Widths:
 	db $00,$08,$10,$18,$20,$28
 
-DATA_21B010:
+Object_WidthFlags:
 	db $80,$40,$20,$10,$08,$04
 
 DATA_21B016:					; Note: End level card clipping values?
@@ -14442,7 +14840,7 @@ DATA_21B040:
 
 ; Note: Sprite Property tables?
 
-DATA_21B047:
+ObjectGroup_Attributes:
 	db $00,$10,$11,$21,$15,$12,$10,$14,$17,$21,$12,$12,$10,$11,$26,$00
 	db $00,$00,$00,$00,$00,$00,$21,$27,$39,$12,$13,$10,$11,$25,$11,$12
 	db $00,$10,$10,$10,$51,$00,$53,$53,$53,$12,$16,$22,$51,$25,$32,$11
@@ -14456,7 +14854,7 @@ DATA_21B047:
 	db $1E,$1D,$1D,$1D,$1E,$1D,$1D,$1D,$00,$00,$01,$14,$14,$15,$B6,$17
 	db $35,$11,$15,$B0
 
-DATA_21B0FB:
+ObjectGroup_Attributes2:
 	db $00,$10,$10,$50,$20,$10,$10,$00,$00,$10,$10,$10,$10,$10,$60,$00
 	db $00,$00,$00,$00,$00,$00,$50,$10,$C4,$10,$10,$10,$10,$20,$10,$10
 	db $00,$10,$10,$10,$20,$00,$20,$20,$20,$11,$20,$11,$20,$00,$20,$10
@@ -14470,7 +14868,7 @@ DATA_21B0FB:
 	db $11,$11,$11,$11,$11,$11,$11,$11,$00,$00,$00,$14,$14,$14,$A4,$14
 	db $01,$00,$00,$B0
 
-DATA_21B1AF:
+ObjectGroup_Attributes3:
 	db $00,$81,$81,$06,$02,$01,$85,$A5,$A5,$01,$81,$85,$85,$85,$85,$00
 	db $00,$00,$00,$00,$00,$00,$0C,$25,$85,$85,$01,$85,$81,$04,$81,$8A
 	db $00,$8A,$8A,$8A,$85,$A5,$85,$85,$85,$03,$0E,$08,$85,$05,$81,$81
@@ -14484,7 +14882,8 @@ DATA_21B1AF:
 	db $25,$25,$25,$25,$25,$25,$25,$25,$85,$85,$85,$85,$A5,$05,$85,$85
 	db $85,$A5,$A5,$A5
 
-DATA_21B263:
+	; only lower 7 bits are used?
+SNES_ObjectGroup_AttributesPalette:
 	db $00,$00,$01,$01,$01,$02,$00,$00,$04,$06,$02,$02,$00,$01,$04,$00
 	db $00,$00,$00,$00,$00,$00,$01,$03,$01,$02,$03,$00,$01,$01,$01,$01
 	db $00,$00,$00,$00,$00,$00,$06,$06,$06,$05,$02,$02,$00,$01,$06,$05
@@ -14498,7 +14897,7 @@ DATA_21B263:
 	db $02,$01,$01,$01,$02,$01,$01,$01,$00,$00,$01,$01,$01,$05,$06,$01
 	db $02,$01,$01,$B0
 
-DATA_21B317:
+ObjectGroup_KillAction:
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$02,$02,$02,$05,$00
 	db $00,$00,$00,$00,$00,$00,$00,$01,$09,$02,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$05,$00,$00,$09,$00,$00
@@ -14512,7 +14911,7 @@ DATA_21B317:
 	db $07,$07,$07,$07,$07,$07,$07,$07,$00,$00,$00,$00,$00,$05,$00,$05
 	db $05,$00,$00,$05
 
-DATA_21B3CB:
+SNES_ObjectGroup_PatTableSelHi:
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$00,$00,$00,$00
@@ -14528,14 +14927,14 @@ DATA_21B3CB:
 
 ;--------------------------------------------------------------------
 
-DATA_21B47F:
+ObjectGroup_PatternStarts:
 	dl DATA_21B49D
 	dl DATA_21B4C1
 	dl DATA_21B4E5
 	dl DATA_21B509
 	dl DATA_21B52D
 
-DATA_21B48E:
+ObjectGroup_PatternSets:
 	dl DATA_21B551
 	dl DATA_21B5A2
 	dl DATA_21B662
@@ -16708,14 +17107,14 @@ DATA_21C976:
 ; Note: Something related to the muncher level tile animations.
 
 UNK_21C988:
-	dw DATA_21C98E
+	dw PlantInfest_ACnt_MaxConst
 	dw DATA_21C9A9
 	dw DATA_21C9B0
 
-DATA_21C98E:
+PlantInfest_ACnt_MaxConst:
 	db $1A
 
-DATA_21C98F:
+PlantInfest_PatTablePerACnt:
 	db $01,$01,$01,$01,$01,$01,$01,$01
 	db $01,$01,$02,$03,$04,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$04
@@ -16734,7 +17133,7 @@ DATA_21C9B0:
 
 ;--------------------------------------------------------------------
 
-DATA_21C9DF:
+PT2_Anim:
 	db $01,$02,$03,$04,$60,$58,$00,$32
 	db $70,$58,$02,$32,$80,$58,$04,$32
 	db $90,$58,$06,$32,$A0,$58,$08,$32
@@ -16746,6 +17145,7 @@ DATA_21C9DF:
 
 ; Note: This is the music set to play when initially loading a world (ie. From the title screen)
 
+;World_BGM_Arrival/World_BGM_Restore
 SMB3_InitialWorldMapMusic:
 ;$21CA0B
 	db !Define_SMB3_OverworldMusic_World1
@@ -16828,6 +17228,7 @@ DATA_21CA40:
 	db SMB3_Bank38Graphics_Layer3_Water+$0100>>8
 	db SMB3_Bank38Graphics_Layer3_Water+$0200>>8
 	db SMB3_Bank38Graphics_Layer3_Water+$0300>>8
+	;split here
 	db SMB3_Bank38Graphics_Layer3_Water+$0400>>8
 	db SMB3_Bank38Graphics_Layer3_Water+$0500>>8
 	db SMB3_Bank38Graphics_Layer3_Water+$0600>>8
@@ -16855,6 +17256,8 @@ DATA_21CA50:
 	db $48,$2D,$49,$2D
 
 ;--------------------------------------------------------------------
+
+;layer 2 airship clouds
 
 DATA_21CA64:
 	db $C0,$25,$C1,$25,$C4,$25,$C5,$25,$D0,$25,$D1,$25,$D4,$25,$D5,$25
@@ -16991,10 +17394,12 @@ SMB3_InitialPlayerYPosLo:
 DATA_21CE3A:						; Note: Initial FG camera position?
 	db $EF,$00,$00,$EF,$30,$70,$B0,$EF
 
+;GamePlay_TimeStart
 SMB3_TimeSettingTable:
 ;$21CE42
 	db $03,$04,$02,$00
 
+;GamePlay_BGM
 SMB3_LevelMusicTable:
 ;$21CE46
 	db !Define_SMB3_LevelMusic_Overworld
@@ -17008,7 +17413,7 @@ SMB3_LevelMusicTable:
 	db !Define_SMB3_LevelMusic_Athletic
 	db !Define_SMB3_LevelMusic_ThroneRoom
 	db !Define_SMB3_LevelMusic_CloudBonusRoom
-	db !Define_SMB3_OverworldMusic_Underground
+	db !Define_SMB3_OverworldMusic_Underground ; SNES: new
 
 ;--------------------------------------------------------------------
 
@@ -17019,9 +17424,9 @@ DATA_21CE52:
 
 ; Note: Map16 data pointers
 
-CODE_21CE5A:
-	dw DATA_21CF56			; Overworld?
-	dw DATA_248000
+TileLayout_ByTileset:
+	dw Tile_Layout_TS0			; Overworld?
+	dw Tile_Layout_TS1
 	dw DATA_268000
 	dw DATA_24A480
 	dw DATA_24DE00
@@ -17040,9 +17445,10 @@ CODE_21CE5A:
 	dw DATA_218E3A
 	dw DATA_219B79
 
-CODE_21CE80:
-	db DATA_21CF56>>16
-	db DATA_248000>>16
+;CODE_21CE80
+SNES_TileLayout_ByTileset_Bank:
+	db Tile_Layout_TS0>>16
+	db Tile_Layout_TS1>>16
 	db DATA_268000>>16
 	db DATA_24A480>>16
 	db DATA_24DE00>>16
@@ -17159,7 +17565,7 @@ UNK_21CF42:
 
 ; Note: Overworld map16 data.
 
-DATA_21CF56:
+Tile_Layout_TS0:
 	db $88,$10,$89,$10,$8A,$10,$8B,$10,$DC,$18,$DD,$18,$DE,$18,$DF,$18
 	db $FF,$10,$FF,$10,$FF,$10,$FF,$10,$27,$08,$27,$88,$8D,$08,$8F,$08
 	db $27,$08,$27,$88,$8D,$08,$A4,$08,$27,$08,$27,$88,$8D,$08,$A5,$08
@@ -19476,7 +19882,7 @@ DATA_21E9FE:
 
 ;--------------------------------------------------------------------
 
-DATA_21EA01:
+Level_XStarts:
 	db $18,$70,$D8,$80
 
 ;--------------------------------------------------------------------
@@ -20122,7 +20528,7 @@ DATA_21EF09:
 	dw RegularLuigiPalette
 	dw TanookiSuitPalette
 	dw HammerSuitPalette
-	dw SMB3_GlobalSpritePalette_Row08To0C
+	dw SMB3TitleScreenPalette_Row08To0C
 	dw RegularMarioPalette
 
 	dw RegularLuigiPalette
@@ -20132,7 +20538,7 @@ DATA_21EF09:
 	dw RegularLuigiPalette
 	dw TanookiSuitPalette
 	dw HammerSuitPalette
-	dw SMB3_GlobalSpritePalette_Row08To0C
+	dw SMB3TitleScreenPalette_Row08To0C
 	dw RegularLuigiPalette
 
 ;--------------------------------------------------------------------
@@ -22339,12 +22745,12 @@ CODE_22B1F9:
 SMB3_NorSpr082_BoomerangBro_Status02:
 .Main:
 ;$22B200
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l CODE_22B32C
 	LDA.b $9C
 	BNE.b CODE_22B1F8
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.b $A7,x
 	AND.b #$04
 	BEQ.b CODE_22B21E
@@ -22420,7 +22826,7 @@ CODE_22B28A:
 SMB3_NorSpr081_HammerBro_Status02:
 .Main:
 ;$22B28B
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
 	LDA.w DATA_21C41A,y
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
@@ -22469,7 +22875,7 @@ CODE_22B2E4:
 	STA.w !RAM_SMB3_NorSpr081_HammerBro_PassThroughGroundTimer,x
 CODE_22B2EF:
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$06
 	BNE.b CODE_22B303
@@ -22521,7 +22927,7 @@ CODE_22B33C:
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l SMB3_CheckIfSpriteIsVerticallyOffScreen_Main
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	PLA
@@ -22641,7 +23047,7 @@ CODE_22B489:
 	JSL.l CODE_27DF2F
 CODE_22B492:
 	STZ.w $0679,x
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	LDA.w !RAM_SMB3_Level_NorSpr_XOffscreenFlag,x
 	STA.b $DC
 	REP.b #$10
@@ -22777,7 +23183,7 @@ CODE_22B575:
 	LDA.b #$40
 	STA.w !RAM_SMB3_NorSprXXX_SidewaysMovingThwomp_PhaseTimer,x
 CODE_22B581:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDY.w !RAM_SMB3_NorSprXXX_SidewaysMovingThwomp_XSpeedIndex,x
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	CMP.w DATA_21C424,y
@@ -22801,7 +23207,7 @@ CODE_22B5A4:
 	LDY.w !RAM_SMB3_NorSprXXX_SidewaysMovingThwomp_XSpeedIndex,x
 	LDA.w DATA_21C426,y
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_22B5B0:
 	RTS
 
@@ -22875,7 +23281,7 @@ CODE_22B605:
 	LDA.b #$3C
 	STA.w !RAM_SMB3_NorSprXXX_FixedMovementThwomp_PhaseTimer,x
 CODE_22B611:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	RTS
 
@@ -22892,10 +23298,10 @@ SMB3_NorSpr088_YellowWavyCheepCheep_Status02:
 	LDA.b #$F0
 CODE_22B627:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	JSL.l CODE_279BB8
-	JSL.l CODE_279BC4
+	JSL.l Object_SetPaletteFromAttr
+	JSL.l Object_DeleteOffScreen
 	INC.b !RAM_SMB3_NorSpr088_YellowWavyCheepCheep_AnimationFrameCounter,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b !RAM_SMB3_NorSpr088_YellowWavyCheepCheep_AnimationFrameCounter,x
 	AND.b #$01
@@ -22941,7 +23347,7 @@ SMB3_NorSpr088_YellowWavyCheepCheep_Status01:
 SMB3_NorSpr087_FireBro_Status02:
 .Main:
 ;$22B676
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
 	LDA.w DATA_21C432,y
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
@@ -22989,7 +23395,7 @@ CODE_22B6C3:
 	PHA
 	ADC.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	PLA
@@ -22997,7 +23403,7 @@ CODE_22B6C3:
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
 	LDA.b $9C
 	BNE.b CODE_22B715
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.w !RAM_SMB3_NorSpr087_FireBro_SpitAnimationTimer,x
 	CMP.b #$40
 	BCS.b CODE_22B6FC
@@ -23174,7 +23580,7 @@ CODE_22B7FF:
 	BNE.b CODE_22B81C
 	DEC.b !RAM_SMB3_Level_Player_YPosHi
 CODE_22B81C:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
 	LDA.w DATA_21C436,y
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
@@ -23213,10 +23619,10 @@ CODE_22B85E:
 	BNE.b CODE_22B8BD
 	LDA.b !RAM_SMB3_NorSpr086_SledgeBro_IsJumpingFlag,x
 	BEQ.b CODE_22B8BE
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
-	JSL.l CODE_278B93
-	JSL.l CODE_279B6C
+	JSL.l Object_WorldDetectN1
+	JSL.l Object_HandleBumpUnderneath
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BMI.b CODE_22B887
 	CMP.b #$70
@@ -23312,8 +23718,8 @@ CODE_22B908:
 	LDA.b #$40
 	STA.w !RAM_SMB3_NorSpr086_SledgeBro_PhaseTimer,x
 CODE_22B914:
-	JSL.l CODE_278B93
-	JSL.l CODE_279B6C
+	JSL.l Object_WorldDetectN1
+	JSL.l Object_HandleBumpUnderneath
 	RTS
 
 CODE_22B91D:
@@ -23327,7 +23733,7 @@ CODE_22B929:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_22B92D:
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.b $A7,x
 	AND.b #$04
 	BEQ.b CODE_22B942
@@ -23355,7 +23761,7 @@ CODE_22B943:
 	ADC.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 CODE_22B966:
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	PLA
@@ -23474,7 +23880,7 @@ SMB3_NorSpr085_GreenSpinyEgg_Status02:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$02
 	BNE.b CODE_22BAAD
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.w $06B7,x
 	PHA
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
@@ -23489,7 +23895,7 @@ CODE_22BA61:
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_22BA6B
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_22BA6B:
 	LDA.b $A7,x
 	AND.b #$04
@@ -23524,7 +23930,7 @@ CODE_22BA9C:
 	LDA.b #$10
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_22BAA6:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	JSR.w CODE_22C3F9
 CODE_22BAAD:
 	LDY.b #$00
@@ -23555,7 +23961,7 @@ CODE_22BADA:
 	RTL
 
 CODE_22BADB:
-	JSR.w CODE_22CBA0
+	JSR.w GroundTroop_DrawMirrored
 	REP.b #$10
 	LDY.b $C6,x
 	LDA.w SMB3_OAMBuffer[$00].Prop,y
@@ -23592,7 +23998,7 @@ SMB3_NorSpr084_RedSpinyEgg_Status02:
 ;$22BB1A
 	LDA.b $9C
 	BNE.b CODE_22BB7C
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	LSR
 	LSR
@@ -23618,10 +24024,10 @@ CODE_22BB40:
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_22BB4A:
 	JSL.l CODE_27A7E5
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_278B9B
 CODE_22BB56:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.b $A7,x
 	AND.b #$04
 	BEQ.b CODE_22BB7C
@@ -23639,7 +24045,7 @@ CODE_22BB7C:
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_22BB86
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_22BB86:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
@@ -23656,7 +24062,7 @@ CODE_22BB86:
 CODE_22BB9D:
 	CMP.b #$02
 	BCS.b CODE_22BBC8
-	JSR.w CODE_22CBA0
+	JSR.w GroundTroop_DrawMirrored
 	REP.b #$10
 	LDY.b $C6,x
 	LDA.w SMB3_OAMBuffer[$01].Prop,y
@@ -23685,7 +24091,7 @@ CODE_22BBC8:
 SMB3_NorSpr073_HoppingRedGoomba_Status02:
 .Main:
 ;$22BDDB
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BEQ.b CODE_22BDE7
 	JSR.w CODE_22BE70
@@ -23757,13 +24163,13 @@ CODE_22BE61:
 	BEQ.b CODE_22BE6B
 	JSL.l CODE_27990E
 CODE_22BE6B:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	RTL
 
 ;--------------------------------------------------------------------
 
 CODE_22BE70:
-	JSR.w CODE_22CBA0
+	JSR.w GroundTroop_DrawMirrored
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	XBA
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
@@ -23853,7 +24259,7 @@ CODE_22BEEB:
 SMB3_NorSpr074_Paragoomba_Status02:
 .Main:
 ;$22BF1E
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BEQ.b CODE_22BF2A
 	JSR.w CODE_22BE70
@@ -23996,7 +24402,7 @@ CODE_22C010:
 	LDA.w DATA_21C456,y
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 CODE_22C024:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	RTS
 
@@ -24110,7 +24516,7 @@ SMB3_NorSpr06D_RedKoopa_Status02:
 SMB3_NorSpr07B_GiantRedKoopa_Status02:
 .Main:
 ;$22C221
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $68,x
 	LSR
 	LSR
@@ -24140,9 +24546,9 @@ CODE_22C254:
 	LDA.b $4D,x
 	BNE.b CODE_22C276
 	INC.b $4D,x
-	JSL.l CODE_279906
-	JSL.l CODE_27A7F0
-	JSL.l CODE_27A7F0
+	JSL.l Object_AboutFace
+	JSL.l Object_ApplyXVel
+	JSL.l Object_ApplyXVel
 	BRA.b CODE_22C272
 
 CODE_22C26E:
@@ -24151,7 +24557,7 @@ CODE_22C26E:
 CODE_22C272:
 	JSL.l CODE_278B67
 CODE_22C276:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	RTL
 
 ;--------------------------------------------------------------------
@@ -24179,7 +24585,7 @@ CODE_22C294:
 	LSR
 	AND.b #$01
 	STA.w $0669,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.w $0518,x
 	BNE.b CODE_22C2D0
@@ -24215,7 +24621,7 @@ CODE_22C2DA:
 SMB3_NorSpr06F_VerticalRedParaKoopa_Status02:
 .Main:
 ;$22C2E1
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_22C4BF
 	LDA.b $9C
 	BNE.b CODE_22C324
@@ -24268,7 +24674,7 @@ SMB3_NorSpr07C_GiantGoomba_Status02:
 SMB3_NorSpr07E_BouncingGiantGreenParakoopa_Status02:
 .Main:
 CODE_22C329:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BEQ.b CODE_22C335
 	JSR.w CODE_22C48B
@@ -24300,7 +24706,7 @@ CODE_22C34B:
 	LDA.w $0689,x
 	BEQ.b CODE_22C38A
 	DEC.w $0689,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	INC.b $68,x
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
@@ -24379,7 +24785,7 @@ CODE_22C3EA:
 	BEQ.b CODE_22C3F4
 	JSL.l CODE_27990E
 CODE_22C3F4:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	RTL
 
 ;--------------------------------------------------------------------
@@ -24411,8 +24817,10 @@ CODE_22C417:
 	CMP.b #$03
 	BNE.b CODE_22C485
 CODE_22C422:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$10
 	BEQ.b CODE_22C485
 	LDA.w $0689,x
@@ -24424,7 +24832,7 @@ CODE_22C422:
 	CMP.b #$C0
 	BEQ.b CODE_22C485
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
-	JSL.l CODE_27A414
+	JSL.l Object_CalcBoundBox
 	JSL.l CODE_27A460
 	BCC.b CODE_22C485
 	LDY.b $9B
@@ -24479,7 +24887,7 @@ CODE_22C499:
 	PHA
 	ORA.b #$10
 	STA.w $0679,x
-	JSR.w CODE_22CBA0
+	JSR.w GroundTroop_DrawMirrored
 	PLA
 	STA.w $0679,x
 	RTS
@@ -24492,7 +24900,7 @@ CODE_22C4AF:
 	JMP.w CODE_22CBA6
 
 CODE_22C4BC:
-	JMP.w CODE_22CBA0
+	JMP.w GroundTroop_DrawMirrored
 
 CODE_22C4BF:
 	REP.b #$20
@@ -24852,7 +25260,7 @@ CODE_22C752:
 	ADC.b #$00
 	STA.b $44,x
 CODE_22C778:
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	STA.b $56,x
 	PLA
@@ -25143,7 +25551,7 @@ SMB3_NorSpr07D_GiantPiranhaPlantInSmallPipe_Status02:
 SMB3_NorSpr07F_GiantPiranhaPlantInGiantPipe_Status02:
 .Main:
 ;$22C98B
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $4D,x
 	AND.b #$03
 	BNE.b CODE_22C99E
@@ -25159,7 +25567,7 @@ CODE_22C99E:
 	LSR
 	AND.b #$01
 	STA.w $0669,x
-	JSR.w CODE_22CA2C
+	JSR.w GiantPiranha_Draw
 	JSL.l CODE_279B70
 	JSR.w CODE_22C9B4
 	RTL
@@ -25240,7 +25648,7 @@ CODE_22CA19:
 CODE_22CA2B:
 	RTS
 
-CODE_22CA2C:
+GiantPiranha_Draw:
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	PHA
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
@@ -25259,11 +25667,12 @@ CODE_22CA2C:
 	ADC.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 CODE_22CA4F:
+;new SNES code
 	LDA.w $0679,x
 	AND.b #$CF
-	ORA.b #$20
+	ORA.b #$20	; set new priority
 	STA.w $0679,x
-	JSR.w CODE_22D35C
+	JSR.w SNESGiantPiranha_Draw
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	PLA
@@ -25460,7 +25869,7 @@ CODE_22CB9D:
 
 ; Note: Is this a generic sprite graphics routine?
 
-CODE_22CBA0:
+GroundTroop_DrawMirrored:
 	LDY.b #$00
 	LDA.b #$80
 	BNE.b CODE_22CBAA							; Note: This will always branch.
@@ -25634,7 +26043,7 @@ CODE_22D35B:
 
 ;--------------------------------------------------------------------
 
-CODE_22D35C:
+SNESGiantPiranha_Draw:
 	REP.b #$10
 	LDY.w $00C6,x
 	LDA.b $44,x
@@ -25660,7 +26069,7 @@ CODE_22D35C:
 	STA.w SMB3_OAMBuffer[$03].XDisp,y
 	LDA.b $71,x
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.w SMB3_OAMBuffer[$04].YDisp,y
 	STA.w SMB3_OAMBuffer[$05].YDisp,y
 	CLC
@@ -25670,7 +26079,7 @@ CODE_22D35C:
 	LDA.w $0691,x
 	DEC
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.w SMB3_OAMBuffer[$00].YDisp,y
 	STA.w SMB3_OAMBuffer[$01].YDisp,y
 	CLC
@@ -25678,10 +26087,10 @@ CODE_22D35C:
 	STA.w SMB3_OAMBuffer[$02].YDisp,y
 	STA.w SMB3_OAMBuffer[$03].YDisp,y
 	LDA.b #$28
-	STA.w SMB3_OAMBuffer[$00].Tile,y
-	STA.w SMB3_OAMBuffer[$01].Tile,y
-	STA.w SMB3_OAMBuffer[$02].Tile,y
-	STA.w SMB3_OAMBuffer[$03].Tile,y
+	STA.w SMB3_OAMBuffer[$00].Tile,y	;mask tile
+	STA.w SMB3_OAMBuffer[$01].Tile,y	;mask tile
+	STA.w SMB3_OAMBuffer[$02].Tile,y	;mask tile
+	STA.w SMB3_OAMBuffer[$03].Tile,y	;mask tile
 	LDA.b #$12
 	STA.w SMB3_OAMBuffer[$00].Prop,y
 	STA.w SMB3_OAMBuffer[$01].Prop,y
@@ -25692,7 +26101,7 @@ CODE_22D35C:
 	ASL
 	ORA.b #$A0
 	STA.w SMB3_OAMBuffer[$04].Tile,y
-	STA.w SMB3_OAMBuffer[$05].Tile,y
+	STA.w SMB3_OAMBuffer[$05].Tile,y	
 	INC
 	INC
 	STA.w SMB3_OAMBuffer[$06].Tile,y
@@ -25734,7 +26143,7 @@ CODE_22D422:
 	LDA.b $71,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.b $00
 	CLC
 	ADC.w #$0010
@@ -25765,7 +26174,7 @@ CODE_22D46A:
 	LDA.w $0691,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.b $00
 	CLC
 	ADC.w #$0010
@@ -25799,6 +26208,10 @@ CODE_22D4A4:
 ;--------------------------------------------------------------------
 
 ; Note: Routine that sets the pointer to the player graphics
+; Output: 
+; $00,$01, - graphics page pointer (low, high)
+; $0220-$022B : pose offset
+; $0238 - graphics page pointer (bank)
 
 CODE_22E000:
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
@@ -25809,7 +26222,7 @@ CODE_22E007:
 	LDA.b !RAM_SMB3_Level_Player_CurrentPose
 	LSR
 	TAX
-	LDA.w DATA_21896F,x
+	LDA.w SNES_PlayerPose_HiOffset,x
 	LDX.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	CMP.b #$20
 	BCC.b CODE_22E01D
@@ -25821,72 +26234,83 @@ CODE_22E01D:
 	TAY
 	TXA
 	CLC
-	ADC.b $04
+	ADC.b $04 ; add luigi offset
 	TAX
-	TYA
+	TYA ; get value from table back
 	CLC
 	ADC.w DATA_2189C3,x
-	STA.b $01
-	STZ.b $00
+	STA.b $01 ; high
+	STZ.b $00 ; low
 	LDA.w DATA_2189D5,x
-	STA.w $0238
-	LDA.b #DATA_218777>>16
-	STA.b $06
+	STA.w $0238 ; bank
+	
+	LDA.b #SPPF_Table>>16
+	STA.b $06 ; bank of pose table
 	REP.b #$30
-	LDA.w #DATA_218777
-	STA.b $04
+	LDA.w #SPPF_Table
+	STA.b $04 ; high/low of pose table
+	
+	; $04,$05,$06 - pose table pointer
+	
 	LDA.b !RAM_SMB3_Level_Player_CurrentPose
 	AND.w #$00FF
-	TAX
-	LDA.w DATA_2186CF,x
-	TAY
+	TAX	
+	LDA.w SPPF_Offsets,x
+	
+	TAY	
 	LDA.b [$04],y
 	AND.w #$00FF
-	TAX
+	TAX		
 	LDA.w DATA_2189E7,x
 	CLC
 	ADC.b $00
 	STA.w $0220
+	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
-	TAX
+	TAX	
 	LDA.w DATA_2189E7,x
 	CLC
 	ADC.b $00
 	STA.w $0222
+	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
-	TAX
+	TAX	
 	LDA.w DATA_2189E7,x
 	CLC
 	ADC.b $00
 	STA.w $0224
+	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
-	TAX
+	TAX	
 	LDA.w DATA_2189E7,x
 	CLC
 	ADC.b $00
 	STA.w $0226
+	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
-	TAX
+	TAX	
 	LDA.w DATA_2189E7,x
 	CLC
 	ADC.b $00
 	STA.w $0228
+	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
-	TAX
+	TAX	
 	LDA.w DATA_2189E7,x
 	CLC
 	ADC.b $00
 	STA.w $022A
+	
 	SEP.b #$30
 	RTL
 
@@ -26138,6 +26562,8 @@ CODE_22E2E4:
 
 ;--------------------------------------------------------------------
 
+;background copy (airship, Layer 3)
+
 CODE_22E2FE:
 	LDA.l $7F2000
 	BMI.b CODE_22E337
@@ -26170,7 +26596,7 @@ CODE_22E337:
 CODE_22E338:
 	REP.b #$30
 	LDX.w #$0FFE
-	LDA.w #$20FF
+	LDA.w #$20FF ;tile from tilemap
 CODE_22E340:
 	STA.l $7F2000,x
 	STA.l $7F3000,x
@@ -26178,7 +26604,7 @@ CODE_22E340:
 	DEX
 	BPL.b CODE_22E340
 	LDX.w #$069A
-	LDA.w #$25D1
+	LDA.w #$25D1 ;tile from tilemap
 CODE_22E352:
 	STA.l $7F2000,x
 	INX
@@ -26192,6 +26618,7 @@ CODE_22E360:
 	INX
 	CPX.w #$1000
 	BNE.b CODE_22E360
+	
 	STZ.b $00
 	STZ.b $02
 CODE_22E36F:
@@ -26628,12 +27055,17 @@ CODE_22E65F:
 
 ;--------------------------------------------------------------------
 
-CODE_22E677:
+SNES_NMI_SoundPortCheck:	;$22E677
+
+;check APU0
 	LDA.w !RAM_SMB3_Global_SoundCh1
 	BNE.b CODE_22E690
+	
+	; empty. perform a read
 	LDA.w !REGISTER_APUPort0
-	CMP.w $1204
-	BEQ.b CODE_22E68E
+	CMP.w $1204 ; check mirror
+	BEQ.b CODE_22E68E ; check if song playing is equal
+	
 	INC.w $120A
 	LDA.w $120A
 	CMP.b #$03
@@ -26645,12 +27077,17 @@ CODE_22E690:
 	STA.w $1204
 	STZ.w $120A
 CODE_22E699:
+
+;check APU1
 	LDA.w !RAM_SMB3_Global_SoundCh2
 	BNE.b CODE_22E6B4
+	
+	; empty. perform a read
 	LDA.w !REGISTER_APUPort1
 	AND.b #$0F
 	CMP.w $1205
-	BEQ.b CODE_22E6B2
+	BEQ.b CODE_22E6B2 ; lower bits
+	
 	INC.w $120B
 	LDA.w $120B
 	CMP.b #$03
@@ -26663,8 +27100,11 @@ CODE_22E6B4:
 	STA.w $1205
 	STZ.w $120B
 CODE_22E6BF:
-	LDA.w !RAM_SMB3_Global_MusicCh1
+
+;check APU2
+	LDA.w !RAM_SMB3_Global_MusicCh1 ; 
 	BEQ.b CODE_22E73A
+	
 	LDY.b #$04
 	STY.w $120C
 	STA.w !REGISTER_APUPort2
@@ -26672,8 +27112,12 @@ CODE_22E6BF:
 	BCS.b CODE_22E6D3
 	STA.w $1206
 CODE_22E6D3:
+
+;check APU3
 	LDA.w !RAM_SMB3_Global_SoundCh3
 	BNE.b CODE_22E6F9
+	
+	; empty. perform a read 
 	LDA.w !REGISTER_APUPort3
 	AND.b #$7F
 	CMP.w $1207
@@ -26722,6 +27166,7 @@ CODE_22E72A:
 	RTL
 
 CODE_22E73A:
+; APU2: empty. perform a read
 	LDY.w !REGISTER_APUPort2
 	CPY.w $1206
 	BNE.b CODE_22E6D3
@@ -26747,7 +27192,7 @@ CODE_22F004:
 	LSR
 	BNE.b CODE_22F068
 	LDX.b #$00
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$81
 	STA.w $05F3
 	LDA.b #$20
@@ -27039,7 +27484,7 @@ endif
 	LDA.b #!Define_SMB3_SpriteID_OWSpr02_Airship
 	STA.w !RAM_SMB3_Overworld_OWSpr_SpriteID+$01
 	INC
-	STA.w $0414
+	STA.w !Level_JctCtl
 	STZ.w !RAM_SMB3_Overworld_OWSpr_SpriteID
 	RTS
 
@@ -27321,7 +27766,7 @@ else
 	ADC.b #$04
 endif
 	STA.b $8C,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b $5F,x
 	BNE.b CODE_22F3B6
 	STZ.b $8C,x
@@ -27392,7 +27837,7 @@ CODE_22F420:
 CODE_22F421:
 	LDX.b #$01
 	STX.b $9B
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b $5F,x
 	CMP.b #$E0
 	BNE.b CODE_22F43C
@@ -27648,7 +28093,7 @@ CODE_238132:
 	STA.w !RAM_SMB3_Global_BG1And2WindowMaskSettingsMirror
 CODE_238162:
 	JSL.l CODE_2AFA63
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	LDA.w $1050
 	BPL.b CODE_238162
 	STZ.w $1050
@@ -27689,7 +28134,7 @@ CODE_23818F:
 	STA.w !RAM_SMB3_Global_ObjectAndColorWindowSettingsMirror
 CODE_2381BF:
 	JSL.l CODE_2AFA63
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	LDA.w $1050
 	BPL.b CODE_2381BF
 	STZ.w $1050
@@ -27726,8 +28171,8 @@ CODE_2381F9:
 	ADC.w DATA_218B01,y
 	STA.w $0211
 	STA.b $12
-	JSL.l CODE_2097BA
-	JSL.l CODE_209D1F
+	JSL.l Scroll_Update_Ranges
+	JSL.l Scroll_Update
 	JSL.l CODE_238DD7
 	DEC.w !RAM_SMB3_Overworld_ScrollMapTimer
 	DEC.w !RAM_SMB3_Overworld_ScrollMapTimer
@@ -27895,9 +28340,9 @@ CODE_23833D:
 	LSR
 	LSR
 	TAY
-	LDA.w DATA_218200,y
+	LDA.w Tile_Mem_Addr,y
 	STA.b $2E
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	STA.b $2F
 	INC.b $2F
 	LDA.b #$7E2000>>16
@@ -28418,11 +28863,11 @@ CODE_238679:
 	AND.b #$0F
 	ASL
 	TAY
-	LDA.w DATA_218200,y
+	LDA.w Tile_Mem_Addr,y
 	CLC
 	ADC.b #$F0
 	STA.b $0D
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	ADC.b #$00
 	STA.b $0E
 	LDA.b #$7E2000>>16
@@ -28610,8 +29055,8 @@ DATA_238898:
 	dw CODE_2388A6
 	dw CODE_238922
 	dw CODE_238922
-	dw CODE_238951
-	dw CODE_238956
+	dw Map_PanInit
+	dw Map_PanRight
 	dw CODE_2389FE
 
 ;--------------------------------------------------------------------
@@ -28627,11 +29072,11 @@ CODE_2388A6:
 	LSR
 	LSR
 	TAY
-	LDA.w DATA_218200,y
+	LDA.w Tile_Mem_Addr,y
 	CLC
 	ADC.b #$F0
 	STA.b $2E
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	ADC.b #$00
 	STA.b $2F
 	PLA
@@ -28721,24 +29166,31 @@ CODE_23894C:
 
 ;--------------------------------------------------------------------
 
-CODE_238951:
+;CODE_238951
+Map_PanInit:
 	STZ.b $20
 	INC.w $0417
-CODE_238956:
+;CODE_238956
+Map_PanRight:
+
 	LDY.b $20
+	
 	LDA.b $24
 	CLC
 	ADC.w DATA_218C97,y
 	STA.b $24
+	
 	AND.b #$F0
 	LSR
 	LSR
 	LSR
 	TAY
-	LDA.w DATA_218200,y
+	
+	LDA.w Tile_Mem_Addr,y
 	STA.b $2E
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	STA.b $2F
+	
 	INC.b $2F
 	LDA.b #$7E2000>>16
 	STA.b $30
@@ -28747,27 +29199,33 @@ CODE_238956:
 	STA.b $00
 	LDX.b #$00
 CODE_23897E:
+
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAY
-	LDA.w CODE_21CE5A,y
+	LDA.w TileLayout_ByTileset,y
 	STA.b $0D
-	LDA.w CODE_21CE5A+$01,y
+	LDA.w TileLayout_ByTileset+$01,y
 	STA.b $0E
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
-	LDA.w CODE_21CE80,y
+	LDA.w SNES_TileLayout_ByTileset_Bank,y
 	STA.b $0F
+	
 	LDY.b $00
-	LDA.b [$2E],y
+	LDA.b [$2E],y ; tile
 	REP.b #$30
+	
 	AND.w #$00FF
 	ASL
 	ASL
 	ASL
 	TAY
+	
 	TXA
 	AND.w #$00FF
 	TAX
+	
+	; check if getting right half of tile
 	LDA.b $20
 	AND.w #$0001
 	BNE.b CODE_2389B2
@@ -28776,12 +29234,14 @@ CODE_23897E:
 	INY
 	INY
 CODE_2389B2:
+
 	LDA.b [$0D],y
 	STA.w $03C2,x
 	INY
 	INY
 	LDA.b [$0D],y
 	STA.w $03C4,x
+	
 	INX
 	INX
 	INX
@@ -28794,6 +29254,7 @@ CODE_2389B2:
 	AND.b #$F0
 	CMP.b #$B0
 	BNE.b CODE_23897E
+	
 	LDA.b $24
 	AND.b #$0F
 	ASL
@@ -29350,9 +29811,9 @@ SMB3_GetOverworldTilePlayerIsOn:
 	TAY
 	LDA.b #$7E2000>>16
 	STA.b $30
-	LDA.w DATA_218200,y
+	LDA.w Tile_Mem_Addr,y
 	STA.b $2E
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	INC
 	STA.b $2F
 	LDA.b !RAM_SMB3_Overworld_Mario_XPosLo,x
@@ -29539,10 +30000,10 @@ CODE_238EFC:
 	ADC.w DATA_218E00,y
 	ASL
 	TAX
-	LDA.w DATA_218200,x
+	LDA.w Tile_Mem_Addr,x
 	STA.b $2E
 	STA.b $D8
-	LDA.w DATA_218200+$01,x
+	LDA.w Tile_Mem_Addr+$01,x
 	INC
 	STA.b $2F
 	CLC
@@ -29689,7 +30150,7 @@ CODE_239017:
 	BNE.b CODE_23902A
 
 CODE_239025:
-	JSR.w CODE_239068
+	JSR.w W8D_GetNext8x8
 	BRA.b CODE_23902D
 
 CODE_23902A:
@@ -29729,14 +30190,20 @@ CODE_239052:
 	STA.w $105A
 	RTS
 
-CODE_239068:
+;CODE_239068
+W8D_GetNext8x8:
 	STY.b $01
 	STX.b $04
+	
 	JSR.w CODE_2390C9
+	
 	LDX.w $105A
+	
 	LDA.l $7E2450,x
 	STA.b $0A
-	JSL.l CODE_209EFC
+	
+	JSL.l TileLayout_GetBaseAddr
+	
 	REP.b #$30
 	LDA.b $02
 	PHA
@@ -30191,7 +30658,7 @@ CODE_239318:
 	TAY
 	INY
 	INY
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	STA.b $04
 	INC.b $04
 	LDA.w $0700
@@ -31524,7 +31991,7 @@ SMB3_SlidingPictureGameState02_FadeOut:
 	LDA.w !RAM_SMB3_SlidingPictureGame_XUpTextYPosLo
 	BNE.b CODE_239BA5
 	INC.w !RAM_SMB3_SlidingPictureGame_XUpTextYPosLo
-	JSL.l CODE_29E26B
+	JSL.l Palette_PrepareFadeOut
 	RTS
 
 CODE_239BA5:
@@ -33138,7 +33605,7 @@ CODE_23A6C1:
 	LDA.w DATA_21A483,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.w DATA_21A483+$01,x
 	STA.b [$2E],y
 	BRA.b CODE_23A706
@@ -33148,7 +33615,7 @@ CODE_23A6F3:
 	LDA.b #$BA
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.b #$BB
 	STA.b [$2E],y
 CODE_23A706:
@@ -33198,7 +33665,7 @@ CODE_23A742:
 	LDA.b #$BA
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.b #$BB
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
@@ -33220,7 +33687,7 @@ CODE_23A742:
 	LDA.w DATA_21A483,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.w DATA_21A483+$01,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
@@ -33246,7 +33713,7 @@ CODE_23A790:
 	LDA.w DATA_21A483,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.w DATA_21A483+$01,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
@@ -33257,7 +33724,7 @@ CODE_23A7C3:
 	LDA.b #$BA
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.b #$BB
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
@@ -33280,7 +33747,7 @@ CODE_23A7DA:
 	LDA.w DATA_21A483,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.w DATA_21A483+$01,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
@@ -33340,7 +33807,7 @@ CODE_23A855:
 	STA.b [$2E],y
 CODE_23A857:
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23A841
 	LDA.b $00
@@ -33382,7 +33849,7 @@ CODE_23A89F:
 	STA.b [$2E],y
 CODE_23A8A1:
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23A88B
 	RTL
@@ -33410,7 +33877,7 @@ CODE_23A8CB:
 	LDA.b #$B8
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_23A8CB
 	LDA.w DATA_21A48D,x
@@ -33435,7 +33902,7 @@ CODE_23A901:
 	LDA.b #$B9
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_23A901
 	LDA.w DATA_21A490,x
@@ -33466,7 +33933,7 @@ CODE_23A935:
 	TXA
 	STA.b [$2E],y
 	INC.b $0F
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23A92A
 	RTL
@@ -33682,7 +34149,7 @@ SMB3_ConstructedPlainResizableObj14_NoteBlocks:
 .Main:
 SMB3_ConstructedPlainResizableObj16_Coins:
 .Main:
-CODE_23AA8A:
+LoadLevel_BlockRun:
 	LDA.w $0706
 	SEC
 	SBC.b #$10
@@ -33707,7 +34174,7 @@ CODE_23AAAA:
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
 CODE_23AAB3:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23AA9F
 	RTL
@@ -33894,7 +34361,7 @@ CODE_23ABD9:
 CODE_23ABE5:
 	JSL.l CODE_2A8794
 CODE_23ABE9:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	DEC.b $02
 	BMI.b CODE_23ABF5
@@ -33928,7 +34395,7 @@ CODE_23AC19:
 CODE_23AC1C:
 	LDA.w DATA_21A5B3,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23AC1C
 	RTL
@@ -33966,7 +34433,7 @@ CODE_23AC45:
 	LDA.b $2F
 	ADC.b #$00
 	STA.b $2F
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23AC45
 	RTL
@@ -33986,7 +34453,7 @@ CODE_23AC64:
 	LDA.b $2F
 	SBC.b #$00
 	STA.b $2F
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23AC64
 	RTL
@@ -34015,7 +34482,7 @@ CODE_23AC83:
 	ADC.b #$00
 	STA.b $2F
 	STY.w $0700
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23AC83
 	RTL
@@ -34115,7 +34582,7 @@ CODE_23AD3A:
 	LDA.w DATA_21A5C3,x
 CODE_23AD41:
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -34267,7 +34734,7 @@ CODE_23AE2E:
 CODE_23AE3F:
 	LDA.b #$9C
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_23AE3F
 	LDA.b $00
@@ -34293,7 +34760,7 @@ CODE_23AE6F:
 	LDA.b #$8E
 	STA.b [$2E],y
 CODE_23AE73:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_23AE6F
 	RTL
@@ -34374,7 +34841,7 @@ CODE_23AEE5:
 	LDA.w DATA_21A5CF,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_23AEE5
 	LDA.b $00
@@ -34398,7 +34865,7 @@ CODE_23AF14:
 	BEQ.b CODE_23AF29
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_23AF14
 CODE_23AF29:
@@ -34412,7 +34879,7 @@ SMB3_ConstructedPlainResizableObj25_WaterWithNoCurrent:
 .Main:
 SMB3_ConstructedPlainResizableObj28_DiamondBlocks:
 .Main:
-CODE_23AF2A:
+LoadLevel_TopDecoBlocks:
 	LDY.b #$00
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	STA.b $02
@@ -34451,10 +34918,10 @@ CODE_23AF69:
 	CPX.b #$02
 	BEQ.b CODE_23AF87					; If this is object 25 in a level with a layer 3 tide, make the water invisible.
 CODE_23AF6D:
-	LDA.w DATA_21A5D3,x
+	LDA.w LL_TopBlock,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -34466,7 +34933,7 @@ CODE_23AF82:
 
 CODE_23AF87:
 	LDX.b #$08
-	LDA.w DATA_21A5D3,x
+	LDA.w LL_TopBlock,x
 	STA.b [$2E],y
 	REP.b #$30
 	TYA
@@ -34477,7 +34944,7 @@ CODE_23AF87:
 	LDA.b #$01
 	STA.b [$2E],y
 	SEP.b #$10
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -34519,7 +34986,7 @@ CODE_23AFE2:
 	LDA.w DATA_21A5DC,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -34538,7 +35005,7 @@ CODE_23AFFE:
 	LDA.b #$01
 	STA.b [$2E],y
 	SEP.b #$10
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -34547,7 +35014,7 @@ CODE_23AFFE:
 
 ;--------------------------------------------------------------------
 
-CODE_23B024:
+LoadLevel_LittleCloudSolidRun:
 	LDX.b #$01
 	BEQ.b CODE_23B02A				; Glitch: This should be a BNE/BRA!
 
@@ -34563,7 +35030,7 @@ CODE_23B02A:
 CODE_23B034:
 	LDA.w DATA_21A5E5,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23B034
 	RTL
@@ -34593,7 +35060,7 @@ CODE_23B057:
 CODE_23B05E:
 	LDA.w DATA_21A5E7,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_23B05E
 	RTL
@@ -34616,7 +35083,7 @@ CODE_23B074:
 CODE_23B07D:
 	LDA.b #$5B
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_23B07D
 	RTL
@@ -34633,25 +35100,33 @@ SMB3_ConstructedPlainResizableObj03_GroundedBlueScrewPanel:
 .Main:
 ;$23B089
 	STX.b $0B
+	
 	REP.b #$20
 	LDA.b $2E
 	STA.b $02
 	SEP.b #$20
+	
 	LDA.w $0706
 	AND.b #$0F
 	STA.b $00
+	
 	LDX.b #$00
 CODE_23B09C:
 	TXA
+	
 	LDX.b $0B
 	CLC
 	ADC.w DATA_21A644,x
 	STA.b $0C
 	TAX
+	
 	LDA.w $0706
 	AND.b #$C0
 	STA.b $01
+	
 	LDY.w $0700
+	
+;SNES: new \ 
 	CPX.b #$06
 	BNE.b CODE_23B0C8
 	LDA.w $0350
@@ -34663,7 +35138,8 @@ CODE_23B09C:
 	JSR.w CODE_23B1A5
 	LDA.b #$0A
 	BRA.b CODE_23B0CB
-
+;/
+	
 CODE_23B0C8:
 	LDA.w DATA_21A5EA,x
 CODE_23B0CB:
@@ -34671,11 +35147,14 @@ CODE_23B0CB:
 CODE_23B0CD:
 	JSR.w CODE_23B36A
 	LDA.b [$2E],y
+	
 	CMP.b #$53
 	BEQ.b CODE_23B0FB
 	CMP.b #$55
 	BEQ.b CODE_23B0FB
+	
 	LDX.b $0C
+;SNES: new
 	CPX.b #$06
 	BNE.b CODE_23B0F4
 	LDA.w $0350
@@ -34687,7 +35166,8 @@ CODE_23B0CD:
 	JSR.w CODE_23B1A5
 	LDA.b #$0B
 	BRA.b CODE_23B0F7
-
+;/
+	
 CODE_23B0F4:
 	LDA.w DATA_21A5F6,x
 CODE_23B0F7:
@@ -34702,7 +35182,9 @@ CODE_23B0FB:
 	LDA.b $2F
 	SBC.b #$00
 	STA.b $2F
+	
 	LDX.b $0C
+;SNES: new
 	CPX.b #$06
 	BNE.b CODE_23B11D
 	LDA.w $0350
@@ -34713,23 +35195,28 @@ CODE_23B0FB:
 	BNE.b CODE_23B11D
 	LDA.b #$0C
 	BRA.b CODE_23B120
-
+;/
+	
 CODE_23B11D:
 	LDA.w DATA_21A602,x
 CODE_23B120:
 	STA.b [$2E],y
+	
 	REP.b #$20
 	LDA.b $02
 	STA.b $2E
 	SEP.b #$20
+	
 	LDY.w $0700
 	INY
 	TYA
 	AND.b #$0F
 	BNE.b CODE_23B153
+	
 	LDA.w $0700
 	AND.b #$F0
 	TAY
+	
 	REP.b #$20
 	LDA.b $2E
 	CLC
@@ -34737,20 +35224,28 @@ CODE_23B120:
 	STA.b $2E
 	STA.b $02
 	SEP.b #$20
+	
 	LDA.b $03
 	STA.b $04
+	
 	LDA.b $0E
 	AND.b #$10
 	BNE.b CODE_23B153
+	
 	INC.b $04
 CODE_23B153:
 	STY.w $0700
+	
 	DEC.b $00
+	
 	LDX.b #$01
+	
 	LDA.b $00
 	CMP.b #$01
 	BPL.b CODE_23B165
+	
 	INX
+	
 	CMP.b #$00
 	BNE.b CODE_23B16A
 CODE_23B165:
@@ -34759,12 +35254,15 @@ CODE_23B165:
 
 CODE_23B16A:
 	LDA.b [$2E],y
+	
 	CMP.b #$80
-	BEQ.b CODE_23B182
+	BEQ.b CODE_23B182 ; SNES: just place sky
+	
 	CMP.b #$90
 	BCC.b CODE_23B17C
 	CMP.b #$9F
 	BCS.b CODE_23B17C
+	
 	LDA.b #$9D
 	BRA.b CODE_23B180
 
@@ -34773,6 +35271,7 @@ CODE_23B17C:
 	ORA.b #$0B
 CODE_23B180:
 	STA.b [$2E],y
+	
 CODE_23B182:
 	JSR.w CODE_23B36A
 	LDA.b [$2E],y
@@ -34791,6 +35290,9 @@ CODE_23B194:
 	BEQ.b CODE_23B19E
 	DEX
 	BPL.b CODE_23B194
+	
+	;SNES: removed tile setting to TILE1_BLOCK_SHADOW. jump back
+	
 	BRA.b CODE_23B182
 
 CODE_23B19E:
@@ -34798,6 +35300,7 @@ CODE_23B19E:
 	STA.b [$2E],y
 	BRA.b CODE_23B182
 
+;SNES: new \ 
 CODE_23B1A5:
 	PHX
 	PHY
@@ -34813,6 +35316,7 @@ CODE_23B1A5:
 	PLY
 	PLX
 	RTS
+;/
 
 ;--------------------------------------------------------------------
 
@@ -34829,47 +35333,63 @@ SMB3_ConstructedPlainResizableObj07_FloatingBlueScrewPanel:
 	STA.b $00
 	LDA.b $2F
 	STA.b $01
+	
 	LDA.w $0706
 	SEC
 	SBC.b #$50
 	PHA
+	
 	AND.b #$F0
 	LSR
 	LSR
 	LSR
 	LSR
 	STA.b $02
+	
 	PLA
+	
 	AND.b #$0F
-	STA.b $03
+	STA.b $03	
 	STA.b $05
+	
 	STZ.b $04
 CODE_23B1DC:
 	LDX.b $02
+	
 	LDA.b $04
 	CLC
 	ADC.w DATA_21A644,x
+	
 	TAX
+	
 	LDY.w $0700
 	LDA.w DATA_21A648,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
+	
 	DEC.b $05
+	
 CODE_23B1F3:
 	LDA.w DATA_21A654,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
+	
 	DEC.b $05
 	LDA.b $05
 	CMP.b #$01
 	BNE.b CODE_23B1F3
+	
 	LDA.w DATA_21A660,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
+	
+	;SNES: remove shadow
+	
 	LDA.b $00
 	STA.b $2E
 	LDA.b $01
 	STA.b $2F
+	
 	LDA.w $0700
 	CLC
 	ADC.b #$10
@@ -34878,17 +35398,20 @@ CODE_23B1F3:
 	ADC.b #$00
 	STA.b $2F
 	STA.b $01
+	
 	LDA.b $03
 	STA.b $05
+	
 	INC.b $04
 	LDA.b $04
 	CMP.b #$02
 	BNE.b CODE_23B1DC
+	
 	RTL
 
 ;--------------------------------------------------------------------
 
-CODE_23B233:
+LoadLevel_RandomPUpClouds:
 	LDA.b #$3B
 	STA.w $05ED
 	JSL.l SMB3_GetRand_Main
@@ -34927,7 +35450,7 @@ SMB3_ConstructedPlainResizableObj08_LineOfBushes:
 CODE_23B25D:
 	LDA.b #$86
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_23B25D
 	RTL
@@ -34962,7 +35485,7 @@ CODE_23B28C:
 	LDA.w DATA_21A67F,x
 	STA.b [$2E],y
 CODE_23B291:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_23B28C
 	LDA.w DATA_21A683,x
@@ -35025,24 +35548,26 @@ SMB3_ConstructedPlainResizableObj0C_UnderwaterWoodenGround:
 	LDA.w DATA_21A687,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BEQ.b CODE_23B316
 CODE_23B305:
 	LDA.w DATA_21A687+$01,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_23B305
 CODE_23B316:
 	LDA.w DATA_21A687+$02,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
+	
 	LDA.b $00
 	STA.b $2E
 	LDA.b $01
 	STA.b $2F
+	
 	LDA.w $0700
 	CLC
 	ADC.b #$10
@@ -35050,8 +35575,9 @@ CODE_23B316:
 	TAY
 	LDA.b $2F
 	ADC.b #$00
-	STA.b $2F
+	STA.b $2F	
 	STA.b $01
+	
 	DEC.b $03
 	BMI.b CODE_23B368
 	LDA.b $02
@@ -35059,14 +35585,14 @@ CODE_23B316:
 	LDA.w DATA_21A68D,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BEQ.b CODE_23B363
 CODE_23B352:
 	LDA.w DATA_21A68D+$01,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_23B352
 CODE_23B363:
@@ -35077,7 +35603,7 @@ CODE_23B368:
 
 ;--------------------------------------------------------------------
 
-CODE_23B369:
+LoadLevel_CloudRun:
 	RTL
 
 ;--------------------------------------------------------------------
@@ -35127,7 +35653,7 @@ CODE_23B38C:
 	TAY
 	INY
 	INY
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	STA.b $04
 	INC.b $04
 	LDA.w $0700
@@ -35282,7 +35808,7 @@ DATA_23B49E:
 
 ;--------------------------------------------------------------------
 
-CODE_23B4A3:
+LoadLevel_Slope45T2B:
 	LDA.b $2E
 	STA.b $00
 	LDA.b $2F
@@ -35317,10 +35843,10 @@ CODE_23B4D2:
 	CMP.b #$04
 	BEQ.b CODE_23B4DD
 CODE_23B4D8:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B4DD:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_23B4C9
 CODE_23B4E5:
@@ -35390,10 +35916,10 @@ CODE_23B53D:
 	CMP.b #$09
 	BEQ.b CODE_23B55F
 CODE_23B55A:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B55F:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BPL.b CODE_23B53D
 	INC.b $02
@@ -35466,10 +35992,10 @@ CODE_23B5C5:
 	BRA.b CODE_23B5DF
 
 CODE_23B5DA:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B5DF:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BPL.b CODE_23B5DA
 	LDA.b $00
@@ -35543,10 +36069,10 @@ CODE_23B646:
 	STA.b $DA
 	LDA.b [$D8],y
 	BNE.b CODE_23B65E
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B65E:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_23B646
 CODE_23B666:
@@ -35578,18 +36104,23 @@ CODE_23B67A:
 
 ;--------------------------------------------------------------------
 
-CODE_23B698:
+LoadLevel_Slope225T2B:
 	LDA.b $2E
 	STA.b $00
 	LDA.b $2F
 	STA.b $01
+	
 	LDA.b #$00
 	STA.b $02
+	
 	LDA.w $0706
 	PHA
+	
 	AND.b #$0F
 	STA.b $03
+	
 	PLA
+	
 	SEC
 	SBC.b #$10
 	AND.b #$C0
@@ -35598,48 +36129,61 @@ CODE_23B698:
 	ROL
 	ROL
 	TAX
+	
 CODE_23B6B7:
 	LDY.w $0700
+	
 	LDA.b $02
 	STA.b $04
 	BEQ.b CODE_23B6DF
+	
 CODE_23B6C0:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
+;SNES: new
 	TXA
 	BEQ.b CODE_23B6D2
+	
 	LDA.b [$2E],y
 	CMP.b #$08
 	BEQ.b CODE_23B6D7
+;/
 CODE_23B6D2:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B6D7:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_23B6C0
+	
 CODE_23B6DF:
-	LDA.w DATA_21A6B6,x
+	LDA.w LL_225SlopesT2B_Upper,x
 	STA.b [$2E],y
+;SNES\: new
 	TXA
 	BNE.b CODE_23B6EF
+	;X = 0
 	PHX
 	LDX.b #$04
 	JSL.l CODE_2A89DC
 	PLX
 CODE_23B6EF:
-	JSL.l CODE_23BEBB
-	LDA.w DATA_21A6B9,x
+;/
+	JSL.l LoadLevel_NextColumn
+	LDA.w LL_225SlopesT2B_Lower,x
 	STA.b [$2E],y
+;SNES_start
 	CMP.b #$9F
 	BNE.b CODE_23B700
 	JSL.l CODE_2A89DC
 CODE_23B700:
+;SNES_fin
 	LDA.b $00
 	STA.b $2E
 	LDA.b $01
 	STA.b $2F
+	
 	LDA.w $0700
 	CLC
 	ADC.b #$10
@@ -35648,6 +36192,7 @@ CODE_23B700:
 	ADC.b #$00
 	STA.b $2F
 	STA.b $01
+	
 	INC.b $02
 	DEC.b $03
 	BPL.b CODE_23B6B7
@@ -35688,7 +36233,7 @@ CODE_23B73F:
 	JSL.l CODE_2A8AE2
 	PLX
 CODE_23B757:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.w DATA_21A6BF,x
 	STA.b [$2E],y
 	CMP.b #$9D
@@ -35712,14 +36257,14 @@ CODE_23B76A:
 	CMP.b #$07
 	BEQ.b CODE_23B78C
 CODE_23B787:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B78C:
-	JSL.l CODE_23BEBB
-	LDA.w DATA_21A6A7,x
+	JSL.l LoadLevel_NextColumn
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B795:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BPL.b CODE_23B76A
 	LDA.b $00
@@ -35791,19 +36336,19 @@ CODE_23B7FF:
 	LDA.w DATA_21A6C2,x
 	STA.b [$2E],y
 	JSL.l CODE_2A8776
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.w DATA_21A6C5,x
 	STA.b [$2E],y
 	BRA.b CODE_23B828
 
 CODE_23B81A:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
-	LDA.w DATA_21A6A7,x
+	JSL.l LoadLevel_NextColumn
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B828:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BPL.b CODE_23B81A
 	REP.b #$20
@@ -35867,12 +36412,12 @@ CODE_23B886:
 	STA.b $04
 	BEQ.b CODE_23B8A5
 CODE_23B88F:
-	LDA.w DATA_21A6A7,x
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
-	LDA.w DATA_21A6A7,x
+	JSL.l LoadLevel_NextColumn
+	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_23B88F
 CODE_23B8A5:
@@ -35882,7 +36427,7 @@ CODE_23B8A5:
 	BNE.b CODE_23B8B2
 	JSL.l CODE_2A87B2
 CODE_23B8B2:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.w DATA_21A6CB,x
 	STA.b [$2E],y
 	CMP.b #$A5
@@ -36059,7 +36604,7 @@ CODE_23B9C4:
 	BEQ.b CODE_23B9D9
 	JSL.l CODE_2A892C
 CODE_23B9D9:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	LDA.b $03
 	CMP.b #$FF
@@ -36080,7 +36625,7 @@ CODE_23B9E7:
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
 CODE_23BA03:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	LDA.b $03
 	CMP.b #$FF
@@ -36167,7 +36712,7 @@ CODE_23BA97:
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
 CODE_23BAA0:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	LDA.b $03
 	CMP.b #$FF
@@ -36200,7 +36745,7 @@ CODE_23BAD9:
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
 	JSL.l CODE_2A886F
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	LDA.b $03
 	CMP.b #$FF
@@ -36279,7 +36824,7 @@ CODE_23BB32:
 CODE_23BB69:
 	LDA.w DATA_21A6E6,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -36293,7 +36838,7 @@ CODE_23BB7C:
 CODE_23BB83:
 	LDA.w DATA_21A6E9,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BPL.b CODE_23BB83
 CODE_23BB90:
@@ -36402,10 +36947,10 @@ CODE_23BC0E:
 	LDA.b $03
 	ASL
 	TAX
-	LDA.w DATA_218200,x
+	LDA.w Tile_Mem_Addr,x
 	STA.b $2E
 	STA.b $00
-	LDA.w DATA_218200+$01,x
+	LDA.w Tile_Mem_Addr+$01,x
 	STA.b $2F
 	STA.b $01
 	STA.b $04
@@ -36442,7 +36987,7 @@ CODE_23BC74:
 	JSL.l CODE_2AB73A
 	JSR.w CODE_23BC93
 CODE_23BC7F:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_23BC74
 	LDA.b #$83
@@ -36495,7 +37040,7 @@ CODE_23BCD4:
 	LDA.w DATA_21A6F1,x
 	STA.b [$2E],y
 CODE_23BCD9:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_23BCD4
 	LDA.w DATA_21A6F3,x
@@ -36540,7 +37085,7 @@ CODE_23BD1E:
 	LDA.w DATA_21A6F5,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_23BD1E
 CODE_23BD2F:
@@ -36698,7 +37243,7 @@ CODE_23BE2B:
 	LDA.b $01
 	STA.b $2F
 	LDY.w $0700
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	STY.w $0700
 	LDA.b $2E
 	STA.b $00
@@ -36789,7 +37334,8 @@ CODE_23BEA9:
 
 ;--------------------------------------------------------------------
 
-CODE_23BEBB:
+;CODE_23BEBB
+LoadLevel_NextColumn:
 	INY
 	TYA
 	AND.b #$0F
@@ -36917,12 +37463,12 @@ CODE_23BF7E:
 
 ;--------------------------------------------------------------------
 
-CODE_23BFA7:
+Player_DoGameplay:
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
 	LDA.w DATA_21E945,y
 	STA.w $0560
 	JSL.l CODE_23DF67
-	JSR.w CODE_23C0CD
+	JSR.w Level_Initialize
 	JSR.w CODE_23C1E7
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	CMP.b #$07
@@ -36958,7 +37504,7 @@ CODE_23BFF7:
 	SEC
 	SBC.b #$90
 	STA.w $055C
-	JSR.w CODE_23C261
+	JSR.w Player_Update
 	LDA.w !RAM_SMB3_Level_Player_HurtTimer
 	BEQ.b CODE_23C022
 	LDA.l $7FC586
@@ -37012,7 +37558,7 @@ CODE_23C063:
 	LDA.w !RAM_SMB3_Level_Player_StarPowerTimer
 	CMP.b #$20
 	BCS.b CODE_23C07B
-	LDY.w $1062
+	LDY.w !Level_MusicQueueRestore
 CODE_23C07B:
 	STY.w !RAM_SMB3_Global_MusicCh1
 	BNE.b CODE_23C086
@@ -37027,8 +37573,8 @@ CODE_23C089:
 
 ;--------------------------------------------------------------------
 
-CODE_23C08A:
-	JSL.l CODE_20E237
+Player_Draw29:
+	JSL.l Player_Draw
 	RTS
 
 ;--------------------------------------------------------------------
@@ -37043,7 +37589,7 @@ CODE_23C08F:
 	STZ.b !RAM_SMB3_Global_ControllerHold1
 	STZ.b !RAM_SMB3_Global_ControllerPress1
 CODE_23C09F:
-	LDA.w $0414
+	LDA.w !Level_JctCtl
 	CMP.b #$03
 	BEQ.b CODE_23C0C6
 	LDA.w $07BE
@@ -37072,14 +37618,17 @@ CODE_23C0CC:
 
 ;--------------------------------------------------------------------
 
-CODE_23C0CD:
+;CODE_23C0CD
+Level_Initialize:
 	LDA.b $B9
 	BEQ.b CODE_23C0D2
 	RTS
 
 CODE_23C0D2:
 	STA.w $0561
+;SNES:
 	LDA.b #$50
+;/
 	STA.b $C4
 	STZ.b $C5
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
@@ -37089,13 +37638,16 @@ CODE_23C0D2:
 	LDA.b #$40
 	STA.b $BD
 	LDY.w $0426
-	LDA.w DATA_21EA01,y
+	LDA.w Level_XStarts,y
 	STA.b !RAM_SMB3_Level_Player_XPosLo
 	STA.b $B9
+	
 	JSR.w CODE_23C14C
+	
 	LDA.w !RAM_SMB3_Overworld_PlayerPowerUpPose
 	CMP.b #$08
 	BNE.b CODE_23C108
+	
 	LDA.b #$7F
 	STA.w !RAM_SMB3_Global_FilledInPMeterSegments
 	LDA.b #$FF
@@ -37112,7 +37664,7 @@ CODE_23C10B:
 	STA.w $0543
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
 	LDY.b !RAM_SMB3_Level_Player_YPosHi
-	JSL.l CODE_209F99
+	JSL.l LevelJct_GetVScreenH2
 	STY.b !RAM_SMB3_Level_Player_YPosHi
 	STA.b !RAM_SMB3_Level_Player_YPosLo
 	LDA.b #$01
@@ -37120,7 +37672,7 @@ CODE_23C10B:
 	RTS
 
 CODE_23C130:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $0543
 	LDA.b $13
 	STA.w $0542
@@ -37201,7 +37753,7 @@ CODE_23C190:
 	LDA.b #$06
 	STA.w $0427
 	LSR
-	STA.w $0216
+	STA.w !Vert_Scroll
 	RTS
 
 ;--------------------------------------------------------------------
@@ -37215,7 +37767,7 @@ CODE_23C19F:
 	LDA.b #$90
 	STA.b !RAM_SMB3_Level_Player_YSpeed
 	STA.b !RAM_SMB3_Level_Player_XPosLo
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CLC
 	ADC.b #$80
 	STA.b !RAM_SMB3_Level_Player_YPosLo
@@ -37297,7 +37849,7 @@ CODE_23C227:
 	DEC.b $53
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BNE.b CODE_23C24D
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $0543
 	LDA.b $13
 	STA.w $0542
@@ -37316,7 +37868,7 @@ CODE_23C260:
 
 ;--------------------------------------------------------------------
 
-CODE_23C261:
+Player_Update:
 	LDA.w $0578
 	BEQ.b CODE_23C2C2
 	CMP.b #$0F
@@ -37387,7 +37939,7 @@ CODE_23C2C9:
 	BNE.b CODE_23C2F0
 	LDA.b #$00
 	STA.b !RAM_SMB3_Level_Player_CurrentPowerUp
-	JSL.l CODE_27A547
+	JSL.l Player_Die
 	LDA.b #$C0
 	STA.w $0510
 	LDA.b #$02
@@ -37404,7 +37956,7 @@ CODE_23C2F0:
 	ORA.w !RAM_SMB3_Level_TimerTens
 	ORA.w !RAM_SMB3_Level_TimerOnes
 	BNE.b CODE_23C324
-	JSL.l CODE_27A547
+	JSL.l Player_Die
 	LDA.b #$03
 	STA.b !RAM_SMB3_Level_Player_DeathState
 	LDA.b #$FF
@@ -37424,7 +37976,7 @@ CODE_23C324:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	ORA.w !RAM_SMB3_Level_Player_GoalWalkAnimationTimer
 	BNE.b CODE_23C33D
-	JSL.l CODE_27A547
+	JSL.l Player_Die
 	LDA.b #$01
 	STA.b !RAM_SMB3_Level_Player_DeathState
 	JMP.w CODE_23C317
@@ -37477,14 +38029,14 @@ CODE_23C390:
 	JSL.l CODE_27A93D
 	JSR.w CODE_23D364
 	JSR.w CODE_23D810
-	JSR.w CODE_23DAF9
-	JSR.w CODE_23C3BC
+	JSR.w Player_DoSpecialTiles
+	JSR.w Player_DoVibration
 	LDA.b !RAM_SMB3_Level_Player_CurrentPose
 	CMP.b #$2E
 	BEQ.b CODE_23C3B3
 	JSR.w CODE_23CD71
 CODE_23C3B3:
-	JSR.w CODE_23C08A
+	JSR.w Player_Draw29
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_Player_SuctionXOffset
 	RTS
@@ -37493,12 +38045,12 @@ CODE_23C3B3:
 
 ; Note: Seems to be related to screen shaking.
 
-CODE_23C3BC:
+Player_DoVibration:
 	LDA.w !RAM_SMB3_Level_ShakeLayer1Timer
 	BEQ.b CODE_23C3DA
 	DEC.w !RAM_SMB3_Level_ShakeLayer1Timer
 	AND.b #$03
-	LDY.w $0216
+	LDY.w !Vert_Scroll
 	BPL.b CODE_23C3CD
 	ORA.b #$04
 CODE_23C3CD:
@@ -37728,7 +38280,7 @@ CODE_23C52B:
 CODE_23C52D:
 	JSL.l CODE_23DE53
 	JSL.l CODE_23DEA3
-	JMP.w CODE_23C08A
+	JMP.w Player_Draw29
 
 CODE_23C538:
 	LDA.b $BD
@@ -37796,7 +38348,7 @@ CODE_23C5AE:
 	STY.b $09
 	LDA.b #$08
 	STA.b $0A
-	JSL.l CODE_23D2B6
+	JSL.l Player_GetTileAndSlope
 	STA.w $0602
 	STA.b $00
 	LDA.w $0603
@@ -37949,7 +38501,7 @@ CODE_23C6AF:
 	BEQ.b CODE_23C6C2
 	LDY.b #$03
 CODE_23C6C2:
-	STY.w $0414
+	STY.w !Level_JctCtl
 	STZ.w $0713
 	STZ.b !RAM_SMB3_Level_Player_XSpeed
 	STZ.w $034E
@@ -38029,7 +38581,7 @@ CODE_23C75A:
 	STY.b $09
 	LDA.b #$08
 	STA.b $0A
-	JSL.l CODE_23D2B6
+	JSL.l Player_GetTileAndSlope
 	CMP.b #$85
 	BNE.b CODE_23C76E
 	LDY.b #$F0
@@ -38059,7 +38611,7 @@ CODE_23C790:
 	JSL.l CODE_23DE53
 	JSL.l CODE_23DEA3
 	JSR.w CODE_23CECA
-	JSR.w CODE_23C08A
+	JSR.w Player_Draw29
 	RTS
 
 CODE_23C79F:
@@ -38944,17 +39496,23 @@ else
 endif
 	CMP.b #$03
 	BCC.b CODE_23CD40
+	
 	LDA.w $0573
 	AND.b !RAM_SMB3_Global_ControllerHold1
 	BEQ.b CODE_23CD40
+	
 	LDY.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	BEQ.b CODE_23CD09
+	
 	LDY.b #$01
 CODE_23CD09:
 	LDA.b $A6
 	BNE.b CODE_23CD40
+	
 	LDA.w DATA_21E984,y
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
+	
+;SNES: new: skid smoke \ 
 	LDA.l $7FC522
 	ORA.l $7FC523
 	BNE.b CODE_23CD40
@@ -38970,6 +39528,7 @@ CODE_23CD09:
 	STA.l $7FC52A
 	LDA.b $BD
 	STA.l $7FC52C
+;/ 
 CODE_23CD40:
 	LDA.w !RAM_SMB3_Level_Player_DuckingFlag
 	BEQ.b CODE_23CD52
@@ -39554,35 +40113,35 @@ CODE_23D10E:
 	LDA.w !RAM_SMB3_Level_AutoscrollLayerYPosLo
 	PHA
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.w $0780
 	PLA
-	STA.w $0216
+	STA.w !Vert_Scroll
 	STA.w $0543
 	LDA.w $0350
 	CMP.b #$01
 	BEQ.b CODE_23D136
-	CMP.b #$02
+	CMP.b #$02 ; airship clouds
 	BEQ.b CODE_23D15A
-	CMP.b #$23
+	CMP.b #$23 ; airship clouds
 	BEQ.b CODE_23D15A
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$05
 	BNE.b CODE_23D15A
 CODE_23D136:
 	REP.b #$20
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
 	LDA.w $034F
 	AND.w #$00FF
 	BEQ.b CODE_23D158
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $0218
 CODE_23D158:
 	SEP.b #$20
@@ -39605,7 +40164,7 @@ CODE_23D176:
 	RTL
 
 CODE_23D177:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CMP.b #$EF
 	BNE.b CODE_23D18A
 	LDA.w !RAM_SMB3_Level_Player_FlightTimer
@@ -39641,7 +40200,7 @@ endif
 CODE_23D1A6:
 	STA.w $0780
 	CLC
-	ADC.w $0216
+	ADC.w !Vert_Scroll
 	BCS.b CODE_23D1B4
 	LDA.b #$00
 	STA.w $0780
@@ -39655,7 +40214,7 @@ CODE_23D1B7:
 	BCC.b CODE_23D1EF
 	STA.w $0780
 	CLC
-	ADC.w $0216
+	ADC.w !Vert_Scroll
 	BCS.b CODE_23D1CB
 	CMP.b #$EF
 	BCC.b CODE_23D1D2
@@ -39664,20 +40223,20 @@ CODE_23D1CB:
 	STA.w $0780
 	LDA.b #$EF
 CODE_23D1D2:
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
 	LDA.w $034F
 	BEQ.b CODE_23D1EF
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $0218
 CODE_23D1EF:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 CODE_23D1F2:
 	STA.w $0543
 	LDA.w $0217
@@ -39778,11 +40337,11 @@ CODE_23D28C:
 	REP.b #$20
 	LDA.w $0542
 	XBA
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
@@ -39798,71 +40357,100 @@ CODE_23D2B5:
 
 ;--------------------------------------------------------------------
 
-CODE_23D2B6:
-	STZ.w $1CEF
-	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
+;CODE_23D2B6
+Player_GetTileAndSlope:
+	STZ.w $1CEF ; Temp_VarNP0 = 0
+	
+	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag	
 	BNE.b CODE_23D331
+	
 	LDA.w $058B
 	BEQ.b CODE_23D2E4
+	
 	LDA.w !RAM_SMB3_Level_Player_IsAboveTopOfLevelFlag
 	BNE.b CODE_23D2E4
+	
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
 	CLC
 	ADC.b $09
 	SEC
 	SBC.w $0543
+	
 	CMP.b #$A0
 	BCC.b CODE_23D2E4
+	
 	SBC.b #$10
 	AND.b #$F0
 	STA.b $0D
+	
 	LDA.b #$01
 	STA.b $0C
+	
 	STA.w $1CEF
+	
 	BNE.b CODE_23D2F3
+	
 CODE_23D2E4:
 	LDA.b !RAM_SMB3_Level_Player_YPosHi
 	STA.b $0C
+	
 	LDA.b $09
 	CLC
 	ADC.b !RAM_SMB3_Level_Player_YPosLo
 	STA.b $0D
+	
 	BCC.b CODE_23D2F3
+	
 	INC.b $0C
+	
 CODE_23D2F3:
 	LDA.b $0C
 	BEQ.b CODE_23D306
+	
 	CMP.b #$01
 	BNE.b CODE_23D301
+	
 	LDA.b $0D
 	CMP.b #$B0
 	BCC.b CODE_23D306
+	
 CODE_23D301:
 	LDA.b #$00
 	STA.b $B4
+	
 	RTL
 
 CODE_23D306:
 	LDA.b $43
 	STA.b $0E
+	
 	LDA.b $0A
 	BPL.b CODE_23D310
+	
 	DEC.b $0E
+	
 CODE_23D310:
 	LDA.b !RAM_SMB3_Level_Player_XPosLo
 	CLC
 	ADC.b $0A
-	STA.b $0F
+	STA.b $0F	
 	BCC.b CODE_23D31B
+	
 	INC.b $0E
+	
 CODE_23D31B:
+
 	STY.b $09
 	STX.b $0A
-	JSL.l CODE_209FA5
+	
+	JSL.l Player_GetTileAndSlope_Normal
+	
 	LDX.b $0A
 	LDY.w $0571
 	BNE.b CODE_23D32E
+	
 	JSL.l SMB3_ModifyMap16IDForPSwitchAffectedBlocks_Main
+	
 CODE_23D32E:
 	LDY.b $09
 	RTL
@@ -39870,15 +40458,18 @@ CODE_23D32E:
 CODE_23D331:
 	LDA.b !RAM_SMB3_Level_Player_YPosHi
 	STA.b $0C
+	
 	LDA.b $09
 	CLC
 	ADC.b !RAM_SMB3_Level_Player_YPosLo
 	STA.b $0D
 	BCC.b CODE_23D340
+	
 	INC.b $0C
 CODE_23D340:
 	LDA.b $0C
 	BPL.b CODE_23D347
+	
 	LDA.b #$00
 	RTL
 
@@ -39887,14 +40478,20 @@ CODE_23D347:
 	CLC
 	ADC.b $0A
 	STA.b $0F
+	
 	STY.b $09
-	JSL.l CODE_209F2E
+	
+	JSL.l Player_GetTileV
+	
 	LDY.w $0571
 	BNE.b CODE_23D35D
+	
 	JSL.l SMB3_ModifyMap16IDForPSwitchAffectedBlocks_Main
+	
 CODE_23D35D:
 	LDY.b #$00
 	STY.b $0E
+	
 	LDY.b $09
 	RTL
 
@@ -39961,7 +40558,7 @@ CODE_23D3BB:
 	STA.b $09
 	LDA.w DATA_21EB42+$01,y
 	STA.b $0A
-	JSL.l CODE_23D2B6
+	JSL.l Player_GetTileAndSlope
 	STA.w $0603,x
 	PHA
 	AND.b #$C0
@@ -40194,7 +40791,7 @@ CODE_23D54A:
 	RTS
 
 CODE_23D553:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$04
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
@@ -40603,7 +41200,7 @@ CODE_23D7ED:
 	SBC.b #$10
 	STA.b $0D
 	STX.b $04
-	JSL.l CODE_209FA5
+	JSL.l Player_GetTileAndSlope_Normal
 	LDX.b $04
 	CMP.b #$40
 	BNE.b CODE_23D80C
@@ -40633,7 +41230,7 @@ CODE_23D81F:
 	STA.b $09
 	LDA.w DATA_21EC28+$01,y
 	STA.b $0A
-	JSL.l CODE_23D2B6
+	JSL.l Player_GetTileAndSlope
 	LDX.b #$04
 	STA.w $0603,x
 	JSR.w CODE_23D567
@@ -41034,7 +41631,7 @@ CODE_23DADA:
 	STA.b $09
 	LDA.w DATA_21EB82+$01,y
 	STA.b $0A
-	JSL.l CODE_23D2B6
+	JSL.l Player_GetTileAndSlope
 	STA.w $0603,x
 	AND.b #$C0
 	ASL
@@ -41047,7 +41644,7 @@ CODE_23DADA:
 
 ;--------------------------------------------------------------------
 
-CODE_23DAF9:
+Player_DoSpecialTiles:
 	LDA.w !RAM_SMB3_Level_Player_IsTanookiStatueTimer
 	ORA.w !RAM_SMB3_Level_Player_TailSwipeTimer
 	ORA.w !RAM_SMB3_Level_Player_SomersaultJumpFlag
@@ -41090,7 +41687,7 @@ CODE_23DB39:
 	BEQ.b CODE_23DB4B
 	DEY
 CODE_23DB4B:
-	JSR.w CODE_23DDCD
+	JSR.w PipeEntryPrepare
 CODE_23DB4E:
 	JMP.w CODE_23DBF3
 
@@ -41183,9 +41780,9 @@ CODE_23DBD7:
 	LDA.b $00
 	LSR
 	TAY
-	JSR.w CODE_23DDCD
+	JSR.w PipeEntryPrepare
 	JSL.l CODE_23DDBB
-	JSR.w CODE_23C08A
+	JSR.w Player_Draw29
 	PLA
 	PLA
 	RTS
@@ -41435,9 +42032,12 @@ CODE_23DD8F:
 	LDY.w $0560
 	CPY.b #$06
 	BNE.b CODE_23DDBA
+	
 	LDA.b !RAM_SMB3_Global_ControllerPress1
 	BIT.b #!Joypad_X|(!Joypad_Y>>8)
-	BNE.b CODE_23DDAB
+	BNE.b CODE_23DDAB	 ; If Player is not pressing 'B', jump to PRG008_BF03 (RTS)
+	
+;SNES:\
 	LDA.w !RAM_SMB3_Global_ControllerPress2P1					; Optimization: Unnecessary absolute addressing
 	LDY.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_23DDA7
@@ -41445,13 +42045,14 @@ CODE_23DD8F:
 CODE_23DDA7:
 	AND.b #!Joypad_X|(!Joypad_Y>>8)
 	BEQ.b CODE_23DDBA
+;SNES:/	
 CODE_23DDAB:
 	JSL.l SMB3_GetToadHouseChestItem_Main
 	TXA
 	BEQ.b CODE_23DDBA
 	DEX
 	LDA.w $0529
-	JSL.l CODE_27A8D9
+	JSL.l ToadHouse_GiveItem
 CODE_23DDBA:
 	RTS
 
@@ -41474,15 +42075,20 @@ CODE_23DDC7:
 
 ; Note: Something related to going down a pipe?
 
-CODE_23DDCD:
+PipeEntryPrepare:
 	STX.w $0571
+	
 	LDA.b #!Define_SMAS_Sound0060_IntoPipe
 	STA.w !RAM_SMB3_Global_SoundCh1
+
+;SNES: new (fade music, assuming this is a pipe level)
 	LDA.w !RAM_SMB3_Global_LoadOverworldMusicBank
 	BNE.b CODE_23DDDF
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
 CODE_23DDDF:
+;/
+
 	LDA.b #$04
 	CPY.b #$03
 	BEQ.b CODE_23DDFF
@@ -45324,14 +45930,14 @@ CODE_23F6D9:
 	AND.b #$03
 	TAY
 	LDA.w DATA_21EDDD,y
-	STA.w $0216
+	STA.w !Vert_Scroll
 CODE_23F6ED:
 	LDA.w !RAM_SMB3_BattleMode_POWBlockHitCounter
 	CMP.b #$03
 	BEQ.b CODE_23F6D8
 	LDA.b #$98
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.w SMB3_OAMBuffer[$08].YDisp
 	LDA.b #$78
 	STA.w SMB3_OAMBuffer[$08].XDisp
@@ -45857,7 +46463,7 @@ macro SMB3Bank24Macros(StartBank, EndBank)
 
 ; Note: FG Map16 data for levels that use the tile set seen in 1-1
 
-DATA_248000:
+Tile_Layout_TS1:
 	db $FC,$10,$FC,$10,$FC,$10,$FC,$10,$3B,$0C,$3A,$0C,$FC,$10,$FC,$10
 	db $FF,$10,$FF,$10,$FF,$10,$FF,$10,$05,$10,$06,$10,$07,$10,$08,$10
 	db $05,$10,$D6,$0C,$07,$10,$D6,$0C,$E8,$14,$E9,$14,$EA,$14,$EB,$14
@@ -46005,7 +46611,7 @@ DATA_248000:
 	db $5C,$1A,$66,$1A,$76,$1A,$67,$1A,$68,$1A,$66,$1A,$69,$1A,$67,$1A
 	db $68,$1A,$66,$1A,$3E,$1A,$2E,$1A
 
-DATA_248918:
+DATA_248918: ;Tile_Attributes_TS1
 	db $25,$50,$A0,$E2,$2D,$53,$AD,$F0
 
 ;--------------------------------------------------------------------
@@ -46019,7 +46625,7 @@ DATA_248935:
 
 SMB3_ProcessConstructedPlainResizableObjects:
 .Main:
-;$24893D
+;$24893D ;LoadLevel_Generator_TS1
 	LDA.b $0E
 	AND.b #$E0
 	LSR
@@ -46054,15 +46660,15 @@ DATA_24895A:
 	dl SMB3_ConstructedPlainResizableObj0A_SmilingClouds_Main
 	dl SMB3_ConstructedPlainResizableObj0B_WoodenGround_Main
 	dl SMB3_ConstructedPlainResizableObj0C_UnderwaterWoodenGround_Main
-	dl CODE_23B369
+	dl LoadLevel_CloudRun
 	dl CODE_23B26D
 	dl SMB3_ConstructedPlainResizableObj0F_BrickBlocks_Main
 	dl SMB3_ConstructedPlainResizableObj10_CoinQuestionMarkBlocks_Main
 	dl SMB3_ConstructedPlainResizableObj11_CoinBrickBlocks_Main
 	dl SMB3_ConstructedPlainResizableObj12_WoodBlocks_Main
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
 	dl SMB3_ConstructedPlainResizableObj14_NoteBlocks_Main
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
 	dl SMB3_ConstructedPlainResizableObj16_Coins_Main
 	dl SMB3_ConstructedPlainResizableObj17_ExitEnabledVerticalUpPipe_Main
 	dl SMB3_ConstructedPlainResizableObj18_VerticalUpPipe_Main
@@ -46076,23 +46682,23 @@ DATA_24895A:
 	dl SMB3_ConstructedPlainResizableObj20_BulletBillShooter_Main
 	dl CODE_23AEC7
 	dl SMB3_ConstructedPlainResizableObj22_PSwitchCoins_Main
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl SMB3_ConstructedPlainResizableObj25_WaterWithNoCurrent_Main
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl SMB3_ConstructedPlainResizableObj28_DiamondBlocks_Main
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl SMB3_ConstructedPlainResizableObj2B_ThrowBlocks_Main
 	dl SMB3_ConstructedPlainResizableObj2C_VerticalScreenScrollingPipe_Main
-	dl CODE_23B024
-	dl CODE_2A8674
-	dl CODE_2A8394
+	dl LoadLevel_LittleCloudSolidRun
+	dl SNESLoadLevel_BonusGenerator ; bonus room generator
+	dl CODE_2A8394 ; giant bush
 
 ;--------------------------------------------------------------------
 
-CODE_2489EA:
+LeveLoad_FixedSizeGen_TS1:
 	LDA.b $0E
 	AND.b #$E0
 	LSR
@@ -46105,7 +46711,7 @@ DATA_2489F8:
 	dl CODE_23AAC1
 	dl CODE_23AAC7
 	dl CODE_23AACD
-	dl CODE_23B233
+	dl LoadLevel_RandomPUpClouds
 	dl CODE_23A699
 	dl CODE_23A682
 	dl CODE_23B23D
@@ -46343,29 +46949,29 @@ SMB3_ProcessUndergroundAndBonusRoomResizableObjects:
 	JSL.l SMB3_ExecutePtr_Long
 
 DATA_24AE00:
-	dl CODE_23B4A3
+	dl LoadLevel_Slope45T2B
 	dl CODE_23B50E
 	dl CODE_23B5AA
 	dl CODE_23B622
-	dl CODE_23B4A3
+	dl LoadLevel_Slope45T2B
 	dl CODE_23B50E
 	dl CODE_23B5AA
 	dl CODE_23B622
-	dl CODE_23B4A3
+	dl LoadLevel_Slope45T2B
 	dl CODE_23B50E
 	dl CODE_23B5AA
 	dl CODE_23B622
 	dl CODE_23B8E5
 	dl CODE_23B8E5
 	dl CODE_23B8E5
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
 	dl CODE_23A6C1
 	dl CODE_23A6C1
 	dl CODE_23A6C1
@@ -46378,25 +46984,25 @@ DATA_24AE00:
 	dl CODE_23AE7B
 	dl CODE_23AEC7
 	dl CODE_23AEC7
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
-	dl CODE_23B698
+	dl LoadLevel_Slope225T2B
 	dl CODE_23B720
 	dl CODE_23B7E4
 	dl CODE_23B86B
-	dl CODE_23B698
+	dl LoadLevel_Slope225T2B
 	dl CODE_23B720
 	dl CODE_23B7E4
 	dl CODE_23B86B
-	dl CODE_23B698
+	dl LoadLevel_Slope225T2B
 	dl CODE_23B720
 	dl CODE_23B7E4
 	dl CODE_23B86B
@@ -46420,8 +47026,8 @@ DATA_24AE00:
 	dl CODE_23BCB5
 	dl CODE_23BD06
 	dl CODE_23BD06
-	dl CODE_23B369
-	dl CODE_2A8674
+	dl LoadLevel_CloudRun
+	dl SNESLoadLevel_BonusGenerator
 	dl CODE_2AB753
 	dl CODE_2AB787
 
@@ -46703,14 +47309,14 @@ DATA_24E6B2:
 	dl CODE_23AC80
 	dl CODE_23ACAF
 	dl CODE_24E938
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
 	dl CODE_23A6C1
 	dl CODE_23A6C1
 	dl CODE_23A6C1
@@ -46723,14 +47329,14 @@ DATA_24E6B2:
 	dl CODE_23AE7B
 	dl CODE_23AEC7
 	dl CODE_23AEC7
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
 	dl CODE_24E978
@@ -46828,7 +47434,7 @@ CODE_24E805:
 	LDA.b #$4B
 	STA.b [$2E],y
 CODE_24E809:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BNE.b CODE_24E805
 	LDA.b #$4C
@@ -46870,7 +47476,7 @@ CODE_24E848:
 	LDA.l DATA_24E819,x
 	STA.b [$2E],y
 CODE_24E84E:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_24E848
 	LDA.l DATA_24E81D,x
@@ -46905,7 +47511,7 @@ CODE_24E876:
 CODE_24E889:
 	LDA.b #$81
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_24E889
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
@@ -46916,7 +47522,7 @@ CODE_24E889:
 CODE_24E8A0:
 	LDA.b #$25
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_24E8A0
 CODE_24E8AB:
@@ -46937,7 +47543,7 @@ CODE_24E8BC:
 	LDA.b #$83
 	STA.b [$2E],y
 CODE_24E8C0:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_24E8BC
 	LDA.b #$84
@@ -46982,7 +47588,7 @@ CODE_24E906:
 	LDA.l DATA_24E8D1,x
 	STA.b [$2E],y
 CODE_24E90C:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_24E906
 	CPX.b #$02
@@ -47038,7 +47644,7 @@ CODE_24E958:
 	LDA.l DATA_24E934,x
 	STA.b [$2E],y
 CODE_24E95E:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_24E958
 	LDA.l DATA_24E936,x
@@ -47071,7 +47677,7 @@ CODE_24E978:
 CODE_24E98C:
 	LDA.l DATA_24E975,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_24E98C
 	RTL
@@ -47100,10 +47706,10 @@ CODE_24E9B3:
 CODE_24E9B7:
 	LDA.l DATA_24E99B,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.l DATA_24E99D,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_24E9B7
 	JSR.w CODE_24EA8D
@@ -47144,7 +47750,7 @@ CODE_24E9FE:
 	LDA.l DATA_24E9DA,x
 	STA.b [$2E],y
 CODE_24EA04:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_24E9FE
 	LDA.l DATA_24E9DC,x
@@ -47236,7 +47842,7 @@ CODE_24EA6D:
 CODE_24EA73:
 	LDA.b #$66
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	CPX.b #$FF
 	BNE.b CODE_24EA73
@@ -47524,14 +48130,14 @@ DATA_25894C:
 	dl CODE_258BEF
 	dl CODE_258BEF
 	dl CODE_258C68
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
 	dl CODE_23A6C1
 	dl CODE_23A6C1
 	dl CODE_23A6C1
@@ -47544,14 +48150,14 @@ DATA_25894C:
 	dl CODE_23AE7B
 	dl CODE_23AEC7
 	dl CODE_23AEC7
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
 	dl CODE_23A811
@@ -48016,7 +48622,7 @@ CODE_258CA0:
 CODE_258CA4:
 	LDA.b #$8C
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_258CA4
 	LDA.b $00
@@ -48069,7 +48675,7 @@ CODE_258CF4:
 	LDA.l DATA_258CC8,x
 CODE_258CF8:
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_258CF4
 	LDA.l DATA_258CCA,x
@@ -48133,7 +48739,7 @@ CODE_258D5F:
 	LDA.l DATA_258D29,x
 CODE_258D63:
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_258D5F
 	LDA.l DATA_258D2B,x
@@ -48165,7 +48771,7 @@ CODE_258D93:
 CODE_258D9C:
 	LDA.b #$09
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_258D9C
 	RTL
@@ -48201,7 +48807,7 @@ CODE_258DC4:
 CODE_258DCD:
 	LDA.b #$E2
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_258DCD
 	RTL
@@ -48231,7 +48837,7 @@ CODE_258DD9:
 CODE_258E00:
 	LDA.b #$8B
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	CPX.b #$FF
 	BNE.b CODE_258E00
@@ -48242,7 +48848,7 @@ CODE_258E0F:
 CODE_258E11:
 	LDA.b #$8C
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	CPX.b #$FF
 	BNE.b CODE_258E11
@@ -48315,7 +48921,7 @@ CODE_258E7F:
 	BEQ.b CODE_258E95
 	LDA.b #$8B
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	CPX.b #$FF
 	BNE.b CODE_258E7F
@@ -48324,7 +48930,7 @@ CODE_258E7F:
 CODE_258E95:
 	LDA.b #$8C
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	CPX.b #$FF
 	BNE.b CODE_258E95
@@ -48387,7 +48993,7 @@ CODE_258EEB:
 CODE_258EF5:
 	LDA.l DATA_258EDF,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_258EF5
 	LDA.b $00
@@ -48730,14 +49336,14 @@ DATA_25B087:
 	dl CODE_25B4DA
 	dl CODE_25B533
 	dl CODE_25B585
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
 	dl CODE_23A6C1
 	dl CODE_23A6C1
 	dl CODE_23A6C1
@@ -48750,14 +49356,14 @@ DATA_25B087:
 	dl CODE_23AE7B
 	dl CODE_23AEC7
 	dl CODE_23AEC7
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
 	dl CODE_25B5CD
@@ -48862,11 +49468,11 @@ CODE_25B1EE:
 	LDA.l DATA_25B1B2,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.l DATA_25B1B9,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_25B1EE
 	JSR.w CODE_25B717
@@ -48874,11 +49480,11 @@ CODE_25B211:
 	LDA.l DATA_25B1C0,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.l DATA_25B1C7,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_25B211
 	RTL
@@ -48908,11 +49514,11 @@ CODE_25B24F:
 	LDA.l DATA_25B232,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.l DATA_25B235,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.l DATA_25B238,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
@@ -48974,7 +49580,7 @@ CODE_25B29E:
 	LDA.b $01
 	STA.b $2F
 	LDY.w $0700
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	STY.w $0700
 	LDA.b $2E
 	STA.b $00
@@ -49061,7 +49667,7 @@ CODE_25B352:
 	LDA.l DATA_25B338,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_25B352
 	JSR.w CODE_25B717
@@ -49155,7 +49761,7 @@ CODE_25B42A:
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
 CODE_25B430:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	JMP.w CODE_25B3D3
 
@@ -49223,7 +49829,7 @@ CODE_25B485:
 	SBC.b #$02
 CODE_25B491:
 	PHA
-	JSL.l CODE_209B2A
+	JSL.l LoadLevel_Set_TileMemAddr
 	PLA
 	TAX
 	LDY.w $0700
@@ -49295,7 +49901,7 @@ CODE_25B501:
 CODE_25B505:
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_25B501
 	LDA.l DATA_25B4D6,x
@@ -49337,7 +49943,7 @@ CODE_25B54E:
 CODE_25B552:
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BNE.b CODE_25B54E
 	LDA.l DATA_25B52F,x
@@ -49383,7 +49989,7 @@ CODE_25B5A6:
 	TXA
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_25B59C
 	LDX.b #$E4
@@ -49436,7 +50042,7 @@ CODE_25B5F9:
 	LDX.b $03
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BPL.b CODE_25B5DA
 	JSR.w CODE_25B717
@@ -49484,7 +50090,7 @@ CODE_25B64B:
 	LDX.b $03
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	BPL.b CODE_25B62B
 	JSR.w CODE_25B717
@@ -49534,7 +50140,7 @@ CODE_25B6B0:
 	BEQ.b CODE_25B6C6
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	JMP.w CODE_25B6B0
 
@@ -49560,7 +50166,7 @@ CODE_25B6E0:
 	LDA.b #$C5
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	LDA.b $03
 	CMP.b #$FF
@@ -49814,14 +50420,14 @@ DATA_25D55D:
 	dl CODE_25DA35
 	dl CODE_25DA96
 	dl CODE_25DAF7
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
 	dl CODE_23A6C1
 	dl CODE_23A6C1
 	dl CODE_23A6C1
@@ -49834,14 +50440,14 @@ DATA_25D55D:
 	dl CODE_23AE7B
 	dl CODE_23AEC7
 	dl CODE_23AEC7
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
 	dl CODE_25DB19
@@ -49858,7 +50464,7 @@ DATA_25D55D:
 	dl CODE_25DC67
 	dl CODE_25DC7C
 	dl CODE_23A91B
-	dl CODE_2A8674
+	dl SNESLoadLevel_BonusGenerator
 	dl CODE_2A8483
 	dl CODE_2AB753
 
@@ -49927,10 +50533,10 @@ CODE_25D6A3:
 CODE_25D6AC:
 	LDA.b #$9C
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.b #$9D
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_25D6AC
 	RTL
@@ -49957,7 +50563,7 @@ CODE_25D6DB:
 CODE_25D6E2:
 	LDA.l DATA_25D6C0,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$04
 	BEQ.b CODE_25D6F5
@@ -50001,7 +50607,7 @@ CODE_25D730:
 CODE_25D737:
 	LDA.l DATA_25D70B,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$06
 	BEQ.b CODE_25D74E
@@ -50048,7 +50654,7 @@ CODE_25D797:
 CODE_25D79E:
 	LDA.l DATA_25D764,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$08
 	BEQ.b CODE_25D7B9
@@ -50123,10 +50729,10 @@ CODE_25D80C:
 CODE_25D815:
 	LDA.b #$5B
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.b #$5D
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_25D815
 	RTL
@@ -50153,7 +50759,7 @@ CODE_25D844:
 CODE_25D84B:
 	LDA.l DATA_25D829,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$04
 	BEQ.b CODE_25D85E
@@ -50197,7 +50803,7 @@ CODE_25D899:
 CODE_25D8A0:
 	LDA.l DATA_25D874,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$06
 	BEQ.b CODE_25D8B7
@@ -50244,7 +50850,7 @@ CODE_25D900:
 CODE_25D907:
 	LDA.l DATA_25D8CD,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$08
 	BEQ.b CODE_25D922
@@ -50543,12 +51149,12 @@ CODE_25DAF7:
 	LDY.w $0700
 	LDA.b #$08
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 CODE_25DB09:
 	LDA.b #$33
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BNE.b CODE_25DB09
 	LDA.b #$07
@@ -50603,7 +51209,7 @@ CODE_25DB40:
 CODE_25DB54:
 	LDA.l DATA_25DB3C,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_25DB54
 	RTL
@@ -50648,7 +51254,7 @@ CODE_25DB8B:
 CODE_25DB94:
 	LDA.b #$80
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_25DB94
 	RTL
@@ -50677,7 +51283,7 @@ CODE_25DBBA:
 CODE_25DBBE:
 	LDA.b #$E4
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	LDA.b $03
 	CMP.b #$FF
@@ -50697,7 +51303,7 @@ CODE_25DBBE:
 	STA.b $01
 	DEX
 	BPL.b CODE_25DBBA
-	JSL.l CODE_209B2A
+	JSL.l LoadLevel_Set_TileMemAddr
 	LDA.b $2E
 	STA.b $00
 	LDA.b $2F
@@ -50782,7 +51388,7 @@ CODE_25DC67:
 CODE_25DC70:
 	LDA.b #$80
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_25DC70
 	RTL
@@ -50824,10 +51430,10 @@ CODE_25DCA4:
 CODE_25DCAB:
 	LDA.b #$9C
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.b #$9D
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $05
 	BPL.b CODE_25DCAB
 	LDA.b $00
@@ -50896,7 +51502,7 @@ CODE_25DD23:
 CODE_25DD2A:
 	LDA.l DATA_25D6C0,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$04
 	BEQ.b CODE_25DD3D
@@ -50987,7 +51593,7 @@ CODE_25DDC0:
 CODE_25DDC7:
 	LDA.l DATA_25D70B,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$06
 	BEQ.b CODE_25DDDE
@@ -51080,7 +51686,7 @@ CODE_25DE62:
 CODE_25DE69:
 	LDA.l DATA_25D764,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$08
 	BEQ.b CODE_25DE84
@@ -51173,7 +51779,7 @@ CODE_25DEFE:
 CODE_25DF0B:
 	LDA.l DATA_25DEFB,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_25DF0B
 	LDA.b $00
@@ -51279,7 +51885,7 @@ CODE_25DF9B:
 CODE_25DF9D:
 	LDA.l DATA_25DF5D,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_25DF9D
 	RTL
@@ -51354,7 +51960,7 @@ CODE_25E007:
 CODE_25E00A:
 	LDA.l DATA_25DFCF,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$03
 	BNE.b CODE_25E00A
@@ -51420,6 +52026,7 @@ DATA_25F01E:
 DATA_25F03C:
 	dw $7FFF,$04E1,$6D6F,$0087,$3EEB,$2D9C,$3ABF,$5AD6,$1950,$4BF7,$1FED,$57B1,$00C9,$00EA,$2E67
 
+	;battle mode?
 CODE_25F05A:
 	LDA.b #$80
 	STA.w !REGISTER_ScreenDisplayRegister
@@ -51443,7 +52050,7 @@ CODE_25F05A:
 	STZ.w $0356
 	STZ.w !RAM_SMB3_BattleMode_MariosRoundWinCount
 	STZ.w !RAM_SMB3_BattleMode_LuigisRoundWinCount
-	JSL.l CODE_29C82B
+	JSL.l SNES_Setup_PalData_B ; get palettes
 	STZ.w !RAM_SMB3_BattleMode_CurrentStage
 	LDA.b #$C0
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
@@ -51810,7 +52417,7 @@ CODE_25F3E5:
 	LDA.w #$0400
 	STA.l !RAM_SMB3_BattleMode_ResultsScreenTilemapVRAMAddressLo
 	SEP.b #$20
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	BRA.b CODE_25F384
 
 CODE_25F3F6:
@@ -52667,14 +53274,14 @@ DATA_2688AE:
 	dl CODE_268B4B
 	dl CODE_268AC1
 	dl CODE_268B29
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
 	dl CODE_23A6C1
 	dl CODE_23A6C1
 	dl CODE_23A6C1
@@ -52687,14 +53294,14 @@ DATA_2688AE:
 	dl CODE_23AE7B
 	dl CODE_23AEC7
 	dl CODE_23AEC7
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
 	dl CODE_268B66
@@ -52730,7 +53337,7 @@ DATA_26896D:
 	dl CODE_268BCD
 	dl CODE_268BEE
 	dl CODE_23BE51
-	dl CODE_268BFA
+	dl LoadLevel_Candle
 	dl CODE_268C06
 	dl CODE_23A682
 	dl CODE_268C21
@@ -52788,7 +53395,7 @@ CODE_2689EB:
 CODE_2689FF:
 	LDA.b #$02
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BPL.b CODE_2689FF
 	RTL
@@ -52866,7 +53473,7 @@ CODE_268A5C:
 	LDX.b #$03
 	LDY.w $0700
 CODE_268A70:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_268A70
 	STY.w $0700
@@ -52905,7 +53512,7 @@ CODE_268A9E:
 	STA.b [$2E],y
 CODE_268AA4:
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_268A9E
 	LDA.l DATA_268A87,x
@@ -52933,7 +53540,7 @@ CODE_268ACA:
 	LDA.l DATA_268ABF,x
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -52994,7 +53601,7 @@ CODE_268B2E:
 	LDA.b #$E4
 	STA.b [$2E],y
 	JSL.l CODE_2AB73A
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_268B2E
 	JSR.w CODE_268B0E
@@ -53021,7 +53628,7 @@ CODE_268B4D:
 CODE_268B57:
 	LDA.l DATA_268B49,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_268B57
 	RTL
@@ -53042,7 +53649,7 @@ CODE_268B78:
 CODE_268B7A:
 	LDA.b #$02
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_268B7A
 	JSR.w CODE_268B0E
@@ -53080,7 +53687,7 @@ CODE_268BAE:
 CODE_268BB5:
 	LDA.b #$02
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $04
 	LDA.b $04
 	CMP.b #$FF
@@ -53122,11 +53729,11 @@ CODE_268BEE:
 
 ;--------------------------------------------------------------------
 
-CODE_268BFA:
+LoadLevel_Candle:
 	LDY.w $0700
 	LDA.b #$9B
 	STA.b [$2E],y
-	JSL.l CODE_2A8705
+	JSL.l SNESLevelCandleAdditionalUpperTiles
 	RTL
 
 ;--------------------------------------------------------------------
@@ -53362,14 +53969,14 @@ DATA_26B062:
 	dl CODE_26B3CA
 	dl CODE_26B407
 	dl CODE_26B407
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
-	dl CODE_23AA8A
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
+	dl LoadLevel_BlockRun
 	dl CODE_23A6C1
 	dl CODE_23A6C1
 	dl CODE_23A6C1
@@ -53382,14 +53989,14 @@ DATA_26B062:
 	dl CODE_23AE7B
 	dl CODE_23AEC7
 	dl CODE_23AEC7
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
-	dl CODE_23AF2A
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
+	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
 	dl CODE_26B408
@@ -53494,18 +54101,18 @@ CODE_26B1CB:
 	LDY.w $0700
 	LDA.l DATA_26B1BA,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BEQ.b CODE_26B1F8
 CODE_26B1DC:
 	LDA.l DATA_26B1BC,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BEQ.b CODE_26B1F8
 	LDA.l DATA_26B1BE,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	BNE.b CODE_26B1DC
 CODE_26B1F8:
@@ -53587,7 +54194,7 @@ CODE_26B25A:
 	LDA.b $01
 	STA.b $2F
 	LDY.w $0700
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	STY.w $0700
 	LDA.b $2E
 	STA.b $00
@@ -53666,7 +54273,7 @@ CODE_26B2DE:
 	LDA.b $01
 	STA.b $2F
 	LDY.w $0700
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	STY.w $0700
 	INX
 	CPX.b #$02
@@ -53688,7 +54295,7 @@ CODE_26B30C:
 	LDA.b #$81
 	STA.b [$2E],y
 CODE_26B310:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_26B30C
 	RTL
@@ -53705,7 +54312,7 @@ CODE_26B318:
 CODE_26B325:
 	LDA.b #$81
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BNE.b CODE_26B325
 CODE_26B330:
@@ -53772,7 +54379,7 @@ CODE_26B378:
 CODE_26B381:
 	LDA.b #$9E
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_26B381
 	RTL
@@ -53880,7 +54487,7 @@ CODE_26B408:
 CODE_26B411:
 	LDA.b #$58
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_26B411
 	RTL
@@ -53895,7 +54502,7 @@ CODE_26B41D:
 CODE_26B426:
 	LDA.b #$C6
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BNE.b CODE_26B426
 	LDA.b #$C7
@@ -53926,12 +54533,12 @@ CODE_26B44E:
 CODE_26B452:
 	LDA.l DATA_26B436,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BMI.b CODE_26B46E
 	LDA.l DATA_26B438,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_26B452
 CODE_26B46E:
@@ -53975,7 +54582,7 @@ CODE_26B4A5:
 	LDA.l DATA_26B47A,x
 	STA.b [$2E],y
 CODE_26B4AB:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_26B4A5
 	LDA.l DATA_26B47D,x
@@ -54020,7 +54627,7 @@ CODE_26B4EF:
 	LDA.l DATA_26B4CD,x
 	STA.b [$2E],y
 CODE_26B4F5:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_26B4EF
 	LDA.l DATA_26B4D0,x
@@ -54074,7 +54681,7 @@ CODE_26B54E:
 CODE_26B559:
 	LDA.l DATA_26B52B,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $02
 	INX
 	TXA
@@ -54120,7 +54727,7 @@ CODE_26B58A:
 	TAX
 	LDA.l DATA_26B586,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.l DATA_26B588,x
 	STA.b [$2E],y
 	RTL
@@ -54135,8 +54742,8 @@ CODE_26B5A5:
 CODE_26B5AE:
 	LDA.b #$C9
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_26B5AE
 	RTL
@@ -54153,13 +54760,13 @@ CODE_26B5BE:
 CODE_26B5CB:
 	LDA.b #$E3
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BEQ.b CODE_26B5E1
 	LDA.b #$E4
 CODE_26B5D8:
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BNE.b CODE_26B5CB
 CODE_26B5E1:
@@ -54195,7 +54802,7 @@ CODE_26B609:
 	LDA.l DATA_26B5E8,x
 CODE_26B60D:
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BPL.b CODE_26B609
 	JSR.w CODE_26B881
@@ -54222,7 +54829,7 @@ CODE_26B634:
 CODE_26B638:
 	LDA.l DATA_26B5E8,x
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEC.b $03
 	BNE.b CODE_26B638
 	LDA.l DATA_26B5E6,x
@@ -54247,7 +54854,7 @@ CODE_26B663:
 	LDA.b #$2D
 CODE_26B665:
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BPL.b CODE_26B663
 	RTL
@@ -54266,7 +54873,7 @@ CODE_26B67D:
 	LDA.b #$A3
 CODE_26B67F:
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	DEX
 	BNE.b CODE_26B67D
 	LDA.b #$BE
@@ -54326,7 +54933,7 @@ CODE_26B718:
 	CMP.b #$FF
 	BEQ.b CODE_26B72A
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	JMP.w CODE_26B718
 
@@ -54371,7 +54978,7 @@ CODE_26B7C1:
 	CMP.b #$FF
 	BEQ.b CODE_26B7D3
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	JMP.w CODE_26B7C1
 
@@ -54432,7 +55039,7 @@ CODE_26B82E:
 	CMP.b #$FF
 	BEQ.b CODE_26B840
 	STA.b [$2E],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	JMP.w CODE_26B82E
 
@@ -59886,7 +60493,7 @@ SMB3_BattleMode_ProcessPOWBlock:
 	AND.b #$03
 	TAY
 	LDA.w DATA_21EDDD,y
-	STA.w $0216
+	STA.w !Vert_Scroll
 CODE_26ED61:
 	LDA.w !RAM_SMB3_BattleMode_POWBlockHitCounter
 	CMP.b #$03
@@ -59905,7 +60512,7 @@ CODE_26ED7C:
 CODE_26ED7D:
 	LDA.b #$98
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.w SMB3_OAMBuffer[$00].YDisp
 	LDA.b #$78
 	STA.w SMB3_OAMBuffer[$00].XDisp
@@ -61722,7 +62329,7 @@ endmacro
 
 macro SMB3Bank27Macros(StartBank, EndBank)
 %BANK_START(<StartBank>)
-CODE_278000:
+BlockChange_Do:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_278037
 	LDA.w $052B
@@ -61730,9 +62337,9 @@ CODE_278000:
 	JSL.l CODE_209F86
 	STA.w $052B
 	STY.w $052A
-	LDA.w DATA_21823C,y
+	LDA.w Tile_Mem_AddrVL,y
 	STA.b $2E
-	LDA.w DATA_21824C,y
+	LDA.w Tile_Mem_AddrVH,y
 	STA.b $2F
 	LDA.w $052B
 	AND.b #$F0
@@ -61751,9 +62358,9 @@ CODE_278037:
 	LDA.w $0528
 	ASL
 	TAX
-	LDA.w DATA_218200,x
+	LDA.w Tile_Mem_Addr,x
 	STA.b $2E
-	LDA.w DATA_218200+$01,x
+	LDA.w Tile_Mem_Addr+$01,x
 	STA.b $2F
 	STZ.b $06
 	LDA.w $052A
@@ -61793,25 +62400,25 @@ CODE_27807D:
 
 DATA_278081:
 	dw CODE_278144
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_2780B3
-	dw CODE_278145
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_OneTile
+	dw TileChng_DoorAppear
 	dw CODE_2781B5
 	dw CODE_278216
 	dw CODE_278216
@@ -61822,7 +62429,7 @@ DATA_278081:
 
 ; Note: Something related to blocks updating after being hit.
 
-CODE_2780B3:
+TileChng_OneTile:
 	LDX.w $0564
 	DEX
 	LDY.b $04
@@ -61835,7 +62442,7 @@ CODE_2780B3:
 	TAX
 	LDY.b #$00
 CODE_2780C5:
-	LDA.w DATA_2184F8,x
+	LDA.w TileChng_Pats,x
 	STA.w $036E,y
 	INX
 	INY
@@ -61905,7 +62512,7 @@ CODE_278144:
 
 ;--------------------------------------------------------------------
 
-CODE_278145:
+TileChng_DoorAppear:
 	LDA.b #$00
 	STA.w $0564
 	LDY.b $04
@@ -62220,7 +62827,7 @@ CODE_278357:
 
 ;--------------------------------------------------------------------
 
-CODE_278500:
+AutoScroll_Do:
 	LDA.w !RAM_SMB3_Level_Player_SmokePuffAnimationTimer
 	ORA.w !RAM_SMB3_Level_Player_SizeChangeAnimationTimer
 	ORA.b $9C
@@ -62256,7 +62863,8 @@ DATA_27852D:
 
 ;--------------------------------------------------------------------
 
-CODE_278539:
+;CODE_278539
+CoinShip_CoinGlow:
 	DEC.w $1A67
 	BPL.b CODE_278559
 	LDA.b #$05
@@ -62283,7 +62891,7 @@ CODE_27855A:
 	CMP.b #$11
 	BNE.b CODE_27856B
 	PHA
-	JSR.w CODE_278539
+	JSR.w CoinShip_CoinGlow
 	PLA
 CODE_27856B:
 	CMP.b #$0E
@@ -62421,7 +63029,7 @@ CODE_278660:
 CODE_27866D:
 	STA.w $0351
 	LDA.w $0350
-	CMP.b #$23
+	CMP.b #$23 ; airship clouds (not #$02 as well?)
 	BEQ.b CODE_27867B
 	JSL.l CODE_29D356
 CODE_27867B:
@@ -62524,10 +63132,10 @@ CODE_278722:
 CODE_278723:
 	LDA.w $1A04
 	BNE.b CODE_27873C
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CMP.b #$EF
 	BNE.b CODE_278722
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w !RAM_SMB3_Level_AutoscrollLayerYPosLo
 	INC.w $1A04
 	LDA.b #$20
@@ -62625,9 +63233,9 @@ CODE_2787D2:
 	ADC.b #$00
 	ASL
 	TAY
-	LDA.w DATA_218200,y
+	LDA.w Tile_Mem_Addr,y
 	STA.b $00
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	CLC
 	ADC.b $02
 	STA.b $01
@@ -62871,7 +63479,7 @@ CODE_278A35:
 	BEQ.b CODE_278A64
 	TYA
 	TAX
-	LDA.w DATA_21AF8B,x
+	LDA.w DATA_21AF8B-1,x
 	STA.w !RAM_SMB3_Global_PointsToGiveLo
 CODE_278A42:
 	DEC.w !RAM_SMB3_Level_TimerHundreds,x
@@ -62949,7 +63557,7 @@ CODE_278A94:
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	SEC
 	SBC.w #$0010
 	BPL.b CODE_278AB2
@@ -63102,7 +63710,7 @@ CODE_278B8E:
 
 ; Note: Routine that handles normal sprite level collision?
 
-CODE_278B93:
+Object_WorldDetectN1:
 	LDA.b #$FF
 	BNE.b CODE_278B9D				; Note: This will always branch
 
@@ -63126,7 +63734,7 @@ CODE_278BAA:
 	STA.b $A7,x
 	STA.w $06B3
 	STA.w $07B5
-	JSL.l CODE_278CF3
+	JSL.l Object_GetAttrAndMoveTiles
 	PLA
 	STA.b $00
 	LDY.w $064F
@@ -63288,7 +63896,7 @@ CODE_278CC0:
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	LDA.b #$00
 	STA.w $07B6,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 CODE_278CD3:
 	RTL
 
@@ -63306,15 +63914,16 @@ CODE_278CD4:
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	SBC.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 CODE_278CF2:
 	RTL
 
 ;--------------------------------------------------------------------
 
-CODE_278CF3:
+;CODE_278CF3:
+Object_GetAttrAndMoveTiles:
 	LDY.b #$6C
-	JSL.l CODE_278E13
+	JSL.l Object_DetectTile
 	ASL
 	ROL
 	ROL
@@ -63381,8 +63990,10 @@ CODE_278D63:
 CODE_278D66:
 	LDA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
 	STA.w $1FE1,x
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B0FB,y
+	LDA.w ObjectGroup_Attributes2,y
+;
 	AND.b #$F0
 	LSR
 	PHA
@@ -63392,7 +64003,7 @@ CODE_278D66:
 	INY
 	INY
 CODE_278D7C:
-	JSL.l CODE_278E13
+	JSL.l Object_DetectTile
 	STA.w $1F76
 	STA.w $064B
 	PHA
@@ -63468,7 +64079,7 @@ CODE_278DFA:
 	INY
 	INY
 CODE_278E00:
-	JSL.l CODE_278E13
+	JSL.l Object_DetectTile
 	STA.w $1F77
 	STA.w $064C
 	ASL
@@ -63478,7 +64089,8 @@ CODE_278E00:
 	STA.w $064F
 	RTL
 
-CODE_278E13:
+;CODE_278E13
+Object_DetectTile:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_278E1B
 	JMP.w CODE_278EEB
@@ -63535,14 +64147,14 @@ CODE_278E63:
 	PHX
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $00
-	LDA.l DATA_218200+$01,x
+	LDA.l Tile_Mem_Addr+$01,x
 	ADC.b $02
 	STA.b $01
-	LDA.w DATA_21821E,x
+	LDA.w SNESTile_Mem_AddrHi,x
 	STA.b $D8
-	LDA.w DATA_21821E+$01,x
+	LDA.w SNESTile_Mem_AddrHi+$01,x
 	ADC.b $02
 	STA.b $D9
 	LDA.b #$7E4000>>16
@@ -63556,6 +64168,7 @@ CODE_278E63:
 	LSR
 	ORA.w $1F79
 	TAY
+;SNES: new\
 CODE_278EA9:
 	LDA.b [$D8],y
 	BEQ.b CODE_278EC5
@@ -63563,9 +64176,9 @@ CODE_278EA9:
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $DB
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $DC
 	LDA.b [$00],y
 	TAY
@@ -63574,6 +64187,7 @@ CODE_278EA9:
 	BRA.b CODE_278EC7
 
 CODE_278EC5:
+;SNES: new/
 	LDA.b [$00],y
 CODE_278EC7:
 	JSL.l SMB3_ModifyMap16IDForPSwitchAffectedBlocks_Main
@@ -63654,12 +64268,12 @@ CODE_278F34:
 	STA.b $00
 	LDA.w $1A4F,x
 	BNE.b CODE_278EEA
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x	; custom sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr01F_VineHead
 	BEQ.b CODE_278FC0
 	LDA.b $9E,x
 	BMI.b CODE_278F5B
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; custom sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr062_Blooper
 	BEQ.b CODE_278FC0
 	CMP.b #!Define_SMB3_SpriteID_NorSpr06A_LaunchingBlooperNanny
@@ -63720,7 +64334,7 @@ CODE_278FC0:
 
 ;--------------------------------------------------------------------
 
-CODE_278FC1:
+Objects_HandleScrollAndUpdate:
 	JMP.w CODE_278FD3				;\ Note: Seems that the skipped code is for a debug function.
 	db $35						;| $1CFF seems to be used to prevent taking damage.
 	BEQ.b CODE_278FD3				;|
@@ -63761,22 +64375,29 @@ CODE_278FF4:
 	BPL.b CODE_279017
 	LDA.b #$07
 	STA.w $055D
-CODE_279017:
+	
+CODE_279017: ; PRG000_C973
 	LDX.b #$07
+	
 CODE_279019:
 	STX.b $9B
+	
 	LDA.b $9C
 	BNE.b CODE_27905A
+	
 	LDA.w !RAM_SMB3_Level_NorSpr_DecrementingTable7E0518,x
 	BEQ.b CODE_279027
+	
 	DEC.w !RAM_SMB3_Level_NorSpr_DecrementingTable7E0518,x
 CODE_279027:
+
 	LDA.w !RAM_SMB3_Level_NorSpr_DecrementingTable7E0520,x
 	BEQ.b CODE_27902F
 	DEC.w !RAM_SMB3_Level_NorSpr_DecrementingTable7E0520,x
 CODE_27902F:
 	CPX.b #$05
 	BCS.b CODE_27905A
+	
 	LDA.w !RAM_SMB3_Level_NorSpr_DecrementingTable7E06AB,x
 	BEQ.b CODE_27903B
 	DEC.w !RAM_SMB3_Level_NorSpr_DecrementingTable7E06AB,x
@@ -63785,28 +64406,35 @@ CODE_27903B:
 	BEQ.b CODE_27905A
 	CMP.b #$60
 	BCC.b CODE_279057
+	
 	LDA.b #$01
+	
 	LDY.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CPY.b #$02
 	BEQ.b CODE_279057
+	
 	CPY.b #$04
 	BNE.b CODE_279053
+	
 	LDA.b #$03
 CODE_279053:
 	AND.b !RAM_SMB3_Global_FrameCounter
 	BNE.b CODE_27905A
 CODE_279057:
 	DEC.w !RAM_SMB3_Level_NorSpr_DecrementingTable7E06A6,x
+	
 CODE_27905A:
 	TXA
 	CLC
 	ADC.w $055D
-	ASL
+	ASL ; SNES: word length
 	TAY
-	REP.b #$20
-	LDA.w DATA_21AF6E,y
-	STA.b $C6,x
+	
+	REP.b #$20	
+	LDA.w SprRamOffsets,y
+	STA.b $C6,x	
 	SEP.b #$20
+	
 	JSR.w SMB3_ProcessNormalSprites_Main
 	JSR.w CODE_27A5BC
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
@@ -63860,7 +64488,7 @@ CODE_2790BF:
 	LDA.b #$00
 	STA.w $052E,y
 CODE_2790DF:
-	LDA.w $0414
+	LDA.w !Level_JctCtl
 	BEQ.b CODE_2790EA
 	STA.w $055F
 	STZ.w $07BE
@@ -63872,6 +64500,7 @@ CODE_2790EA:
 CODE_2790EB:
 	RTS
 
+	;Object_DoStateAction
 SMB3_ProcessNormalSprites:
 .Main:
 ;$2790EC
@@ -63887,14 +64516,22 @@ CODE_2790F7:
 	DEY
 	BNE.b CODE_2790F7
 CODE_279102:
-	STY.b $DE
+
+	; Y contains index to the base value for this group of object IDs
+	; A contains the object's ID
+
+	STY.b $DE	;SNES: new (pageA000-1) value
+	
 	INY
 	SEC
 	SBC.w DATA_21AFA2-$01,y
 	STA.w $0418
 	TAY
+	
+	; bank switching no longer necessary
+	
 CODE_27910D:
-	JSL.l CODE_27A995
+	JSL.l AScrlURDiag_CheckWrapping
 	JSL.l SMB3_CheckIfSpriteIsVerticallyOffScreen_Main
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
@@ -63906,9 +64543,9 @@ DATA_279120:
 	dw SMB3_NorSprStatus02_Normal_Main
 	dw CODE_2791E8
 	dw SMB3_NorSprStatus04_Carried_Main
-	dw CODE_2793E1
-	dw CODE_27974B
-	dw CODE_279810
+	dw ObjState_Kicked
+	dw ObjState_Killed
+	dw ObjState_Squashed
 	dw CODE_279132
 
 ;--------------------------------------------------------------------
@@ -64005,8 +64642,10 @@ CODE_2791E7:
 ;--------------------------------------------------------------------
 
 CODE_2791E8:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$10
 	BEQ.b CODE_2791FD
 	LDA.b #$10
@@ -64018,7 +64657,7 @@ CODE_2791E8:
 CODE_2791FD:
 	LDA.b $9C
 	BNE.b CODE_27924E
-	JSR.w CODE_279887
+	JSR.w Object_ShellDoWakeUp
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
 	LDA.b $A7,x
 	AND.b #$04
@@ -64055,14 +64694,14 @@ CODE_279241:
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_27924B
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_27924B:
 	JSR.w CODE_279917
 CODE_27924E:
-	JSR.w CODE_279394
+	JSR.w Object_BumpOffOthers
 CODE_279251:
 	JSR.w CODE_279BE0
-CODE_279254:
+Object_DrawShelled:
 	LDA.b #$02
 	STA.w $0669,x
 	LDA.w $1FF9,x
@@ -64078,7 +64717,7 @@ CODE_27926E:
 	RTS
 
 CODE_27926F:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr050_BobOmb
 	BEQ.b CODE_27927A
 	CMP.b #!Define_SMB3_SpriteID_NorSpr055_WindupBobOmb
@@ -64091,7 +64730,7 @@ CODE_27927A:
 CODE_279282:
 	JSR.w CODE_279EC0
 	JSR.w CODE_27A9C0
-	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; sprite hijack
 	CPY.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
 	BNE.b CODE_2792B3
 	REP.b #$10
@@ -64224,7 +64863,7 @@ CODE_279331:
 
 ;--------------------------------------------------------------------
 
-CODE_279394:
+Object_BumpOffOthers:
 	TXA
 	CLC
 	ADC.b !RAM_SMB3_Global_FrameCounter
@@ -64237,8 +64876,10 @@ CODE_279394:
 	BEQ.b CODE_2793E0
 	DEX
 CODE_2793A9:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$10
 	BEQ.b CODE_2793DB
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
@@ -64246,7 +64887,7 @@ CODE_2793A9:
 	BNE.b CODE_2793DB
 	JSL.l SMB3_CheckIfNormalSpriteOffScreen_Main
 	BNE.b CODE_2793DB
-	JSL.l CODE_27A414
+	JSL.l Object_CalcBoundBox
 	JSL.l CODE_27A460
 	BCC.b CODE_2793DB
 	LDY.b $9B
@@ -64267,7 +64908,7 @@ CODE_2793E0:
 
 ;--------------------------------------------------------------------
 
-CODE_2793E1:
+ObjState_Kicked:
 	LDA.b $9C
 	BEQ.b CODE_2793E8
 	JMP.w CODE_2794B7
@@ -64321,13 +64962,13 @@ CODE_279425:
 CODE_279448:
 	LDA.b #!Define_SMAS_Sound0060_HitHead
 	STA.w !RAM_SMB3_Global_SoundCh1
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
 	BNE.b CODE_279457
 	JMP.w CODE_279A56
 
 CODE_279457:
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_27945B:
 	JSR.w CODE_279917
 	TXA
@@ -64364,7 +65005,7 @@ CODE_279486:
 	BNE.b CODE_2794A6
 	LDA.w $05F5,y
 	JSL.l CODE_278A8A
-	JSR.w CODE_279527
+	JSR.w ObjectKill_SetShellKillVars
 	LDA.w !RAM_SMB3_Level_NorSpr_XSpeed,y
 	ASL
 	LDA.b #$10
@@ -64375,14 +65016,14 @@ CODE_2794A4:
 CODE_2794A6:
 	TYA
 	TAX
-	JSR.w CODE_279527
+	JSR.w ObjectKill_SetShellKillVars
 	LDX.b $9B
 	LDA.w $05F5,x
 	INC.w $05F5,x
 	JSL.l CODE_278A86
 CODE_2794B7:
 	JSR.w CODE_279BE0
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
 	BEQ.b CODE_2794EE
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07A_GiantGreenKoopa
@@ -64414,6 +65055,8 @@ CODE_2794EE:
 	LSR
 	STA.w $0769,x
 	JSR.w CODE_279EC0
+
+;SNES: new \ 
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CPY.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
 	BNE.b CODE_279521
@@ -64434,6 +65077,7 @@ CODE_2794EE:
 	SEP.b #$10
 CODE_279521:
 	RTS
+;SNES: new /
 
 CODE_279522:
 	JSL.l CODE_22C964
@@ -64441,17 +65085,20 @@ CODE_279522:
 
 ;--------------------------------------------------------------------
 
-CODE_279527:
+ObjectKill_SetShellKillVars:
 	LDA.b #$06
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #$D0
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
+	
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
-	STA.w $1A47
+	STA.w $1A47	
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
-	STA.w $1A48
+	STA.w $1A48	
+;SNES: new \ 
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
-	STA.w $027E
+	STA.w $027E	
+;/
 	LDA.b #$0A
 	STA.w $1A46
 	RTS
@@ -64510,13 +65157,13 @@ SMB3_NorSprStatus04_Carried:
 	JMP.w CODE_27971F
 
 CODE_2795A9:
-	JSR.w CODE_279887
+	JSR.w Object_ShellDoWakeUp
 	BIT.b !RAM_SMB3_Global_ControllerHold1
-	BVC.b CODE_2795B3							; Note: !Joypad_X|(!Joypad_Y>>8)
+	BVC.b Player_KickObject							; Note: !Joypad_X|(!Joypad_Y>>8)
 CODE_2795B0:
 	JMP.w CODE_279671
 
-CODE_2795B3:
+Player_KickObject:
 	LDA.w $0571
 	BNE.b CODE_2795B0
 	LDA.b #!Define_SMAS_Sound0060_KickShell
@@ -64525,7 +65172,7 @@ CODE_2795B3:
 	STA.w !RAM_SMB3_Level_Player_KickAnimationTimer
 	LDA.b #$10
 	STA.w $0520,x
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x	; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr050_BobOmb
 	BEQ.b CODE_2795D2
 	CMP.b #!Define_SMB3_SpriteID_NorSpr055_WindupBobOmb
@@ -64556,7 +65203,7 @@ CODE_2795F8:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$04
 	BNE.b CODE_27963F
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x	; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
 	BEQ.b CODE_279635
 	LDY.b #$01
@@ -64565,7 +65212,7 @@ CODE_2795F8:
 	LDY.b #$FF
 CODE_279613:
 	STY.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_279635
@@ -64679,7 +65326,7 @@ CODE_2796CF:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	LDA.b !RAM_SMB3_Level_Player_YSpeed
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
 	JSR.w CODE_27A6F0
 	BCC.b CODE_27971F
@@ -64712,8 +65359,9 @@ CODE_27971F:
 	LDA.w SMB3_OAMBuffer[$14].YDisp
 	CMP.b #$F0
 	BEQ.b CODE_27974A
+;SNES: new \ 
 CODE_27972C:
-	LDA.w $0679,x
+	LDA.w $0679,x ; flip bits
 	ORA.b #$20
 	STA.b $D8
 	LDA.w $0571
@@ -64726,16 +65374,19 @@ CODE_27972C:
 CODE_279742:
 	LDA.b $D8
 	STA.w $0679,x
-	JSR.w CODE_279254
+;SNES: new /
+	JSR.w Object_DrawShelled
 CODE_27974A:
 	RTS
 
 ;--------------------------------------------------------------------
 
-CODE_27974B:
+ObjState_Killed:
 	JSR.w CODE_2797FA
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B317,y
+	LDA.w ObjectGroup_KillAction,y
+;
 	AND.b #$0F
 	BEQ.b CODE_279763
 	CPX.b #$05
@@ -64762,7 +65413,7 @@ DATA_279767:
 ;--------------------------------------------------------------------
 
 CODE_27977B:
-	JSL.l CODE_279D6F
+	JSL.l Object_DoHaltedAction
 	JMP.w CODE_2797BC
 
 ;--------------------------------------------------------------------
@@ -64875,7 +65526,7 @@ CODE_27980D:
 
 ;--------------------------------------------------------------------
 
-CODE_279810:
+ObjState_Squashed:
 	LDA.w $06A6,x
 	BEQ.b CODE_279839
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
@@ -64905,8 +65556,8 @@ CODE_279839:
 
 ;--------------------------------------------------------------------
 
-CODE_279887:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+Object_ShellDoWakeUp:
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x	; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr050_BobOmb
 	BEQ.b CODE_279892
 	CMP.b #!Define_SMB3_SpriteID_NorSpr055_WindupBobOmb
@@ -64955,7 +65606,7 @@ CODE_2798C8:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$04
 	BNE.b CODE_2798F1
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b $A7,x
 	BEQ.b CODE_2798F1
 	LDA.b #$05
@@ -64983,7 +65634,7 @@ CODE_279905:
 
 ;--------------------------------------------------------------------
 
-CODE_279906:
+Object_AboutFace:
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	JSL.l SMB3_UnnecessaryInvertARt_Main
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
@@ -65002,7 +65653,7 @@ CODE_279917:
 	BNE.b CODE_279985
 	LDA.w $1F76
 	CMP.b #$F3
-	BNE.b CODE_27997B
+	BNE.b Player_HitEnemy
 	LDA.b #$D0
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
@@ -65010,8 +65661,10 @@ CODE_279917:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	LDA.b #$80
 	STA.w $0679,x
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$40
 	BNE.b CODE_27994C
 	LDA.b #$06
@@ -65021,6 +65674,7 @@ CODE_279917:
 	RTS
 
 CODE_27994C:
+;hijacked
 	PHX
 	REP.b #$30
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -65030,22 +65684,23 @@ CODE_27994C:
 	CLC
 	ADC.b $D8
 	TAX
-	LDA.l DATA_288438,x
+	LDA.l ObjectGroup_CollideJumpTable,x
 	STA.b $D8
 	SEP.b #$30
 	PLX
+;
 	LDA.b $D9
 	AND.b #$F8
 	CMP.b #$08
 	BNE.b CODE_279978
 	LDA.b $D8
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x	;sprite hijack
 	LDA.b #$00
 	JSL.l CODE_278A8A
 CODE_279978:
 	JMP.w CODE_279AEF
 
-CODE_27997B:
+Player_HitEnemy:
 	JSR.w CODE_27A31C
 	LDA.b #$00
 	STA.w $0797,x
@@ -65058,8 +65713,10 @@ CODE_279986:
 	BNE.b CODE_279985
 	LDA.w !RAM_SMB3_Level_Player_SlidingXSpeed
 	BNE.b CODE_27999C
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B0FB,y
+	LDA.w ObjectGroup_Attributes2,y
+;
 	AND.b #$02
 	BEQ.b CODE_2799D9
 	BNE.b CODE_2799C6						; Note: This will always branch.
@@ -65070,7 +65727,7 @@ CODE_27999C:
 	CMP.b #$02
 	BEQ.b CODE_2799C5
 	STA.b $03
-	JSR.w CODE_27A67A
+	JSR.w Enemy_Kill
 	LDA.w !RAM_SMB3_Global_RandomByte02,x
 	AND.b #$1F
 	ADC.b #$B4
@@ -65102,7 +65759,7 @@ CODE_2799D3:
 	BNE.b CODE_2799D0
 CODE_2799D9:
 	LDY.b #$11
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr06B_JumpingFakeBrick
 	BEQ.b CODE_2799EF
 	CMP.b #!Define_SMB3_SpriteID_NorSpr064_WaterHoppingRedCheepCheep
@@ -65136,8 +65793,10 @@ CODE_279A14:
 	STA.w $0797,x
 	LDA.w !RAM_SMB3_Level_Player_IsSwimmingFlag
 	BNE.b CODE_279A28
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$20
 	BEQ.b CODE_279A33
 CODE_279A28:
@@ -65147,16 +65806,20 @@ CODE_279A28:
 	JMP.w CODE_279B1E
 
 CODE_279A33:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B0FB,y
+	LDA.w ObjectGroup_Attributes2,y
+;
 	AND.b #$04
 	BNE.b CODE_279A75
 	LDA.w !RAM_SMB3_Level_Player_IsTanookiStatueTimer
 	ORA.w !RAM_SMB3_Level_Player_InKuriboShoeFlag
 	BEQ.b CODE_279A5C
 	JSR.w CODE_279A76
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$10
 	BEQ.b CODE_279A56
 	LDA.b #$03
@@ -65175,7 +65838,7 @@ CODE_279A63:
 	LDA.w !RAM_SMB3_Level_ConsecutiveEnemiesStompedCounter
 	INC.w !RAM_SMB3_Level_ConsecutiveEnemiesStompedCounter
 	JSL.l CODE_278A8A
-	JSR.w CODE_2795B3
+	JSR.w Player_KickObject
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_Player_KickAnimationTimer
 CODE_279A75:
@@ -65194,6 +65857,7 @@ endif
 	STA.w !RAM_SMB3_Global_SoundCh1
 	DEC.w $1CF6,x
 	BPL.b CODE_279A75
+;hijacked
 	PHX
 	REP.b #$30
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -65203,10 +65867,11 @@ endif
 	CLC
 	ADC.b $D8
 	TAX
-	LDA.l DATA_288438,x
+	LDA.l ObjectGroup_CollideJumpTable,x
 	STA.b $D8
 	SEP.b #$30
 	PLX
+;
 	LDA.b $D9
 	AND.b #$F4
 	CMP.b #$04
@@ -65225,13 +65890,15 @@ CODE_279AB5:
 	CMP.b #$08
 	BNE.b CODE_279ACF
 	LDA.b $D8
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; 
 	INC.w $1CF6,x
 	JMP.w CODE_279AE7
 
 CODE_279ACF:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B0FB,y
+	LDA.w ObjectGroup_Attributes2,y
+;
 	AND.b #$01
 	BEQ.b CODE_279AEC
 	LDA.b #!Define_SMAS_Sound0060_KickShell
@@ -65268,7 +65935,7 @@ CODE_279B0C:
 	BNE.b CODE_279B6B
 	BIT.b !RAM_SMB3_Global_ControllerHold1
 	BVS.b CODE_279B18							; Note: !Joypad_X|(!Joypad_Y>>8)
-	JMP.w CODE_2795B3
+	JMP.w Player_KickObject
 
 CODE_279B18:
 	LDA.b #$04
@@ -65299,8 +65966,10 @@ CODE_279B3C:
 	BEQ.b CODE_279B67							; Note: This will always branch.
 
 CODE_279B4C:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$10
 	BEQ.b CODE_279B67
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
@@ -65318,14 +65987,14 @@ CODE_279B6B:
 
 ;--------------------------------------------------------------------
 
-CODE_279B6C:
+Object_HandleBumpUnderneath:
 	JSR.w CODE_279917
 	RTL
 
 ;--------------------------------------------------------------------
 
 CODE_279B70:
-	JSR.w CODE_27997B
+	JSR.w Player_HitEnemy
 	RTL
 
 ;--------------------------------------------------------------------
@@ -65358,16 +66027,18 @@ CODE_279B7D:
 
 ; Note: Routine that stores the initial sprite tile properties of a normal sprite?
 
-CODE_279BB8:
+Object_SetPaletteFromAttr:
+;
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B263,y
+	LDA.w SNES_ObjectGroup_AttributesPalette,y
+;
 	AND.b #$07
 	STA.w $1FE9,x
 	RTL
 
 ;--------------------------------------------------------------------
 
-CODE_279BC4:
+Object_DeleteOffScreen:
 	JSR.w CODE_279BE0
 	RTL
 
@@ -65510,7 +66181,7 @@ CODE_279C91:
 
 ;--------------------------------------------------------------------
 
-CODE_279C97:
+Level_PrepareNewObject:
 	STZ.w $0691,x
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07F_GiantPiranhaPlantInGiantPipe
@@ -65570,10 +66241,12 @@ CODE_279D14:
 
 ;--------------------------------------------------------------------
 
-CODE_279D6F:
+Object_DoHaltedAction:
 	PHX
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$0F
 	STA.b $00
 	ASL
@@ -65591,20 +66264,20 @@ CODE_279D6F:
 
 DATA_279D95:
 	dl SMB3_NorSpr0XX_HotFoot_Status02_CODE_28B625
-	dl CODE_279EBC
-	dl CODE_279F52
+	dl Object_ShakeAndDraw
+	dl Object_Draw16x32Sprite
 	dl SMB3_NorSpr029_Spike_Status02_CODE_28BB64
 	dl CODE_279B7D
 	dl CODE_279DC2
-	dl CODE_279F6C
+	dl Object_DrawWide
 	dl CODE_279B7D
-	dl CODE_28BFD9
+	dl Shoe_DrawGoomba
 	dl CODE_279B7D
 	dl CODE_279EDE
 	dl CODE_28CE71
 	dl CODE_279B7D
-	dl SMB3_NorSpr040_BusterBeetle_Status02_CODE_28B3A6
-	dl CODE_28BD52
+	dl SMB3_NorSpr040_BusterBeetle_Status02_Buster_DrawHoldingIceBrick
+	dl Bank2_PiranhaSpikeHaltAction
 
 ;--------------------------------------------------------------------
 
@@ -65628,11 +66301,11 @@ SMB3_GetNormalSpriteOnScreenPosition:
 
 ;--------------------------------------------------------------------
 
-CODE_279DD4:
+Fish_FixedY_ExceptHitFloor:
 	LDA.b $A7,x
 	AND.b #$04
 	BNE.b CODE_279DF8
-CODE_279DDA:
+Fish_FixedYIfAppro:
 	LDA.w $05FC
 	BEQ.b CODE_279DF8
 	LDA.w $0424
@@ -65654,42 +66327,65 @@ CODE_279DF8:
 
 ;--------------------------------------------------------------------
 
-CODE_279DF9:
+;difference between NES:
+;$02 - stores priority and nametable as vhpp---n
+;$03 - Objects_ColorCycle overwrite has the following format: ----tttb (t: timer based on global timer, b: is bobomb (nametable bit))
+
+Object_ShakeAndCalcSprite:
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	SEC
 	SBC.w $0543
-	STA.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x
+	STA.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x	
 	STA.b $00
+	
+	; This is the object "shakin' awake" routine!  (Enemies in shell etc.)
+	
 	SEC
+	
 	LDA.w $06AB,x
 	BEQ.b CODE_279E10
+	
 	CMP.b #$40
 	BCC.b CODE_279E0F
+	
 	LSR
 	LSR
+	
 CODE_279E0F:
 	LSR
+	
 CODE_279E10:
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	SBC.w $0210
 	STA.b !RAM_SMB3_Level_NorSpr_OnScreenXPos,x
 	STA.b $01
+	
 	LDA.w $0679,x
-	STA.b $02
-	AND.b #$30
+	STA.b $02 ; 
+	
+;SNES: new \ 
+	AND.b #$30 ; get priority bits
 	CMP.b #$10
-	BEQ.b CODE_279E28
+	BEQ.b CODE_279E28 
 	LDA.b #$20
-	TSB.b $02
+	TSB.b $02 ; set to priority 3 if priority 1/3
 CODE_279E28:
+;Get pattern Hi byte
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B3CB,y
+	LDA.w SNES_ObjectGroup_PatTableSelHi,y
+;
 	AND.b #$01
-	TSB.b $02
+	TSB.b $02 ; set nametable
+;fin
+	
 	LDY.w $0418
+	
 	LDA.w $0769,x
 	BEQ.b CODE_279E58
+	
 	DEC.w $0769,x
+	
+;SNES: new \ 
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr019_FireFlower
 	BEQ.b CODE_279E58
@@ -65702,6 +66398,7 @@ CODE_279E28:
 
 CODE_279E52:
 	JSL.l CODE_27AA75
+;/ 
 CODE_279E56:
 	BPL.b CODE_279E5B
 CODE_279E58:
@@ -65709,38 +66406,53 @@ CODE_279E58:
 CODE_279E5B:
 	ASL
 	STA.b $03
+
+;SNES: new \ 
+;set the nametable bit
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr055_WindupBobOmb
 	BNE.b CODE_279E67
 	INC.b $03
 CODE_279E67:
+;/
+
 	LDA.w !RAM_SMB3_Level_NorSpr_YOffscreenFlag,x
 	STA.b $04
+	
 	LDA.w !RAM_SMB3_Level_NorSpr_XOffscreenFlag,x
 	STA.b $07
+	
 	LDA.w $0669,x
 	ASL
 	STA.b $05
+	
+;SNES new: \ 
 	LDA.b $DE
 	ASL
 	CLC
 	ADC.b $DE
 	TAX
-	LDA.l DATA_21B47F,x
+	LDA.l ObjectGroup_PatternStarts,x
 	STA.b $D8
-	LDA.l DATA_21B47F+$01,x
+	LDA.l ObjectGroup_PatternStarts+$01,x
 	STA.b $D9
-	LDA.l DATA_21B47F+$02,x
+	LDA.l ObjectGroup_PatternStarts+$02,x
 	STA.b $DA
 	LDA.b [$D8],y
+;/	
 	CLC
 	ADC.b $05
 	STA.b $05
+	
 	TAX
+	
 	LDY.b $9B
+	
 	LDA.w $00C6,y
 	STA.b $06
+	
 	TAY
+	
 	RTL
 
 ;--------------------------------------------------------------------
@@ -65748,9 +66460,10 @@ CODE_279E67:
 ; Note: Some sort of sprite graphics routine.
 
 CODE_279EA1:
-	JSL.l CODE_279DF9
-	JSL.l CODE_279F91
+	JSL.l Object_ShakeAndCalcSprite
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
+	;SNES - boo trail related
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr02F_Boo
 	BNE.b CODE_279EBB
@@ -65760,7 +66473,7 @@ CODE_279EA1:
 CODE_279EBB:
 	RTS
 
-CODE_279EBC:
+Object_ShakeAndDraw:
 	JSR.w CODE_279EA1
 	RTL
 
@@ -65812,7 +66525,7 @@ CODE_279EE2:
 ; Note: Some sort of sprite graphics routine.
 
 CODE_279F12:
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
 	LDA.w $0669,x
 	ASL
@@ -65825,7 +66538,7 @@ CODE_279F12:
 	INX
 	INX
 CODE_279F28:
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	REP.b #$20
 	LDX.b $9B
 	LDA.b $C6,x
@@ -65844,29 +66557,29 @@ CODE_279F44:
 	CLC
 	ADC.b $00
 	STA.b $00
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	RTS
 
-CODE_279F52:
+Object_Draw16x32Sprite:
 	JSR.w CODE_279F12
 	RTL
 
 ;--------------------------------------------------------------------
 
 CODE_279F56:
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
 	LDA.w $0669,x
 	CLC
 	ADC.b $05
 	STA.b $05
 	TAX
-	JSL.l CODE_27A07A
+	JSL.l Object_Draw24x16Sprite
 	LDX.b $9B
 	RTS
 
-CODE_279F6C:
+Object_DrawWide:
 	JSR.w CODE_279F56
 	RTL
 
@@ -65900,19 +66613,24 @@ CODE_279F8C:
 ;--------------------------------------------------------------------
 
 ; Note: Is this some sort of generic sprite graphics routine?
-
-CODE_279F91:
+;
+Object_Draw16x16Sprite:
+;SNES: new - need 16-bit index into Object_SprRAM \ 
 	LDY.b $9B
 	REP.b #$30
 	LDA.w $00C6,y
 	TAY
-	SEP.b #$20
-	LDA.b $04
+	SEP.b #$20	
+;/
+	
+	LDA.b $04	;from RAM_SMB3_Level_NorSpr_YOffscreenFlag
 	LSR
 	BCC.b CODE_279FA3
 	BRL.w CODE_27A077
 
 CODE_279FA3:
+	; skip horizontal check present in NES.
+
 	LDA.b $00
 	STA.w SMB3_OAMBuffer[$00].YDisp,y
 	STA.w SMB3_OAMBuffer[$01].YDisp,y
@@ -65927,11 +66645,14 @@ CODE_279FA3:
 	ADC.b #$08
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
 	STA.w SMB3_OAMBuffer[$03].XDisp,y
-	PHY
-	PHX
+	PHY ; push spriteram index
+	PHX ; push old frame value
+	
+	; get pattern set
+	
 	TXY
 	REP.b #$20
-	LDA.b $DE
+	LDA.b $DE ; 
 	AND.w #$00FF
 	STA.b $D8
 	ASL
@@ -65939,17 +66660,17 @@ CODE_279FA3:
 	ADC.b $D8
 	TAX
 	SEP.b #$20
-	LDA.w DATA_21B48E,x
+	LDA.w ObjectGroup_PatternSets,x
 	STA.b $D8
-	LDA.w DATA_21B48E+$01,x
+	LDA.w ObjectGroup_PatternSets+$01,x
 	STA.b $D9
-	LDA.w DATA_21B48E+$02,x
+	LDA.w ObjectGroup_PatternSets+$02,x
 	STA.b $DA
 	LDA.b [$D8],y
 	PHA
 	INY
 	LDA.b [$D8],y
-	STA.b $D9
+	STA.b $D9 ; pattern ()
 	PLA
 	STA.b $D8
 	PLX
@@ -65962,6 +66683,7 @@ CODE_279FA3:
 	STA.w SMB3_OAMBuffer[$01].Tile,y
 	INC
 	STA.w SMB3_OAMBuffer[$03].Tile,y
+	
 	LDA.b $02
 	ORA.b $03
 	STA.w SMB3_OAMBuffer[$00].Prop,y
@@ -66024,7 +66746,7 @@ CODE_27A077:
 
 ;--------------------------------------------------------------------
 
-CODE_27A07A:
+Object_Draw24x16Sprite:
 	LDY.b $9B
 	REP.b #$30
 	LDA.w $00C6,y
@@ -66065,11 +66787,11 @@ CODE_27A07A:
 	ADC.b $D8
 	TAX
 	SEP.b #$20
-	LDA.w DATA_21B48E,x
+	LDA.w ObjectGroup_PatternSets,x
 	STA.b $D8
-	LDA.w DATA_21B48E+$01,x
+	LDA.w ObjectGroup_PatternSets+$01,x
 	STA.b $D9
-	LDA.w DATA_21B48E+$02,x
+	LDA.w ObjectGroup_PatternSets+$02,x
 	STA.b $DA
 	LDA.b [$D8],y
 	STA.b $DB
@@ -66170,6 +66892,7 @@ CODE_27A16B:
 
 ;--------------------------------------------------------------------
 
+;Object_GetRandNearUnusedSpr
 CODE_27A19E:
 	PHX
 	LDY.b #$07
@@ -66208,7 +66931,7 @@ CODE_27A1D2:
 	ASL
 	TAY
 	REP.b #$20
-	LDA.w DATA_21AF6E,y
+	LDA.w SprRamOffsets,y
 	STA.b $D8
 	SEP.b #$20
 	REP.b #$10
@@ -66236,7 +66959,7 @@ CODE_27A203:
 	REP.b #$30
 	LDY.w #$000E
 CODE_27A209:
-	LDA.w DATA_21AF6E,y
+	LDA.w SprRamOffsets,y
 	STA.b $D8
 	TAX
 	LDA.w SMB3_OAMBuffer[$00].YDisp,x
@@ -66276,7 +66999,7 @@ CODE_27A233:
 	ASL
 	TAY
 	REP.b #$30
-	LDA.w DATA_21AF6E,y
+	LDA.w SprRamOffsets,y
 	CMP.b $DA
 	BEQ.b CODE_27A258
 	STA.b $D8
@@ -66311,17 +67034,21 @@ CODE_27A26C:
 
 ;--------------------------------------------------------------------
 
+;Object_DetermineHorzVis
 SMB3_CheckIfSpriteIsHorizontallyOffScreen:
 .Main:
 ;$27A27D
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B047,y
+	LDA.w ObjectGroup_Attributes,y
+;
 	AND.b #$70
 	LSR
 	LSR
 	LSR
 	LSR
 	TAY
+;Object_DetermineHorzVisY
 SMB3_CheckIfSpriteIsHorizontallyOffScreen_Entry2:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$02
@@ -66339,17 +67066,17 @@ CODE_27A29C:
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	STA.b $0F
 	REP.b #$20
-	LDA.w DATA_21B00A,y
+	LDA.w Object_Widths,y
 	AND.w #$00FF
 	CLC
 	ADC.b $0E
 	SEC
-	SBC.w $0210
+	SBC.w $0210 ; Horz_Scroll
 	CMP.w #$0100
 	BCC.b CODE_27A2C3
 	SEP.b #$20
 	LDA.w !RAM_SMB3_Level_NorSpr_XOffscreenFlag,x
-	ORA.w DATA_21B010,y
+	ORA.w Object_WidthFlags,y
 	STA.w !RAM_SMB3_Level_NorSpr_XOffscreenFlag,x
 CODE_27A2C3:
 	SEP.b #$20
@@ -66359,11 +67086,14 @@ CODE_27A2C3:
 
 ;--------------------------------------------------------------------
 
+;Object_DetermineVertVis
 SMB3_CheckIfSpriteIsVerticallyOffScreen:
 .Main:
 ;$27A2C9
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B047,y
+	LDA.w ObjectGroup_Attributes,y
+;
 	AND.b #$0C
 	LSR
 	LSR
@@ -66409,11 +67139,11 @@ CODE_27A30D:
 
 ; Note: Something related to player to normal sprite collision
 
-CODE_27A313:
+Object_HitTest:
 	JSR.w CODE_27A31C
 	RTL
 
-CODE_27A317:
+Object_HitTestRespond:
 	JSR.w CODE_27A320
 	RTL
 
@@ -66436,7 +67166,7 @@ CODE_27A322:
 	ORA.w $0583
 	ORA.w !RAM_SMB3_Level_Player_BehindLayer1Flag
 	BNE.b CODE_27A31B
-	JSL.l CODE_27A414
+	JSL.l Object_CalcBoundBox
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	BEQ.b CODE_27A348
 	LDA.b #$00
@@ -66522,8 +67252,10 @@ CODE_27A3D4:
 	STA.w $0797,x
 	LDA.w !RAM_SMB3_Level_Player_StarPowerTimer
 	BEQ.b CODE_27A40A
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$80
 	BNE.b CODE_27A40A
 	LDA.b #$06
@@ -66544,7 +67276,7 @@ CODE_27A408:
 CODE_27A40A:
 	LDA.b $0F
 	BNE.b CODE_27A412
-	JSL.l CODE_27A49D
+	JSL.l Object_DoCollision
 CODE_27A412:
 	SEC
 	RTS
@@ -66553,24 +67285,26 @@ CODE_27A412:
 
 ; Note: Routine that gets sprite to sprite clipping values?
 
-CODE_27A414:
+Object_CalcBoundBox:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$0F
 	ASL
 	ASL
 	TAY
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenXPos,x
 	CLC
-	ADC.w DATA_21AE38,y
+	ADC.w Object_BoundBox,y
 	STA.b $00
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x
 	CLC
-	ADC.w DATA_21AE38+$02,y
+	ADC.w Object_BoundBox+$02,y
 	STA.b $04
-	LDA.w DATA_21AE38+$01,y
+	LDA.w Object_BoundBox+$01,y
 	STA.b $01
-	LDA.w DATA_21AE38+$03,y
+	LDA.w Object_BoundBox+$03,y
 	STA.b $05
 	RTL
 
@@ -66579,23 +67313,25 @@ CODE_27A414:
 ; Note: Routine that gets sprite to sprite clipping values?
 
 CODE_27A43A:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$0F
 	ASL
 	ASL
 	TAY
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenXPos,x
 	CLC
-	ADC.w DATA_21AE38,y
+	ADC.w Object_BoundBox,y
 	STA.b $02
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x
 	CLC
-	ADC.w DATA_21AE38+$02,y
+	ADC.w Object_BoundBox+$02,y
 	STA.b $06
-	LDA.w DATA_21AE38+$01,y
+	LDA.w Object_BoundBox+$01,y
 	STA.b $03
-	LDA.w DATA_21AE38+$03,y
+	LDA.w Object_BoundBox+$03,y
 	STA.b $07
 	RTL
 
@@ -66641,7 +67377,7 @@ CODE_27A49C:
 
 ;--------------------------------------------------------------------
 
-CODE_27A49D:
+Object_DoCollision:
 	REP.b #$30
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	AND.w #$00FF
@@ -66651,11 +67387,11 @@ CODE_27A49D:
 	ADC.b $00
 	TAX
 	SEP.b #$20
-	LDA.l DATA_288438,x
+	LDA.l ObjectGroup_CollideJumpTable,x
 	STA.b $00
-	LDA.l DATA_288438+$01,x
+	LDA.l ObjectGroup_CollideJumpTable+$01,x
 	STA.b $01
-	LDA.l DATA_288438+$02,x
+	LDA.l ObjectGroup_CollideJumpTable+$02,x
 	STA.b $02
 	SEP.b #$10
 	LDX.b $9B
@@ -66733,7 +67469,10 @@ CODE_27A544:
 
 CODE_27A545:
 	LDX.b $9B
-CODE_27A547:						; Note: Set Player death animation?
+	
+
+;CODE_27A547
+Player_Die:						; Note: Set Player death animation?
 	LDA.b #!Define_SMB3_LevelMusic_MarioDied
 	STA.w !RAM_SMB3_Global_MusicCh1
 	LDA.b #$01
@@ -66851,19 +67590,21 @@ CODE_27A615:
 	BNE.b CODE_27A5E0
 	JSL.l SMB3_CheckIfNormalSpriteOffScreen_Main
 	BNE.b CODE_27A5E0
-	JSL.l CODE_27A414
+	JSL.l Object_CalcBoundBox
 	JSL.l CODE_27A460
 	BCC.b CODE_27A5E0
 	LDA.w $0797,x
 	ORA.b #$08
 	STA.w $0797,x
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$80
 	BNE.b CODE_27A5E0
 	LDA.b $03
 	CMP.b #$0F
-	BEQ.b CODE_27A67A
+	BEQ.b Enemy_Kill
 	LDY.b #$00
 	LDA.b $BD
 	BEQ.b CODE_27A64C
@@ -66892,13 +67633,15 @@ CODE_27A661:
 	STA.w $1A47
 	LDA.b #$0A
 	STA.w $1A46
-CODE_27A67A:
+Enemy_Kill:
 	LDA.b #$0C
 	STA.w $0520,x
 	LDA.b #!Define_SMAS_Sound0060_KickShell
 	STA.w !RAM_SMB3_Global_SoundCh1
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$40
 	BNE.b CODE_27A69E
 	LDA.w !RAM_SMB3_Level_Player_SlidingXSpeed
@@ -66909,6 +67652,7 @@ CODE_27A69A:
 	LDA.b #$06
 	BNE.b CODE_27A6CB
 CODE_27A69E:
+;hijacked
 	PHX
 	REP.b #$30
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -66918,10 +67662,11 @@ CODE_27A69E:
 	CLC
 	ADC.b $D8
 	TAX
-	LDA.l DATA_288438,x
+	LDA.l ObjectGroup_CollideJumpTable,x
 	STA.b $D8
 	SEP.b #$30
 	PLX
+;
 	LDA.b $D9
 	AND.b #$F8
 	CMP.b #$08
@@ -66951,7 +67696,7 @@ CODE_27A6D8:
 
 ;--------------------------------------------------------------------
 
-CODE_27A6EC:
+ObjectToObject_HitTest:
 	JSR.w CODE_27A6F0
 	RTL
 
@@ -66977,7 +67722,7 @@ CODE_27A704:
 	AND.b #$C0
 	CMP.b #$C0
 	BEQ.b CODE_27A74C
-	JSL.l CODE_27A414
+	JSL.l Object_CalcBoundBox
 	JSL.l CODE_27A460
 	BCC.b CODE_27A74C
 	LDY.b $9B
@@ -66994,8 +67739,10 @@ CODE_27A704:
 	ADC.b #$00
 	BNE.b CODE_27A74C
 	SEC
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$80
 	BEQ.b CODE_27A752
 CODE_27A74C:
@@ -67029,9 +67776,9 @@ CODE_27A75E:
 	PHA
 	PHX
 	TYX
-	LDA.l DATA_21823C,x
+	LDA.l Tile_Mem_AddrVL,x
 	STA.b $00
-	LDA.l DATA_21824C,x
+	LDA.l Tile_Mem_AddrVH,x
 	STA.b $01
 	PLX
 	PLA
@@ -67042,9 +67789,9 @@ CODE_27A77F:
 	LDA.b $0E
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $00
-	LDA.l DATA_218200+$01,x
+	LDA.l Tile_Mem_Addr+$01,x
 	STA.b $01
 	PLX
 	LDA.b $0C
@@ -67070,7 +67817,7 @@ CODE_27A799:
 
 ;--------------------------------------------------------------------
 
-CODE_27A7AE:
+Object_CalcCoarseXDiff:
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	SEC
 	SBC.b !RAM_SMB3_Level_Player_XPosLo
@@ -67122,13 +67869,15 @@ CODE_27A7E5:
 
 ; Note: Something related to X speed.
 
-CODE_27A7F0:
+Object_ApplyXVel:
 	JSR.w SMB3_UpdateNormalSpritePosition_X
 	LDY.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_27A806
 	PHA
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID
-	LDA.w DATA_21B0FB,x
+	LDA.w ObjectGroup_Attributes2,x
+;
 	AND.b #$08
 	BNE.b CODE_27A805
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
@@ -67200,7 +67949,7 @@ CODE_27A89A:
 CODE_27A8A5:
 	STY.b $09
 	STX.b $0A
-	JSL.l CODE_209FA5
+	JSL.l Player_GetTileAndSlope_Normal
 	LDY.b $09
 	LDX.b $0A
 	RTS
@@ -67232,7 +67981,7 @@ CODE_27A8D8:
 
 ; Note: Seems to be the routine for handling opening a toad house chest.
 
-CODE_27A8D9:
+ToadHouse_GiveItem:
 	STX.w !RAM_SMB3_NorSpr035_ToadHouseChestItem_ItemToGive
 	STA.b !RAM_SMB3_Level_NorSpr_XPosLo
 	LSR
@@ -67339,7 +68088,7 @@ CODE_27A98A:
 
 ;--------------------------------------------------------------------
 
-CODE_27A995:
+AScrlURDiag_CheckWrapping:
 	JSR.w CODE_27A9B3
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	CLC
@@ -67530,12 +68279,13 @@ endif
 
 ; Note: Some sort of player to level collision routine.
 
-CODE_27B000:
+;CODE_27B000
+Player_DoLavaDonutArrowBounce:
 	LDA.b !RAM_SMB3_Level_Player_DeathState
 	BNE.b CODE_27B07F
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_27B00C
-	JMP.w CODE_27B0EE
+	JMP.w PRG007_A0DE
 
 CODE_27B00C:
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
@@ -67560,10 +68310,10 @@ CODE_27B00C:
 	PHX
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $2E
 	STA.b $D8
-	LDA.l DATA_218200+$01,x
+	LDA.l Tile_Mem_Addr+$01,x
 	CLC
 	ADC.b $02
 	STA.b $2F
@@ -67581,15 +68331,16 @@ CODE_27B00C:
 	LSR
 	ORA.b $04
 	TAY
+;SNES: new\
 	LDA.b [$D8],y
 	BEQ.b CODE_27B075
 	PHX
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $DB
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $DC
 	LDA.b [$2E],y
 	TAY
@@ -67598,6 +68349,7 @@ CODE_27B00C:
 	BRA.b CODE_27B077
 
 CODE_27B075:
+;SNES: new/
 	LDA.b [$2E],y
 CODE_27B077:
 	CMP.b #$F3
@@ -67634,7 +68386,7 @@ CODE_27B096:
 CODE_27B0A9:
 	LDA.w $0564
 	BNE.b CODE_27B07F
-	JSR.w CODE_27DC88
+	JSR.w PrepareNewObjectOrAbort
 	LDA.b #!Define_SMB3_SpriteID_NorSpr054_DonutBlock
 	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	LDA.b $04
@@ -67665,7 +68417,8 @@ CODE_27B0A9:
 CODE_27B0ED:
 	RTS
 
-CODE_27B0EE:
+;CODE_27B0EE
+PRG007_A0DE:
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
 	CLC
 	ADC.b #$21
@@ -67699,15 +68452,16 @@ CODE_27B0EE:
 	LDA.b #$7E2000>>16
 	STA.b $DA
 	STA.b $DD
+;SNES: new\
 	LDA.b [$DB],y
 	BEQ.b CODE_27B145
 	PHX
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $DB
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $DC
 	LDA.b [$D8],y
 	TAY
@@ -67716,6 +68470,7 @@ CODE_27B0EE:
 	BRA.b CODE_27B147
 
 CODE_27B145:
+;SNES: new/
 	LDA.b [$D8],y
 CODE_27B147:
 	CMP.b #$5B
@@ -67792,7 +68547,7 @@ CODE_27B1BD:
 CODE_27B1BE:
 	LDA.b #$01
 	STA.w $0578
-	JSL.l CODE_27A547
+	JSL.l Player_Die
 	RTS
 
 ;--------------------------------------------------------------------
@@ -67932,9 +68687,9 @@ CODE_27B281:
 
 ; Note: Routine for handling general level stuff?
 
-CODE_27B299:
+Gameplay_UpdateAndDrawMisc:
 	JSR.w CODE_27B1C8
-	JSR.w CODE_27B000
+	JSR.w Player_DoLavaDonutArrowBounce
 	JSR.w SMB3_ProcessMinorExtendedSprites_Main
 	JSR.w CODE_27BA22
 	JSR.w SMB3_ProcessBreathSprites_Main
@@ -68139,9 +68894,11 @@ CODE_27B41E:
 
 ; Note: Routine related to fireballs.
 
+;PRG007_A328
 CODE_27B42B:
 	RTS
 
+;PlayerProjs_UpdateAndDraw
 SMB3_ProcessPlayerFireballs:
 .Main:
 ;$27B42C
@@ -68287,7 +69044,7 @@ CODE_27B52E:
 	LDA.w !RAM_SMB3_Level_FireSpr_YPosLo,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.b $D8
 	CMP.w #$00C0
 	BCC.b CODE_27B55E
@@ -68469,7 +69226,7 @@ CODE_27B693:
 	LDA.w !RAM_SMB3_Level_FireSpr_CurrentState,x
 	CMP.b #$02
 	BEQ.b CODE_27B6A5
-	JSR.w CODE_27B6AE
+	JSR.w Fireball_DetectWorld
 CODE_27B6A5:
 	JMP.w CODE_27B890
 
@@ -68479,7 +69236,8 @@ CODE_27B6A8:
 CODE_27B6AD:
 	RTS
 
-CODE_27B6AE:
+;CODE_27B6AE
+Fireball_DetectWorld:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_27B6EB
 	LDA.b $0C
@@ -68554,13 +69312,13 @@ CODE_27B724:
 	STA.b $06
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $D8
 	STA.b $DB
 	LDA.b $03
 	AND.b #$01
 	CLC
-	ADC.l DATA_218200+$01,x
+	ADC.l Tile_Mem_Addr+$01,x
 	STA.b $D9
 	CLC
 	ADC.b #$20
@@ -68576,6 +69334,7 @@ CODE_27B724:
 	LDA.b #$7E2000>>16
 	STA.b $DA
 	STA.b $DD
+;SNES: new\
 CODE_27B759:
 	LDA.b [$DB],y
 	BEQ.b CODE_27B775
@@ -68585,15 +69344,16 @@ CODE_27B759:
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $DB
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $DC
 	LDA.b ($DB),y
 	PLX
 	BRA.b CODE_27B777
 
 CODE_27B775:
+;SNES: new/
 	LDA.b [$D8],y
 CODE_27B777:
 	JSL.l SMB3_ModifyMap16IDForPSwitchAffectedBlocks_Main
@@ -68764,8 +69524,10 @@ CODE_27B892:
 	LDX.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	LDA.w DATA_21B033,x
 	BNE.b CODE_27B8B1
+;hijacked
 	LDX.w !RAM_SMB3_Level_NorSpr_SpriteID,y
-	LDA.w DATA_21AE78,x
+	LDA.w Object_AttrFlags,x
+;
 	STA.b $00
 	AND.b #$20
 	BNE.b CODE_27B8B1
@@ -68909,7 +69671,7 @@ CODE_27B974:
 	LDA.w !RAM_SMB3_Level_FireSpr_YPosLo,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	CMP.w #$00D0
 	BCS.b CODE_27B96C
 	SEP.b #$20
@@ -69141,7 +69903,7 @@ CODE_27BB3B:
 ;--------------------------------------------------------------------
 
 ; Note: Something related to the air bubbles spawned by the player?
-
+;Bubbles_UpdateAndDraw
 SMB3_ProcessBreathSprites:
 .Main:
 ;$27BB5E
@@ -69150,13 +69912,14 @@ CODE_27BB60:
 	STX.b $9B
 	LDA.w !RAM_SMB3_Level_BreathSpr_MovementTimer,x
 	BEQ.b CODE_27BB6A
-	JSR.w CODE_27BB6E
+	JSR.w Bubble_UpdateAndDraw
 CODE_27BB6A:
 	DEX
 	BPL.b CODE_27BB60
 	RTS
 
-CODE_27BB6E:
+;CODE_27BB6E
+Bubble_UpdateAndDraw:
 	LDA.b $9C
 	BEQ.b CODE_27BB75
 	JMP.w CODE_27BB90
@@ -69210,13 +69973,13 @@ CODE_27BBB5:
 	LDA.w !RAM_SMB3_Level_BreathSpr_XPosHi,x
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $00
 	STA.b $D8
 	LDA.b $01
 	AND.b #$01
 	CLC
-	ADC.l DATA_218200+$01,x
+	ADC.l Tile_Mem_Addr+$01,x
 	STA.b $01
 	CLC
 	ADC.b #$20
@@ -69233,15 +69996,16 @@ CODE_27BBF5:
 	LDA.b #$7E2000>>16
 	STA.b $02
 	STA.b $DA
+;SNES: new\
 	LDA.b [$D8],y
 	BEQ.b CODE_27BC17
 	PHX
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $D8
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $D9
 	LDA.b [$00],y
 	TAY
@@ -69250,6 +70014,7 @@ CODE_27BBF5:
 	BRA.b CODE_27BC19
 
 CODE_27BC17:
+;SNES: new/
 	LDA.b [$00],y
 CODE_27BC19:
 	PHA
@@ -69391,7 +70156,7 @@ CODE_27BD09:
 	RTS
 
 CODE_27BD0A:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $02A7
 	LDA.w $0217
 	STA.w $02A8
@@ -69758,6 +70523,7 @@ CODE_27BFC4:
 ; Note: Seems to be the routine for handling the brick pieces(?) and smoke puffs.
 
 SMB3_ProcessMinorExtendedSprites:
+;BrickBusts_DrawAndUpdate
 .Main:
 ;$27BFDB
 	LDX.b #$01
@@ -70022,6 +70788,7 @@ CODE_27C1C6:
 	STA.w !RAM_SMB3_Level_MExtSpr_SpriteID,x
 	RTS
 
+;PRG007_AD27
 CODE_27C1CC:
 	LDA.w !RAM_SMB3_Level_MExtSpr_Table7E1FAE,x
 	BEQ.b CODE_27C1C6
@@ -70337,7 +71104,8 @@ CODE_27C43C:
 
 ;--------------------------------------------------------------------
 
-CODE_27C442:
+;CODE_27C442
+SObj_CheckHitSolid:
 	LDA.b #$01
 	STA.w $1A68,x
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
@@ -70364,13 +71132,13 @@ CODE_27C442:
 	ADC.b #$00
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $00
 	STA.b $DB
 	LDA.b $01
 	AND.b #$01
 	CLC
-	ADC.l DATA_218200+$01,x
+	ADC.l Tile_Mem_Addr+$01,x
 	STA.b $01
 	CLC
 	ADC.b #$20
@@ -70386,15 +71154,16 @@ CODE_27C442:
 	LDA.b #$7E2000>>16
 	STA.b $02
 	STA.b $DD
+;SNES: new\
 	LDA.b [$DB],y
 	BEQ.b CODE_27C4B7
 	PHX
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	ASL
 	TAX
-	LDA.w DATA_21AB57,x
+	LDA.w SNESTileActsLike_FromTileset,x
 	STA.b $DB
-	LDA.w DATA_21AB57+$01,x
+	LDA.w SNESTileActsLike_FromTileset+$01,x
 	STA.b $DC
 	LDA.b [$00],y
 	TAY
@@ -70403,6 +71172,7 @@ CODE_27C442:
 	BRA.b CODE_27C4B9
 
 CODE_27C4B7:
+;SNES: new/
 	LDA.b [$00],y
 CODE_27C4B9:
 	PHA
@@ -70485,6 +71255,7 @@ CODE_27C527:
 
 SMB3_ProcessExtendedSprites:
 .Main:
+;SpecialObjs_UpdateAndDraw
 ;$27C536
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_Player_NumberOfClingingMicroGoombas
@@ -70645,7 +71416,7 @@ CODE_27C7CC:
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	CMP.w #$0100
 	BCC.b CODE_27C7E6
 	CMP.w #$FFF0
@@ -71219,7 +71990,7 @@ CODE_27D735:
 	AND.w #$00FF
 	ASL
 	TAY
-	LDA.w DATA_21AF6E,y
+	LDA.w SprRamOffsets,y
 	STA.b $C6,x
 	TAY
 	SEP.b #$20
@@ -71447,7 +72218,7 @@ CODE_27DB51:
 
 ;--------------------------------------------------------------------
 
-CODE_27DC88:
+PrepareNewObjectOrAbort:
 	LDX.b #$04
 CODE_27DC8A:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
@@ -71460,7 +72231,7 @@ CODE_27DC8A:
 	RTS
 
 CODE_27DC97:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	RTS
@@ -71611,7 +72382,7 @@ endif
 	STA.b $0A
 	LDA.b $D8
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	DEC
 	STA.b $0B
 	SEP.b #$20
@@ -71636,6 +72407,7 @@ CODE_27DDD1:
 	BEQ.b CODE_27DDEB
 	CMP.w DATA_21E985
 	BEQ.b CODE_27DDEB
+	;check for skid smoke sprite activation
 	LDA.l $7FC522
 	ORA.l $7FC523
 	BEQ.b CODE_27DDBC
@@ -71745,7 +72517,7 @@ CODE_27DE61:
 	STA.b $0A
 	LDA.b $D8
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	CLC
 	ADC.w #$001A
 	STA.b $D8
@@ -71902,7 +72674,7 @@ CODE_27DFBA:
 	LDA.b $71,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	CLC
 	ADC.b $0E
 	SEP.b #$20
@@ -71966,7 +72738,7 @@ macro SMB3Bank28Macros(StartBank, EndBank)
 	%ROUTINE_RT01_SMB3_NorSprStatus01_Init(NULLROM)			; $288000
 	%ROUTINE_RT01_SMB3_NorSprStatus02_Normal(NULLROM)		; $28821C
 
-DATA_288438:
+ObjectGroup_CollideJumpTable:
 	dl SMB3_NorSpr000_UnusedSprite_SteppedOnRt_Main
 	dl CODE_288715				; 01
 	dl SMB3_NorSpr002_UnusedSprite_SteppedOnRt_Main
@@ -72335,7 +73107,7 @@ CODE_288A6A:
 	LDA.b $71,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	SEC
 	SBC.w #$0001
 	CMP.w #$00F0
@@ -72481,10 +73253,10 @@ CODE_288CB3:
 	BNE.b CODE_288CC0
 	JSR.w CODE_288FA3
 CODE_288CC0:
-	JSR.w CODE_288FAF
+	JSR.w Object_InteractWithWorld
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l CODE_279EDE
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l CODE_288DF0
 CODE_288CD3:
 	RTL
@@ -72543,7 +73315,7 @@ CODE_288D17:
 	RTL
 
 CODE_288D28:
-	JSR.w CODE_288FAF
+	JSR.w Object_InteractWithWorld
 	LDA.b $A7,x
 	TAY
 	AND.b #$04
@@ -72553,7 +73325,7 @@ CODE_288D28:
 CODE_288D36:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l CODE_279EDE
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_288D42:
 	JSL.l CODE_288DF0
 	RTL
@@ -72659,15 +73431,15 @@ CODE_288DD1:
 	BNE.b CODE_288DDE
 	JSR.w CODE_288FA3
 CODE_288DDE:
-	JSR.w CODE_288FAF
+	JSR.w Object_InteractWithWorld
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l CODE_279EDE
 	JSR.w CODE_288DFA
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_288DF0:
 	LDA.w $0520,x
 	BNE.b CODE_288DF9
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 CODE_288DF9:
 	RTL
 
@@ -72876,7 +73648,7 @@ CODE_288EFB:
 	PLY
 	SEP.b #$10
 CODE_288F84:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_288F88:
 	RTS
 
@@ -72914,7 +73686,7 @@ CODE_288FAC:
 
 ;--------------------------------------------------------------------
 
-CODE_288FAF:
+Object_InteractWithWorld:
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
 	LDA.b $A7,x
 	TAY
@@ -72962,7 +73734,7 @@ CODE_288FF2:
 	RTS
 
 CODE_288FFC:
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 	JSL.l CODE_27990E
 CODE_289004:
 	RTS
@@ -73012,9 +73784,9 @@ CODE_289031:
 	RTL
 
 CODE_289042:
-	JSR.w CODE_288FAF
+	JSR.w Object_InteractWithWorld
 	JSL.l CODE_279EDE
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BNE.b CODE_289053
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
@@ -73121,7 +73893,7 @@ CODE_289107:
 	CLC
 	ADC.b !RAM_SMB3_Level_NorSpr_OnScreenXPos,x
 	STA.b !RAM_SMB3_Level_NorSpr_OnScreenXPos,x
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	RTL
 
 CODE_289112:
@@ -73161,7 +73933,7 @@ CODE_289126:
 	LDA.b #$01
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 CODE_289160:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSR.w CODE_288A45
 	LDY.w $0526,x
 	LDA.w DATA_21B8BD,y
@@ -73276,7 +74048,7 @@ CODE_289267:
 	CLC
 	ADC.b #$06
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 CODE_289277:
 	LDA.b #$40
@@ -73288,8 +74060,8 @@ CODE_289281:
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 CODE_289284:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279EBC
-	JSL.l CODE_279BC4
+	JSL.l Object_ShakeAndDraw
+	JSL.l Object_DeleteOffScreen
 	JSL.l CODE_288DF0
 	RTL
 
@@ -73342,9 +74114,9 @@ SMB3_NorSpr023_UnusedStarCardItem_Status02:
 	LDA.w $0565
 	ORA.b #$04
 	STA.w $0769,x
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l CODE_279EDE
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	RTL
 
 ;--------------------------------------------------------------------
@@ -73373,7 +74145,7 @@ CODE_2894A7:
 	BEQ.b CODE_2894B5
 	LDA.b $8C,x
 	BEQ.b CODE_2894B5
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_2894B5:
 	LDA.b $A7,x
 	AND.b #$04
@@ -73519,7 +74291,7 @@ CODE_289845:
 	LDA.b #!Define_SMAS_Sound0063_Boomerang
 	STA.w !RAM_SMB3_Global_SoundCh3
 CODE_28985C:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $C6,x
 	PHA
 	LDA.b $C7,x
@@ -73529,7 +74301,7 @@ CODE_28985C:
 	STA.b $C7,x
 	PLA
 	STA.b $C6,x
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
 	LDA.w $0669,x
 	CMP.b #$04
@@ -73668,7 +74440,7 @@ CODE_289965:
 	STA.b $44,x
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l SMB3_CheckIfSpriteIsVerticallyOffScreen_Main
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDA.b $02
 	AND.b #$FE
 	STA.b $02
@@ -73685,7 +74457,7 @@ CODE_289994:
 	STZ.b $C7,x
 	LDY.w $0669,x
 	LDX.w DATA_21BA80,y
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	BIT.b $02
 	BVS.b CODE_2899B8
@@ -73870,7 +74642,7 @@ CODE_289B69:
 	ASL
 	TAY
 	REP.b #$20
-	LDA.w DATA_21AF6E,y
+	LDA.w SprRamOffsets,y
 	STA.b $C6,x
 	SEP.b #$20
 	JSR.w CODE_289BB8
@@ -73993,9 +74765,9 @@ CODE_289BDD:
 	RTS
 
 CODE_289C50:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$04
 	BEQ.b CODE_289C71
@@ -74049,14 +74821,14 @@ CODE_289CB5:
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_289CC3
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 	JSL.l CODE_27990E
 CODE_289CC3:
 	RTS
 
 CODE_289CC4:
 	JSR.w CODE_289D49
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	JSR.w CODE_28964E
 	LDA.b $9C
 	ORA.w $0520,x
@@ -74116,7 +74888,7 @@ CODE_289D37:
 	ADC.w DATA_21BAF0,y
 	STA.b $8C,x
 CODE_289D44:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_289D48:
 	RTS
 
@@ -74244,7 +75016,7 @@ CODE_289E2C:
 CODE_289E35:
 	TYA
 	TAX
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDX.b $9B
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -74546,7 +75318,7 @@ CODE_28B515:
 	LDA.w DATA_21BC98,y
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28B51A:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7D9
 	JSL.l CODE_279B70
 	LDY.b !RAM_SMB3_Level_NorSpr_YSpeed,x
@@ -74557,7 +75329,7 @@ CODE_28B51A:
 	LDY.b #$00
 	JSL.l CODE_27DEFA
 	BCC.b CODE_28B538
-	JSL.l CODE_278CF3
+	JSL.l Object_GetAttrAndMoveTiles
 CODE_28B538:
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
@@ -74609,10 +75381,10 @@ CODE_28B587:
 	AND.b #$01
 	STA.w $0669,x
 CODE_28B593:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_28B597:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTL
 
 SMB3_NorSpr043_2SpotHoppingRedCheepCheep_Status02:
@@ -74650,9 +75422,9 @@ SMB3_NorSpr030_FollowingHotFoot_Status01:
 
 ;--------------------------------------------------------------------
 
-CODE_28B6BC:
+Boo_CheckPlayerSight:
 	LDY.b $68,x
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	EOR.b $BD
 	ASL
 	BPL.b CODE_28B6C9
@@ -74672,9 +75444,9 @@ CODE_28B6D0:
 ;--------------------------------------------------------------------
 
 CODE_28B73A:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTL
 
 ;--------------------------------------------------------------------
@@ -74734,8 +75506,8 @@ SMB3_NorSpr02C_SlowLeftMovingCloudPlatform_Status02:
 	JSL.l CODE_28B960
 	LDA.b $9C
 	BNE.b CODE_28B899
-	JSL.l CODE_27A7F0
-	JSL.l CODE_27A317
+	JSL.l Object_ApplyXVel
+	JSL.l Object_HitTestRespond
 	RTL
 
 ;--------------------------------------------------------------------
@@ -74746,7 +75518,7 @@ CODE_28B8B7:
 	BCC.b CODE_28B8E1
 	LDA.b $9D
 	BMI.b CODE_28B8E1
-CODE_28B8C0:
+Player_StandOnPlatform:
 	LDA.b $71,x
 	SEC
 	SBC.b #$1F
@@ -74777,8 +75549,8 @@ SMB3_NorSpr026_RightFlyingWoodPlatform_Status02:
 	JSL.l CODE_28B960
 	LDA.b $9C
 	BNE.b CODE_28B904
-	JSL.l CODE_27A7F0
-	JSR.w CODE_28C8C5
+	JSL.l Object_ApplyXVel
+	JSR.w PlayerPlatform_Collide
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	BNE.b CODE_28B8F8
 	BCS.b CODE_28B902
@@ -74806,11 +75578,11 @@ CODE_28B905:
 CODE_28B911:
 	LDA.b $A7,x
 	AND.b #$03
-	BEQ.b CODE_28B91F
+	BEQ.b Object_HitFloorAlign
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	BEQ.b CODE_28B91F
-	JSL.l CODE_279906
-CODE_28B91F:
+	BEQ.b Object_HitFloorAlign
+	JSL.l Object_AboutFace
+Object_HitFloorAlign:
 	LDA.b $A7,x
 	AND.b #$04
 	BEQ.b CODE_28B929
@@ -74828,8 +75600,8 @@ SMB3_NorSpr037_FizedHorizontalMovementWoodPlatform_Status02:
 	LDA.b $9C
 	BNE.b CODE_28B960
 	JSL.l CODE_28B93A
-	JSL.l CODE_27A7F0
-	JSR.w CODE_28C8C5
+	JSL.l Object_ApplyXVel
+	JSR.w PlayerPlatform_Collide
 	RTL
 
 ;--------------------------------------------------------------------
@@ -74853,7 +75625,7 @@ CODE_28B93A:
 	LDA.w DATA_21BCC0,y
 	STA.w $0518,x
 CODE_28B960:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_28C308
 	RTL
 
@@ -74874,7 +75646,7 @@ SMB3_NorSpr038_FizedVerticalMovementWoodPlatform_Status02:
 	JSL.l CODE_27A7D9
 	LDA.b #$00
 	STA.w $074D
-	JSR.w CODE_28C8C5
+	JSR.w PlayerPlatform_Collide
 	RTL
 
 ;--------------------------------------------------------------------
@@ -74891,8 +75663,8 @@ SMB3_NorSpr036_LeftFlyingWoodPlatformThatFalls_Status02:
 	LDA.b $9C
 	BNE.b CODE_28BA0E
 	JSL.l CODE_27A7D9
-	JSL.l CODE_27A7F0
-	JSR.w CODE_28C8C5
+	JSL.l Object_ApplyXVel
+	JSR.w PlayerPlatform_Collide
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BNE.b CODE_28BA0C
 	BCC.b CODE_28BA0E
@@ -74965,7 +75737,7 @@ CODE_28BA48:
 	TAY
 CODE_28BA56:
 	STY.b $0D
-	JSL.l CODE_278E13
+	JSL.l Object_DetectTile
 	LDY.b $0C
 	STA.w $0008,y
 	LDY.b $0D
@@ -75014,8 +75786,8 @@ CODE_28BAA3:
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_28BAB2:
 	JSL.l CODE_27A7D9
-	JSL.l CODE_27A7F0
-	JSR.w CODE_28C8C5
+	JSL.l Object_ApplyXVel
+	JSR.w PlayerPlatform_Collide
 	BCC.b CODE_28BAC5
 	LDA.b $4D,x
 	ORA.b #$01
@@ -75194,12 +75966,12 @@ CODE_28BD3A:
 	CLC
 	ADC.w DATA_21BD76,y
 	STA.b !RAM_SMB3_NorSprXXX_SpikeBlowingPiranhaPlant_YOffsetOfSpikeBall,x
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 CODE_28BD4E:
-	JSL.l CODE_279BC4
-CODE_28BD52:
+	JSL.l Object_DeleteOffScreen
+Bank2_PiranhaSpikeHaltAction:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr046_BlowingPiranhaPlant
@@ -75214,7 +75986,7 @@ CODE_28BD6A:
 	BPL.b CODE_28BD73
 	JSR.w CODE_28BEC6
 CODE_28BD73:
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	REP.b #$20
 	LDA.b $C6,x
@@ -75232,7 +76004,7 @@ CODE_28BD73:
 	BMI.b CODE_28BD97
 	JSR.w CODE_28BEC6
 CODE_28BD97:
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	REP.b #$10
 	LDY.b $C6,x
@@ -75301,7 +76073,8 @@ CODE_28BDE9:
 	LDY.b #$00
 	JSL.l SMB3_CheckIfSpriteIsVerticallyOffScreen_Entry2
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
+;
 	LDX.b $9B
 	REP.b #$20
 	LDA.b $C6,x
@@ -75309,8 +76082,9 @@ CODE_28BDE9:
 	ADC.w #$0010
 	STA.b $C6,x
 	SEP.b #$20
+;
 	LDX.b #$6E
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	REP.b #$10
 	LDY.b $C6,x
@@ -75357,11 +76131,11 @@ CODE_28BE80:
 	PHA
 	LDA.b #!Define_SMB3_SpriteID_NorSpr042_3SpotHoppingRedCheepCheep
 	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_28BEAB
 	LDA.w !RAM_SMB3_Level_Player_StarPowerTimer
 	BNE.b CODE_28BEAB
-	JSL.l CODE_27A49D
+	JSL.l Object_DoCollision
 CODE_28BEAB:
 	PLA
 	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -75420,8 +76194,8 @@ CODE_28BFD4:
 
 ;--------------------------------------------------------------------
 
-CODE_28BFD9:
-	JSL.l CODE_279DF9
+Shoe_DrawGoomba:
+	JSL.l Object_ShakeAndCalcSprite
 	LDA.b $02
 	BPL.b CODE_28BFF0
 	LDX.b $9B
@@ -75433,7 +76207,7 @@ CODE_28BFD9:
 	STA.b $00
 	LDX.b $05
 CODE_28BFF0:
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x
 	BIT.b $02
@@ -75452,19 +76226,22 @@ CODE_28C002:
 	BCC.b CODE_28C013
 	ASL.b $07
 CODE_28C013:
-	LDA.b #$02
+	LDA.b #$02 ; different from NES
 	STA.b $03
-	LDA.b $02
-	AND.b #$FE
+;SNES: new \ 
+	LDA.b $02 
+	AND.b #$FE ; reset nametable bit 
 	STA.b $02
+	
 	REP.b #$20
 	LDA.b $C6,x
 	CLC
 	ADC.w #$0010
 	STA.b $C6,x
 	SEP.b #$20
+;/ 
 	LDX.b #$70
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	REP.b #$10
 	LDY.b $C6,x
@@ -75511,7 +76288,7 @@ CODE_28C065:
 	LSR
 	AND.b #$02
 	TAY
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	STA.b $0D
 	LDA.b $0E
 	CLC
@@ -75533,7 +76310,7 @@ CODE_28C095:
 	TYA
 	STA.w !RAM_SMB3_NorSprXXX_Nipper_AnimationFrame,x
 	JSL.l CODE_28B73A
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	LDA.b !RAM_SMB3_NorSprXXX_Nipper_HopAroundFlag,x
 	BNE.b CODE_28C0AB
 	LDA.b $0D
@@ -75578,7 +76355,7 @@ CODE_28C0DA:
 ;--------------------------------------------------------------------
 
 CODE_28C308:
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDA.b $02
 	AND.b #$3F
 	STA.b $02
@@ -75594,7 +76371,7 @@ CODE_28C308:
 	STA.w $00C6,y
 	SEP.b #$20
 CODE_28C328:
-	JSL.l CODE_27A07A
+	JSL.l Object_Draw24x16Sprite
 	PLP
 	BCS.b CODE_28C341
 	REP.b #$20
@@ -75625,7 +76402,7 @@ CODE_28C351:
 	ASL.b $07
 	ASL.b $07
 	ASL.b $07
-	JSL.l CODE_27A07A
+	JSL.l Object_Draw24x16Sprite
 	LDX.b $9B
 	RTS
 
@@ -75697,8 +76474,10 @@ CODE_28C545:
 	CMP.b #$03
 	BNE.b CODE_28C5BE
 CODE_28C550:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21AE78,y
+	LDA.w Object_AttrFlags,y
+;
 	AND.b #$10
 	BEQ.b CODE_28C5BE
 	LDA.w !RAM_SMB3_Level_NorSpr_YOffscreenFlag,x
@@ -75707,7 +76486,7 @@ CODE_28C550:
 	AND.b #$C0
 	CMP.b #$C0
 	BEQ.b CODE_28C5BE
-	JSL.l CODE_27A414
+	JSL.l Object_CalcBoundBox
 	JSL.l CODE_27A460
 	BCC.b CODE_28C5BE
 	LDY.b $9B
@@ -75792,8 +76571,8 @@ SMB3_NorSpr03B_FollowingCheepCheep_Status01:
 
 ;--------------------------------------------------------------------
 
-CODE_28C8C5:
-	JSL.l CODE_27A313
+PlayerPlatform_Collide:
+	JSL.l Object_HitTest
 	BCC.b CODE_28C90E
 	LDA.b !RAM_SMB3_Level_Player_OnScreenYPos
 	CLC
@@ -75802,7 +76581,7 @@ CODE_28C8C5:
 	BCS.b CODE_28C8DE
 	LDA.b !RAM_SMB3_Level_Player_YSpeed
 	BMI.b CODE_28C8DD
-	JSL.l CODE_28B8C0
+	JSL.l Player_StandOnPlatform
 	SEC
 CODE_28C8DD:
 	RTS
@@ -76089,8 +76868,8 @@ CODE_28CE70:
 
 CODE_28CE71:
 	LDA.w $0669,x
-	JSL.l CODE_279DF9
-	JSL.l CODE_279F91
+	JSL.l Object_ShakeAndCalcSprite
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	LDA.w $0669,x
 	CMP.b #$0F
@@ -76272,11 +77051,11 @@ SMB3_NorSpr068_UpsideDownBuzzyBeetle_Status02:
 SMB3_NorSpr069_UpsideDownSpiny_Status02:
 .Main:
 ;$28D33B
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_28D3C7
 	LDA.b $9C
 	BNE.b CODE_28D3BC
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr070_BuzzyBeetle
 	BNE.b CODE_28D356
@@ -76292,10 +77071,10 @@ CODE_28D356:
 CODE_28D35F:
 	TYA
 	STA.w $0669,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b #$FF
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b $A7,x
 	AND.b #$08
 	BNE.b CODE_28D389
@@ -76303,8 +77082,8 @@ CODE_28D35F:
 	LDA.w $1021,x
 	CMP.b #$02
 	BCS.b CODE_28D39B
-	JSL.l CODE_279906
-	JSL.l CODE_27A7F0
+	JSL.l Object_AboutFace
+	JSL.l Object_ApplyXVel
 	BRA.b CODE_28D38E
 
 CODE_28D389:
@@ -76320,6 +77099,7 @@ CODE_28D38E:
 CODE_28D39B:
 	LDA.b #$05
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
+;hijacked
 	PHX
 	REP.b #$30
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -76329,16 +77109,17 @@ CODE_28D39B:
 	CLC
 	ADC.b $D8
 	TAX
-	LDA.l DATA_288438,x
+	LDA.l ObjectGroup_CollideJumpTable,x
 	SEP.b #$30
 	PLX
+;
 	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	STZ.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28D3BC:
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_28D3C6
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_28D3C6:
 	RTL
 
@@ -76351,7 +77132,7 @@ CODE_28D3C7:
 	AND.b #$BF
 	STA.w $0679,x
 CODE_28D3D9:
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTS
 
 ;--------------------------------------------------------------------
@@ -76392,11 +77173,11 @@ SMB3_NorSpr050_BobOmb_Status02:
 SMB3_NorSpr055_WindupBobOmb_Status02:
 .Main:
 ;$28D489
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $68,x
 	CMP.b #$02
 	BEQ.b CODE_28D49E
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	LDA.b $9C
 	BNE.b CODE_28D4A1
 	JSR.w CODE_28E6F7
@@ -76411,7 +77192,7 @@ CODE_28D4A2:
 
 DATA_28D4A8:
 	dw CODE_28D4AE
-	dw CODE_28D529
+	dw BobOmb_FlashToExplode
 	dw CODE_28D5D4
 
 CODE_28D4AE:
@@ -76452,9 +77233,9 @@ CODE_28D4F8:
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_28D502
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_28D502:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	BCC.b CODE_28D528
 	LDA.w $0797,x
 	BEQ.b CODE_28D528
@@ -76479,7 +77260,7 @@ endif
 CODE_28D528:
 	RTS
 
-CODE_28D529:
+BobOmb_FlashToExplode:
 	LDY.b #$02
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$08
@@ -76509,7 +77290,7 @@ CODE_28D557:
 	CMP.b #$40
 	BCS.b CODE_28D55E
 	STA.w $0769,x
-CODE_28D55E:
+CODE_28D55E: ; PRG003_A79F
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
 	LDA.b $A7,x
 	AND.b #$04
@@ -76545,7 +77326,7 @@ CODE_28D590:
 	ASL
 	ROR.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28D5A1:
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_28D5B6
 	LDA.w $0520,x
 	BNE.b CODE_28D5B6
@@ -76832,7 +77613,7 @@ CODE_28E7DD:
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	SEP.b #$20
 	XBA
 	STA.b $D8
@@ -76902,7 +77683,7 @@ CODE_28E858:
 CODE_28E85F:
 	JSR.w CODE_28E86A
 CODE_28E862:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_28E91B
 	RTL
 
@@ -76948,7 +77729,7 @@ CODE_28E8A8:
 	ADC.w DATA_21C311,y
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28E8BE:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
 	PHA
 	CLC
@@ -77030,7 +77811,7 @@ CODE_28E942:
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	CLC
 	ADC.b $DA
 	SEP.b #$20
@@ -77088,7 +77869,7 @@ CODE_28E9AD:
 	CMP.b #!Define_SMB3_SpriteID_NorSpr058_FireChomp			;\ Optimization: Useless CMP.b and branch.
 	BNE.b CODE_28E9B1							;/
 CODE_28E9B1:
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 CODE_28E9B5:
 	REP.b #$20
 	LDA.b $C6,x
@@ -77288,7 +78069,7 @@ CODE_28EB1A:
 CODE_28EB1F:
 	LDA.b $4D,x
 	BEQ.b CODE_28EB96
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b $4D,x
 	CMP.b #$01
@@ -77546,7 +78327,7 @@ CODE_28ED49:
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr059_FireSnake
 	BNE.b CODE_28ED55
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	RTS
 
 CODE_28ED55:
@@ -77581,7 +78362,7 @@ CODE_28ED82:
 	ASL.w $0679,x
 	SEC
 	ROR.w $0679,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b $9E,x
 	BMI.b CODE_28ED99
@@ -77753,7 +78534,7 @@ CODE_28EE9B:
 	LSR
 	STA.w $0769,x
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_29A3C2
+	JSL.l SNES_RotoBooTrailDraw
 	RTL
 
 %FREE_BYTES(NULLROM, 4430, $FF)
@@ -77809,7 +78590,7 @@ SMB3_NorSpr0B1_RightwardFacingFireJet_Status02:
 SMB3_NorSpr0B2_DownwardFacingFireJet_Status02:
 .Main:
 ;$2982D8
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BNE.b CODE_298301
 	LDA.w $0518,x
@@ -77871,7 +78652,7 @@ CODE_29833E:
 	LDA.w DATA_21C59D,y
 	PHA
 	STA.w $0669,x
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	CLC
 	ADC.b #$06
@@ -77891,7 +78672,7 @@ CODE_29833E:
 	ADC.w #$0010
 	STA.b $C6,x
 	SEP.b #$20
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	PLA
@@ -77940,7 +78721,7 @@ CODE_2983B3:
 	LDA.w DATA_21C59D,y
 	PHA
 	STA.w $0669,x
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	CLC
 	ADC.b #$06
@@ -77960,7 +78741,7 @@ CODE_2983B3:
 	ADC.w #$0010
 	STA.b $C6,x
 	SEP.b #$20
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	PLA
@@ -78183,7 +78964,7 @@ SMB3_NorSpr0A6_RedVenusFireTrap_Status02:
 SMB3_NorSpr0A7_UpsideDownRedVenusFireTrap_Status02:
 .Main:
 ;$29852C
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $4D,x
 	LDY.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	BPL.b CODE_29853A
@@ -78239,7 +79020,7 @@ CODE_298595:
 	INC.w $0669,x
 	INC.w $0669,x
 CODE_29859B:
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_Y
 	STY.b $00
 	STZ.b $01
@@ -78892,7 +79673,7 @@ CODE_2996A7:
 	LDA.b $C7,x
 	STA.b $DB
 	JSL.l CODE_27A228
-	JSR.w CODE_2997F6
+	JSR.w PRG005_SUB_B596
 	REP.b #$10
 	LDY.b $DA
 	LDA.b $0D
@@ -79067,7 +79848,7 @@ CODE_2997F5:
 
 ;--------------------------------------------------------------------
 
-CODE_2997F6:
+PRG005_SUB_B596:
 	LDA.b #$00
 	STA.b $0C
 	STA.b $0A
@@ -79078,7 +79859,7 @@ CODE_2997F6:
 	ADC.b $05
 	STA.b $0B
 	PHA
-	LDA.b $5F,x
+	LDA.b $5F,x ; Objects_X
 	SEC
 	SBC.b $0B
 	STA.b $0B
@@ -79086,15 +79867,15 @@ CODE_2997F6:
 	BPL.b CODE_299813
 	DEC.b $0A
 CODE_299813:
-	LDA.b $44,x
+	LDA.b $44,x ; Objects_XHi
 	SBC.b $0A
 	STA.b $0A
 	LDY.b #$00
 CODE_29981B:
 	LDA.b $0B
-	CMP.w $0210
+	CMP.w $0210; Horz_Scroll
 	LDA.b $0A
-	SBC.b $12
+	SBC.b $12 ; Horz_Scroll_Hi
 	BEQ.b CODE_29982D
 	LDA.w DATA_21C653,y
 	ORA.b $0C
@@ -79189,12 +79970,13 @@ CODE_299AD4:
 	JMP.w CODE_299DCD
 
 CODE_299ADC:
-	JMP.w CODE_299AE0
+	JMP.w Level_ObjectsSpawnByScroll
 
 CODE_299ADF:
 	RTS
 
-CODE_299AE0:
+;CODE_299AE0
+Level_ObjectsSpawnByScroll:
 	LDY.b $25
 	LDA.w $0210
 	CLC
@@ -79275,7 +80057,7 @@ CODE_299B60:
 	BNE.b CODE_299B78
 	TYA
 	PHA
-	JSR.w CODE_299C43
+	JSR.w ObjAutoScroller_Init
 	PLA
 	TAY
 CODE_299B6B:
@@ -79392,7 +80174,7 @@ CODE_299C33:
 CODE_299C42:
 	RTS
 
-CODE_299C43:
+ObjAutoScroller_Init:
 	LDA.w !RAM_SMB3_Level_SpriteListData+$01,y
 	CMP.b #$60
 	BNE.b CODE_299C50
@@ -79433,7 +80215,7 @@ CODE_299C74:
 	PLX
 CODE_299C7E:
 	STY.w !RAM_SMB3_Level_ScrollSpr_HorizontalAutoScrollType
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w !RAM_SMB3_Level_AutoscrollLayerYPosLo
 	INC.w !RAM_SMB3_Level_RunScrollSpritesFlag
 	RTS
@@ -79480,7 +80262,7 @@ CODE_299CC0:
 	JMP.w CODE_299D24
 
 CODE_299CCB:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b $08
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	LDA.b $09
@@ -79763,7 +80545,7 @@ CODE_29A0F0:
 ;--------------------------------------------------------------------
 
 CODE_29A0F6:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	RTS
@@ -79925,8 +80707,8 @@ CODE_29A21F:
 	BCC.b CODE_29A22D
 	INC.b $12
 CODE_29A22D:
-	JSR.w CODE_299AE0
-	JSR.w CODE_299AE0
+	JSR.w Level_ObjectsSpawnByScroll
+	JSR.w Level_ObjectsSpawnByScroll
 	LDA.b $0E
 	CMP.b $12
 	BNE.b CODE_29A21F
@@ -80114,7 +80896,7 @@ CODE_29A3A8:
 
 ;--------------------------------------------------------------------
 
-CODE_29A3C2:
+SNES_RotoBooTrailDraw:
 	LDA.l $7FC57A,x
 	BNE.b CODE_29A3DE
 	JSR.w CODE_29A52D
@@ -80135,14 +80917,14 @@ CODE_29A3E8:
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr02F_Boo
 	BEQ.b CODE_29A412
+; disc code
 	LDA.b #$8C
 	STA.b $01
-	LDA.w $0669,x
+	LDA.w $0669,x 
 	BEQ.b CODE_29A3FE
 	STZ.b $03
 	LDA.b #$88
 	BRA.b CODE_29A404
-
 CODE_29A3FE:
 	LDA.b #$C0
 	STA.b $03
@@ -80156,11 +80938,12 @@ CODE_29A404:
 	TSB.b $03
 	BRA.b CODE_29A452
 
+	;boo code
 CODE_29A412:
 	REP.b #$10
 	LDY.w $00C6,x
-	LDA.b #$F0
-	STA.w SMB3_OAMBuffer[$00].YDisp,y
+	LDA.b #$F0 ; "remove" old tiles
+	STA.w SMB3_OAMBuffer[$00].YDisp,y 
 	STA.w SMB3_OAMBuffer[$01].YDisp,y
 	STA.w SMB3_OAMBuffer[$02].YDisp,y
 	STA.w SMB3_OAMBuffer[$03].YDisp,y
@@ -80170,24 +80953,26 @@ CODE_29A412:
 	LDA.b #$40
 CODE_29A42E:
 	ORA.b #$2A
-	STA.b $02
+	STA.b $02 ;prop
 	STA.b $03
-	LDA.b #$AC
-	STA.b $00
+	LDA.b #$AC ;still tile
+	STA.b $00 
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$06
 	BNE.b CODE_29A445
-	LDA.b #$AA
-	STA.b $02
+	LDA.b #$AA ;prop
+	STA.b $02 
 	BRA.b CODE_29A4C0
 
 CODE_29A445:
-	LDA.w $0669,x
-	BEQ.b CODE_29A4C0
-	LDA.b #$AE
+	LDA.w $0669,x ;frame 
+	BEQ.b CODE_29A4C0 ; skip over if not attacking
+	LDA.b #$AE ;attacking tile
 	STA.b $00
 	LDA.b #$84
 	STA.b $01
+	
+	;shared code
 CODE_29A452:
 	LDA.b $01
 	STA.b $0A
@@ -80241,24 +81026,26 @@ CODE_29A48F:
 	JSR.w CODE_29A4E2
 	SEP.b #$10
 CODE_29A4C0:
-	LDA.b $00
+	LDA.b $00 ; tile
 	STA.b $0A
-	LDA.b $02
+	LDA.b $02 ; prop
 	STA.b $0B
-	LDA.b $5F,x
+	LDA.b $5F,x ;xdisp
 	STA.b $0C
-	LDA.b $44,x
+	LDA.b $44,x ;size
 	STA.b $0D
-	LDA.b $71,x
+	LDA.b $71,x ;ydisp
 	STA.b $0E
-	LDA.b $56,x
+	LDA.b $56,x ;hide
 	STA.b $0F
 	REP.b #$10
-	LDY.b $C6,x
+	LDY.b $C6,x ; oam index
 	JSR.w CODE_29A4E2
 	SEP.b #$10
 	RTL
 
+;apply frame
+;inputs -  $0A - tile, $0B - prop, $0C: Xdisp, $0D - flag: size, $0E: Ydisp, $0F - (flag, force hide)
 CODE_29A4E2:
 	REP.b #$20
 	LDA.b $0C
@@ -80267,7 +81054,7 @@ CODE_29A4E2:
 	STA.b $0C
 	LDA.b $0E
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.b $0E
 	SEP.b #$20
 	LDA.b $0C
@@ -80441,8 +81228,8 @@ CODE_29A5E4:
 
 ; Note: Some routine related to initializing the overworld
 
-CODE_29A700:
-	JSR.w CODE_29A7C3
+Map_Init:
+	JSR.w Map_Airship_Pick_Travel
 	LDX.w !RAM_SMB3_Global_CurrentWorld
 	LDA.w DATA_21E3A5,x
 	STA.w $1EEC
@@ -80515,7 +81302,7 @@ CODE_29A753:
 	STA.l $7E3971
 	RTL
 
-CODE_29A7C3:
+Map_Airship_Pick_Travel:
 	LDY.w !RAM_SMB3_Global_CurrentWorld
 	LDA.w !RAM_SMB3_Global_RandomByte02
 	AND.b #$0F
@@ -81610,11 +82397,11 @@ CODE_29AF91:
 	LDA.w !RAM_SMB3_Overworld_Mario_XPosHi,y
 	ASL
 	TAX
-	LDA.w DATA_218200,x
+	LDA.w Tile_Mem_Addr,x
 	CLC
 	ADC.b #$F0
 	STA.b $2E
-	LDA.w DATA_218200+$01,x
+	LDA.w Tile_Mem_Addr+$01,x
 	ADC.b #$00
 	STA.b $2F
 	LDA.w !RAM_SMB3_Overworld_Mario_XPosLo,y
@@ -82682,11 +83469,11 @@ CODE_29B778:
 	ADC.w DATA_21E7F5,x
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	CLC
 	ADC.b #$F0
 	STA.b $2E
-	LDA.l DATA_218200+$01,x
+	LDA.l Tile_Mem_Addr+$01,x
 	ADC.b #$00
 	STA.b $2F
 	LDA.b $03
@@ -82965,9 +83752,9 @@ CODE_29B964:
 	ADC.w DATA_21E882,y
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $2E
-	LDA.l DATA_218200+$01,x
+	LDA.l Tile_Mem_Addr+$01,x
 	STA.b $2F
 	INC.b $2F
 	LDA.b $0F
@@ -83604,7 +84391,7 @@ CODE_29BE32:
 	ASL
 	TAY
 	REP.b #$20
-	LDA.l DATA_218200
+	LDA.l Tile_Mem_Addr
 	CLC
 	ADC.w #$0110
 	STA.b $2E
@@ -83687,9 +84474,9 @@ CODE_29BEC8:
 	TAX
 	LDA.b #$7E2000>>16
 	STA.b $30
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $2E
-	LDA.l DATA_218200+$01,x
+	LDA.l Tile_Mem_Addr+$01,x
 	INC
 	STA.b $2F
 	LDX.b #$07
@@ -83925,8 +84712,10 @@ CODE_29C030:
 	SEP.b #$20
 	INY
 	INY
+;hijacked
 	LDA.b ($04),y
 	STA.b !RAM_SMB3_Level_SpriteDataPtrBank
+;
 	LDA.b ($06),y
 	STA.b !RAM_SMB3_Level_LevelDataPtrBank
 	STA.w !RAM_SMB3_Level_PreviousLevelDataBank
@@ -83978,9 +84767,9 @@ CODE_29C095:
 	LDA.w $0045,y
 	ASL
 	TAX
-	LDA.l DATA_218200,x
+	LDA.l Tile_Mem_Addr,x
 	STA.b $2E
-	LDA.l DATA_218200+$01,x
+	LDA.l Tile_Mem_Addr+$01,x
 	INC
 	STA.b $2F
 	LDA.w $0047,y
@@ -84275,7 +85064,7 @@ CODE_29C312:
 	BEQ.b CODE_29C31D
 	LSR
 	BNE.b CODE_29C34F
-	JMP.w CODE_29D2CE
+	JMP.w Palette_PrepareFadeOutTK
 
 CODE_29C31D:
 	LDA.b !RAM_SMB3_Global_FrameCounter
@@ -84287,7 +85076,7 @@ CODE_29C31D:
 	LDA.b #$01
 	STA.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 	LDA.b #$18
-	STA.w $0216
+	STA.w !Vert_Scroll
 	STZ.w $0218
 	LDA.w !RAM_SMB3_Global_MainScreenLayersMirror
 	AND.b #$FB
@@ -84634,7 +85423,7 @@ CODE_29C538:
 ;--------------------------------------------------------------------
 
 CODE_29C53C:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	BMI.b CODE_29C542
 	RTS
 
@@ -84758,7 +85547,7 @@ else
 	ADC.b #$01
 endif
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	BEQ.b CODE_29C629
 	LDX.b #$06
@@ -84899,7 +85688,7 @@ CODE_29C6F0:
 	LDA.w DATA_21F47E,y
 CODE_29C6F3:
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
-	JSL.l CODE_20E237
+	JSL.l Player_Draw
 	RTS
 
 ;--------------------------------------------------------------------
@@ -85004,10 +85793,11 @@ CODE_29C793:
 
 ;--------------------------------------------------------------------
 
-CODE_29C794:
-	JSL.l CODE_29C82B
+SNES_Setup_PalData:
+	JSL.l SNES_Setup_PalData_B ; get palettes
 	RTL
 
+;$0000 - no special palette
 DATA_29C799:
 	dw $1000
 	dw DATA_3C9000
@@ -85065,26 +85855,33 @@ DATA_29C81F:
 DATA_29C825:
 	dw DATA_3C8BC0,DATA_3C8B60,DATA_3C8BC0
 
-CODE_29C82B:
+SNES_Setup_PalData_B:
+	
+	; set default background colour
 	LDA.b #$20
 	STA.w !RAM_SMB3_Global_FixedColorData1Mirror
 	ASL
 	STA.w !RAM_SMB3_Global_FixedColorData2Mirror
 	ASL
-	STA.w !RAM_SMB3_Global_FixedColorData3Mirror
+	STA.w !RAM_SMB3_Global_FixedColorData3Mirror	
+	
 	REP.b #$30
+	
+	; row0 (status bar)
 	PHB
-	LDX.w #UnknownPaletteData01_Row00
+	LDX.w #UnknownPaletteData01_Row00 
 	LDY.w #SMB3_PaletteMirror[$00].LowByte
 	LDA.w #UnknownPaletteData01_Row00End-UnknownPaletteData01_Row00-$01
 	MVN SMB3_PaletteMirror[$00].LowByte>>16,UnknownPaletteData01_Row00>>16
 	PLB
+	; row8-c (five sprite rows)
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C 
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
 	LDA.w #$009F
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	PLB
+	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	AND.w #$00FF
 	ASL
@@ -85098,15 +85895,19 @@ CODE_29C82B:
 	BEQ.b CODE_29C8A9
 	CMP.w #$3000
 	BEQ.b CODE_29C89F
-	CPX.w #$0004
+	
+;check if throne room
+	
+	CPX.w #$0004 ; tileset 2 (Fortress)
 	BNE.b CODE_29C886
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	AND.w #$00FF
-	CMP.w #$0016
+	CMP.w #$0016 ; if throne room
 	BEQ.b CODE_29C89A
 CODE_29C886:
-	JSR.w CODE_29CAA0
-	JSR.w CODE_29CBC0
+; normal palette loading
+	JSR.w SNES_PalLoadNormal
+	JSR.w SNES_PalLoadRowC
 	LDA.w !RAM_SMB3_Level_BackgroundColorSettingFromHeader
 	AND.w #$0007
 	ASL
@@ -85115,30 +85916,34 @@ CODE_29C886:
 	BRA.b CODE_29C90E
 
 CODE_29C89A:
-	JSR.w CODE_29CB7E
+	JSR.w SNES_PalLoadThroneRoom
 CODE_29C89D:
 	BRA.b CODE_29C90B
 
 CODE_29C89F:
-	JSR.w CODE_29CCB6
+	JSR.w CODE_29CCB6 ; battle mode
 	BRA.b CODE_29C90B
 
 CODE_29C8A4:
-	JSR.w CODE_29CC14
+	JSR.w CODE_29CC14 ; overworld
 	BRA.b CODE_29C90B
 
 CODE_29C8A9:						; Note: Something related to the spade levels.
 	PHX
+	
+	; row 1-7
 	PHB
 	LDX.w #SpadeLevelPalette_Row01To07
 	LDY.w #SMB3_PaletteMirror[$10].LowByte
 	LDA.w #SpadeLevelPalette_Row01To07End-SpadeLevelPalette_Row01To07-$01
 	MVN SMB3_PaletteMirror[$10].LowByte>>16,SpadeLevelPalette_Row01To07>>16
+	; row E
 	LDX.w #DATA_3C8A60
 	LDY.w #SMB3_PaletteMirror[$E0].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$E0].LowByte>>16,DATA_3C8A60>>16
 	PLB
+	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	AND.w #$00FF
 	CMP.w #$000F
@@ -85146,12 +85951,15 @@ CODE_29C8A9:						; Note: Something related to the spade levels.
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	AND.w #$0001
 	BEQ.b CODE_29C8E5
+	
+	; row 7
 	PHB
 	LDX.w #RegularLuigiPalette
 	LDY.w #SMB3_PaletteMirror[$70].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$70].LowByte>>16,RegularLuigiPalette>>16
 	PLB
+	
 CODE_29C8E5:
 	PLX
 	LDA.l DATA_29C799,x
@@ -85159,6 +85967,8 @@ CODE_29C8E5:
 	ASL
 	TAX
 	PHX
+	
+	; row D
 	PHB
 	LDA.l DATA_29C825,x
 	TAX
@@ -85166,6 +85976,7 @@ CODE_29C8E5:
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$D0].LowByte>>16,DATA_3C8BC0>>16
 	PLB
+	
 	PLX
 	LDA.l DATA_29C81F,x
 	TAX
@@ -85200,20 +86011,24 @@ CODE_29C926:
 	SEP.b #$30
 	STZ.w SMB3_PaletteMirror[$00].LowByte
 	STZ.w SMB3_PaletteMirror[$00].HighByte
+	
 	LDA.b $D8
 	STA.w !RAM_SMB3_Global_FixedColorData1Mirror
 	LDA.b $DA
 	STA.w !RAM_SMB3_Global_FixedColorData2Mirror
 	LDA.b $DC
 	STA.w !RAM_SMB3_Global_FixedColorData3Mirror
+	
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	CMP.b #$03
 	BNE.b CODE_29C95D
 	LDA.b #$83
 	STA.w !RAM_SMB3_Global_FixedColorData3Mirror
 CODE_29C95D:
+
 	LDA.b #$01
 	STA.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
+	
 	RTL
 
 DATA_29C963:
@@ -85293,20 +86108,26 @@ DATA_29CA84:
 	dw DATA_3C8B40,DATA_3C8B60,DATA_3C8B80,DATA_3C8BA0
 	dw DATA_3C8BC0,DATA_3C8BE0
 
-CODE_29CAA0:
+;CODE_29CAA0
+SNES_PalLoadNormal:
+; x is shifted tileset
 	LDA.l DATA_29C799,x
+	
+	; rows 3-5, two rows
 	PHB
 	TAX
 	LDY.w #SMB3_PaletteMirror[$30].LowByte
 	LDA.w #$005F
 	MVN SMB3_PaletteMirror[$30].LowByte>>16,SMB3_Palettes_Main>>16
 	PLB
-	LDA.w $02BE
+	
+	LDA.w !SNES_LevelHeaderL3Pal
 	AND.w #$00FF
 	BEQ.b CODE_29CACB
 	DEC
 	ASL
 	TAX
+	
 	PHB
 	LDA.l DATA_29C7FF,x
 	TAX
@@ -85315,6 +86136,7 @@ CODE_29CAA0:
 	MVN SMB3_PaletteMirror[$00].LowByte>>16,DATA_3C9C80>>16
 	PLB
 CODE_29CACB:
+
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	AND.w #$00FF
 	ASL
@@ -85323,11 +86145,14 @@ CODE_29CACB:
 	STA.b $00
 	LDA.w #DATA_29C963>>16
 	STA.b $02
+	
 	LDA.w $073B
 	AND.w #$0003
 	ASL
 	TAY
 	LDA.b [$00],y
+	
+	; rows 6-7, two rows
 	PHB
 	TAX
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
@@ -85340,17 +86165,21 @@ CODE_29CAF8:
 	LDA.w #$003F
 	MVN SMB3_PaletteMirror[$60].LowByte>>16,SMB3_Palettes_Main>>16
 	PLB
+	
 	LDA.w !RAM_SMB3_Level_Layer2BGPaletteFromHeader
 	AND.w #$00FF
 	ASL
 	TAX
 	LDA.l DATA_29C9EB,x
+	
+	; rows 1-2, two rows
 	PHB
 	TAX
 	LDY.w #SMB3_PaletteMirror[$10].LowByte
 	LDA.w #$003F
 	MVN SMB3_PaletteMirror[$10].LowByte>>16,SMB3_Palettes_Main>>16
 	PLB
+	
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	AND.w #$00FF
 	ASL
@@ -85363,6 +86192,8 @@ CODE_29CAF8:
 	AND.w #$00FF
 	ASL
 	STA.b $DA
+	
+; throne room continues here
 CODE_29CB36:
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	AND.w #$00FF
@@ -85381,12 +86212,16 @@ CODE_29CB56:
 	LDX.b $D8
 	LDA.l DATA_29CA84,x
 	TAX
+	
+	;row D
 	PHB
 	TAX
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #$001F
-	MVN SMB3_PaletteMirror[$D0].LowByte>>16,SMB3_Palettes_Main>>16
+	MVN SMB3_PaletteMirror[$D0].LowByte>>16,SMB3_Palettes_Main>>16	
 	PLB
+	
+	;row E
 	LDX.b $DA
 	LDA.l DATA_29CA84,x
 	TAX
@@ -85395,15 +86230,19 @@ CODE_29CB56:
 	LDY.w #SMB3_PaletteMirror[$E0].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$E0].LowByte>>16,SMB3_Palettes_Main>>16
-	BRL.w CODE_29CC7C
+	
+	BRL.w SNES_PalLoadPlayer
 
-CODE_29CB7E:
+SNES_PalLoadThroneRoom:
+
+	; rows 1-7
 	PHB
 	LDX.w #DATA_3CA500
 	LDY.w #SMB3_PaletteMirror[$10].LowByte
 	LDA.w #$00DF
 	MVN SMB3_PaletteMirror[$10].LowByte>>16,DATA_3CA500>>16
 	PLB
+	
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	AND.w #$00FF
 	ASL
@@ -85427,12 +86266,16 @@ CODE_29CBB8:
 	STA.b $DA
 CODE_29CBBD:
 	BRL.w CODE_29CB36
+	
+;;---
 
-CODE_29CBC0:
+;CODE_29CBC0
+SNES_PalLoadRowC:
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	AND.w #$00FF
 	CMP.w #$0007
 	BNE.b CODE_29CBEE
+	
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	AND.w #$00FF
 	TAX
@@ -85447,6 +86290,7 @@ CODE_29CBC0:
 	LDA.w #DATA_3C8A20
 	BRA.b CODE_29CC07
 
+; world 8
 CODE_29CBEE:
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	AND.w #$00FF
@@ -85459,14 +86303,18 @@ CODE_29CBEE:
 	LDA.l DATA_29C7D3,x
 	BEQ.b CODE_29CC13
 CODE_29CC07:
+	; row C
 	PHB
 	TAX
 	LDY.w #SMB3_PaletteMirror[$C0].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$C0].LowByte>>16,SMB3_Palettes_Main>>16
 	PLB
+	
 CODE_29CC13:
 	RTS
+	
+;-----
 
 CODE_29CC14:
 	PHB
@@ -85519,7 +86367,13 @@ CODE_29CC5F:
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #$003F
 	MVN SMB3_PaletteMirror[$D0].LowByte>>16,SMB3TitleScreenPalette_Row0DTo0E>>16
-CODE_29CC7C:
+	
+;---player palette
+;CODE_29CC7C
+SNES_PalLoadPlayer:
+
+	; row F
+	
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	AND.w #$0001
 	TAX
@@ -85539,6 +86393,7 @@ CODE_29CC7C:
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$F0].LowByte>>16,SMB3_Palettes_Main>>16
 	PLB
+	
 	LDX.w #$0020
 CODE_29CCAA:
 	LDA.w SMB3_PaletteMirror[$F0].LowByte,x
@@ -85546,32 +86401,40 @@ CODE_29CCAA:
 	DEX
 	DEX
 	BPL.b CODE_29CCAA
-	RTS
+	RTS ; finish.
 
+;---
 CODE_29CCB6:
+
 	PHB
+	; row 2
 	LDX.w #DATA_3CA920
 	LDY.w #SMB3_PaletteMirror[$20].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$20].LowByte>>16,DATA_3CA920>>16
+	; row 3-5
 	LDX.w #DATA_3C96E0
 	LDY.w #SMB3_PaletteMirror[$30].LowByte
 	LDA.w #$005F
 	MVN SMB3_PaletteMirror[$30].LowByte>>16,DATA_3C96E0>>16
+	; row 6-7
 	LDX.w #DATA_3C9780
 	LDY.w #SMB3_PaletteMirror[$60].LowByte
 	LDA.w #$003F
 	MVN SMB3_PaletteMirror[$60].LowByte>>16,DATA_3C9780>>16
+	; row D-E
 	LDX.w #SMB3TitleScreenPalette_Row0DTo0E
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #$003F
 	MVN SMB3_PaletteMirror[$D0].LowByte>>16,SMB3TitleScreenPalette_Row0DTo0E>>16
+	; row F
 	LDX.w #RegularMarioPalette
 	LDY.w #SMB3_PaletteMirror[$F0].LowByte
 	LDA.w #$001F
 	MVN SMB3_PaletteMirror[$F0].LowByte>>16,RegularMarioPalette>>16
 	STZ.w SMB3_PaletteMirror[$40].LowByte
 	PLB
+	
 	RTS
 
 ;--------------------------------------------------------------------
@@ -85579,10 +86442,10 @@ CODE_29CCB6:
 CODE_29CCF8:
 	REP.b #$30
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
 	LDA.w #$009F
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #DATA_3C8BE0
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #$001F
@@ -85736,10 +86599,10 @@ CODE_29CE95:
 	LDY.w #$7F9400
 	LDA.w #$00FF
 	MVN $7F9400>>16,DATA_3CAC00>>16
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #$7F9500
 	LDA.w #$007F
-	MVN $7F9500>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	MVN $7F9500>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #DATA_3C8A20
 	LDY.w #$7F9580
 	LDA.w #$001F
@@ -85858,10 +86721,10 @@ CODE_29CF82:
 CODE_29CFB6:
 	REP.b #$30
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C+$40
+	LDX.w #SMB3TitleScreenPalette_Row08To0C+$40
 	LDY.w #$7F9540
 	LDA.w #$001F
-	MVN $7F9540>>16,SMB3_GlobalSpritePalette_Row08To0C+$40>>16
+	MVN $7F9540>>16,SMB3TitleScreenPalette_Row08To0C+$40>>16
 	PLB
 	STZ.w $02B3
 	LDA.w #$0000
@@ -86167,11 +87030,15 @@ CODE_29D27E:
 
 ;--------------------------------------------------------------------
 
-CODE_29D295:
+;CODE_29D295
+Palette_PrepareFadeOutTK_Entry:
 	LDA.b #$0B
 	STA.w $101D
 	LDA.b #$04
 	STA.w $101C
+	
+	;SNES: removed all NES code for fading.
+	
 	RTS
 
 ;--------------------------------------------------------------------
@@ -86203,11 +87070,11 @@ CODE_29D2CD:
 
 ;--------------------------------------------------------------------
 
-CODE_29D2CE:
+Palette_PrepareFadeOutTK:
 	LDA.w $101E
 	BNE.b CODE_29D2D7
 	SEC
-	JMP.w CODE_29D295
+	JMP.w Palette_PrepareFadeOutTK_Entry
 
 CODE_29D2D7:
 	RTS
@@ -86216,7 +87083,8 @@ CODE_29D2D7:
 
 ; Todo: Unreferrenced routine.
 
-CODE_29D2D8:
+;CODE_29D2D8
+Palette_DoFadeOutTK:
 	LDA.w $101E
 	BNE.b CODE_29D2F8
 	LDA.w $101C
@@ -87670,25 +88538,30 @@ CODE_29DFA1:
 
 ; Note: Something related to warping from a pipe in level?
 
-CODE_29DFAD:
-	JSL.l CODE_20804D
+; palette fade removed: performed prior
+
+HandleLevelJunction:
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	LDA.w !RAM_SMB3_Global_FrameCounter
 	AND.b #$01
-	BNE.b CODE_29DFAD
+	BNE.b HandleLevelJunction
 	DEC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
-	BNE.b CODE_29DFAD
+	BNE.b HandleLevelJunction
 	LDA.b #$80
 	STA.w !REGISTER_ScreenDisplayRegister
+	
 	STZ.w $05FC
+	
 	LDA.l $7E3955
 	INC
 	STA.l $7E3955
+	
 	JSR.w CODE_29E01B
 	LDA.w $0210
 	STA.l $7E398C
 	LDA.b $12
 	STA.l $7E398B
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.l $7E398E
 	LDA.b $13
 	STA.l $7E398D
@@ -87710,7 +88583,7 @@ CODE_29E002:
 	ADC.b #$10
 	STA.b $24
 CODE_29E009:
-	LDA.w $0414
+	LDA.w !Level_JctCtl
 	CMP.b #$02
 	BEQ.b CODE_29E017
 	LDA.l $7E398C
@@ -87719,7 +88592,7 @@ CODE_29E017:
 	JML.l CODE_208753
 
 CODE_29E01B:
-	LDA.w $0414
+	LDA.w !Level_JctCtl
 	JSL.l SMB3_ExecutePtr_Absolute
 
 DATA_29DFAE:
@@ -87728,7 +88601,7 @@ DATA_29DFAE:
 	dw CODE_29E065
 	dw CODE_29E117
 	dw CODE_29E1D9
-	dw CODE_29E228
+	dw LevelJct_SpecialToadHouse
 
 ;--------------------------------------------------------------------
 
@@ -87738,20 +88611,26 @@ CODE_29E02E:
 	LDA.w !RAM_SMB3_Level_SublevelLevelDataLo
 	STA.b !RAM_SMB3_Level_LevelDataPtrLo
 	STA.w !RAM_SMB3_Level_PreviousLevelDataLo
+	
 	LDA.w !RAM_SMB3_Level_SublevelLevelDataHi
 	STA.b !RAM_SMB3_Level_LevelDataPtrHi
 	STA.w !RAM_SMB3_Level_PreviousLevelDataHi
+	
 	LDA.w !RAM_SMB3_Level_SublevelLevelDataBank
 	STA.b !RAM_SMB3_Level_LevelDataPtrBank
 	STA.w !RAM_SMB3_Level_PreviousLevelDataBank
+	
 	LDA.w !RAM_SMB3_Level_SublevelSpriteDataLo
 	STA.b !RAM_SMB3_Level_SpriteDataPtrLo
 	STA.w !RAM_SMB3_Level_PreviousSpriteDataLo
+	
 	LDA.w !RAM_SMB3_Level_SublevelSpriteDataHi
 	STA.b !RAM_SMB3_Level_SpriteDataPtrHi
 	STA.w !RAM_SMB3_Level_PreviousSpriteDataHi
+	
 	LDA.w !RAM_SMB3_Level_SublevelTilesetFromHeader
 	STA.w !RAM_SMB3_Global_TilesetFromHeader
+	
 	LDA.w $0415
 	EOR.b #$01
 	STA.w $0415
@@ -87830,7 +88709,7 @@ CODE_29E0C9:
 	AND.b #$F0
 	STA.b !RAM_SMB3_Level_Player_YPosLo
 	LDA.w DATA_21EF96,y
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDA.b #$00
 	STA.w $0210
 	JMP.w CODE_29E1CD
@@ -87904,13 +88783,13 @@ CODE_29E14E:
 	AND.b #$F0
 	STA.b !RAM_SMB3_Level_Player_YPosLo
 	LDA.w DATA_21EF96,y
-	STA.w $0216
+	STA.w !Vert_Scroll
 	REP.b #$20
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
@@ -87946,12 +88825,12 @@ CODE_29E1C4:
 	LDA.b !RAM_SMB3_Level_Player_YPosHi
 	BEQ.b CODE_29E1CD
 	LDA.b #$EF
-	STA.w $0216
+	STA.w !Vert_Scroll
 CODE_29E1CD:
 	LDA.w $0210
 	STA.b $B7
 	LDA.b $12
-	JSL.l CODE_2097BA
+	JSL.l Scroll_Update_Ranges
 	RTS
 
 ;--------------------------------------------------------------------
@@ -87985,7 +88864,7 @@ CODE_29E1D9:
 	STA.b $12
 	STA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	LDA.b #$EF
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDA.b #$28
 	STA.b !RAM_SMB3_Level_Player_XPosLo
 	LDA.b #$01
@@ -87999,7 +88878,8 @@ CODE_29E1D9:
 
 ; Note: Something related to normal sprite 07 (1-3 toad house warp)
 
-CODE_29E228:
+;CODE_29E228
+LevelJct_SpecialToadHouse:
 	LDA.b #$00
 	STA.w $0210
 	STA.b $12
@@ -88018,11 +88898,15 @@ CODE_29E228:
 
 ;--------------------------------------------------------------------
 
-CODE_29E24A:
+;CODE_29E24A
+Palette_PrepareFadeOut_Entry:
 	LDA.b #$04
-	STA.w $101D
+	STA.w $101D ; 
 	STA.w $101C
 	INC.w $101B
+	
+	;SNES: removed all NES code for fading.
+	
 	RTS
 
 ;--------------------------------------------------------------------
@@ -88042,10 +88926,12 @@ CODE_29E26A:
 
 ;--------------------------------------------------------------------
 
-CODE_29E26B:
+;CODE_29E26B
+Palette_PrepareFadeOut:
 	LDA.w $101E
 	BNE.b CODE_29E273
-	JSR.w CODE_29E24A
+	;SNES: SEC removed
+	JSR.w Palette_PrepareFadeOut_Entry
 CODE_29E273:
 	RTL
 
@@ -88076,14 +88962,15 @@ CODE_29E294:
 
 ;--------------------------------------------------------------------
 
+;SNES: new palette fade out routine?
 CODE_29E29D:
-	JSR.w CODE_29E24A
+	JSR.w Palette_PrepareFadeOut_Entry
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	LDA.b #$00
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 CODE_29E2A9:
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	JSR.w CODE_29E256
 	LDA.w $101D
 	BNE.b CODE_29E2A9
@@ -88092,7 +88979,7 @@ CODE_29E2A9:
 ;--------------------------------------------------------------------
 
 CODE_29E2B6:
-	JSL.l CODE_29E26B
+	JSL.l Palette_PrepareFadeOut
 	LDA.b #$A0
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	LDA.b #$0F
@@ -88100,7 +88987,7 @@ CODE_29E2B6:
 	LDA.b #$07
 	STA.w !RAM_SMB3_Global_MosaicSizeAndBGEnableMirror
 CODE_29E2C8:
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$01
 	BNE.b CODE_29E2C8
@@ -88117,7 +89004,7 @@ CODE_29E2E7:
 	DEC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	LDA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	BNE.b CODE_29E2C8
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	RTL
 
 ;--------------------------------------------------------------------
@@ -88840,6 +89727,9 @@ CODE_29E9A2:
 
 ;--------------------------------------------------------------------
 
+;copy to Layer 2
+;inputs: $7F2000,$7F2001: source address
+
 CODE_29E9A3:
 	LDA.l $7F2000
 	BMI.b CODE_29E9F7
@@ -88877,6 +89767,8 @@ CODE_29E9F7:
 
 ;--------------------------------------------------------------------
 
+;inputs: $7F2000,$7F2001: source address
+
 CODE_29E9F8:
 	LDA.l $7F2000
 	BMI.b CODE_29EA31
@@ -88904,7 +89796,9 @@ CODE_29EA31:
 
 ;--------------------------------------------------------------------
 
-CODE_29EA32:
+;CODE_29EA32
+Scroll_ToVRAM_Apply:
+;SNES:new\
 	LDA.w $0380
 	BMI.b CODE_29EA68
 	LDX.b #$80
@@ -88926,8 +89820,10 @@ CODE_29EA32:
 	SEP.b #$20
 	LDA.b #$FF
 	STA.w $0380
+;SNES:new/
 CODE_29EA68:
 	RTL
+
 
 ;--------------------------------------------------------------------
 
@@ -89045,6 +89941,7 @@ CODE_29EB2B:
 
 ; Todo: Routine related to the pause menu?
 
+; on pause, queue the pause graphics in SP8
 CODE_29EB63:
 	REP.b #$20
 	LDA.w #$7C00
@@ -89060,9 +89957,10 @@ CODE_29EB63:
 
 ;--------------------------------------------------------------------
 
+; on unpause, queues SP8 DMA and restores it (level)
 CODE_29EB7F:
 	REP.b #$20
-	LDA.w #$7C00
+	LDA.w #$7C00 
 	STA.w $023E
 	LDA.w #SMB3_Bank3FGraphics_Sprite_Global3
 	STA.w $0240
@@ -89075,6 +89973,7 @@ CODE_29EB7F:
 
 ;--------------------------------------------------------------------
 
+; on unpause, queues SP8 DMA and restores it (overworld)
 CODE_29EB9B:
 	REP.b #$20
 	LDA.w #$7C00
@@ -89097,7 +89996,7 @@ CODE_29EBB7:
 	PHY
 	LDA.w !RAM_SMB3_Level_PauseMenuStatus
 	BNE.b CODE_29EBEA
-	JSR.w CODE_29EB63
+	JSR.w CODE_29EB63 ; upload pause graphics
 	JSR.w CODE_29F153
 	JSR.w CODE_29F0E1
 	JSR.w CODE_29EC16
@@ -89376,7 +90275,7 @@ CODE_29ED96:
 	LDA.b #!Define_SMAS_Sound0060_SaveGame
 	STA.w !RAM_SMB3_Global_SoundCh1
 CODE_29ED9B:
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	DEC.w $02DD
 	BNE.b CODE_29ED9B
 	LDA.w !RAM_SMB3_Level_PauseMenuCursorPos
@@ -89542,7 +90441,7 @@ CODE_29EEDF:
 	LDA.b #$22
 	STA.w $02DD
 CODE_29EEE8:
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	DEC.w $02DD
 	BNE.b CODE_29EEE8
 	STZ.w $0290
@@ -89746,7 +90645,7 @@ CODE_29F0A2:
 	STA.w !RAM_SMB3_Global_MainScreenWindowMaskMirror
 	LDA.w $0288
 	STA.w !RAM_SMB3_Global_SubScreenWindowMaskMirror
-	LDA.w $037A
+	LDA.w $037A ; checks pause flag for restoring level/OW SP8, although ideally it should check whether the overworld is not active
 	BNE.b CODE_29F0CC
 	JSR.w CODE_29EB9B
 	BRA.b CODE_29F0CF
@@ -89945,7 +90844,7 @@ CODE_29F876:
 	LDA.b $A6
 	BNE.b CODE_29F8AA
 	LDA.b #$EF
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LDA.b #!Define_SMB3_LevelMusic_BowserBattle
 	STA.w !RAM_SMB3_Global_MusicCh1
 	INC.w !RAM_SMB3_Level_DisableScrollingFlag
@@ -90249,7 +91148,7 @@ CODE_29FAA1:
 CODE_29FAAA:
 	TYA
 	TAX
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr075_BossProjectile
@@ -90320,7 +91219,7 @@ CODE_29FB37:
 	RTS
 
 CODE_29FB3B:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDY.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
@@ -90337,7 +91236,7 @@ CODE_29FB55:
 	LDA.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_29FB59:
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b !RAM_SMB3_NorSpr018_Bowser_CurrentAttackState,x
 	CMP.b #$02
 	BNE.b CODE_29FB69
@@ -90351,7 +91250,7 @@ CODE_29FB69:
 	CLC
 	ADC.b #$10
 	STA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	PLA
@@ -90874,7 +91773,7 @@ CODE_29FF04:
 	STA.w SMB3_OAMBuffer[$00].XDisp,y
 	LDA.b $71,x
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.w SMB3_OAMBuffer[$00].YDisp,y
 	STA.w SMB3_OAMBuffer[$01].YDisp,y
 	CLC
@@ -91297,7 +92196,7 @@ DATA_2A82BA:
 
 ;--------------------------------------------------------------------
 
-CODE_2A82EA:
+SNES_DisplayLevelStartLetters:
 	LDA.b #$80
 	STA.w !REGISTER_VRAMAddressIncrementValue
 	REP.b #$20
@@ -91520,7 +92419,7 @@ CODE_2A848F:
 	STA.b [$2E],y
 	LDA.w DATA_2A847D,x
 	STA.b [$D8],y
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	INX
 	CPX.b #$06
 	BNE.b CODE_2A848F
@@ -91775,71 +92674,95 @@ DATA_2A866D:
 
 ;--------------------------------------------------------------------
 
-CODE_2A8674:
+SNESLoadLevel_BonusGenerator:
 	PHB
 	PHK
 	PLB
-	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo]
-	STA.b $03
+	
+	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo] ; take extra byte (width)
+	STA.b $03 ; width?
 	STA.b $DD
+	
 	REP.b #$20
 	INC.b !RAM_SMB3_Level_LevelDataPtrLo
-	LDA.b $2E
-	STA.b $D8
+	LDA.b $2E ; Map_Tile_AddrL/H
+	STA.b $D8 ; store in temp
 	SEP.b #$20
-	LDA.b $30
+	
+	LDA.b $30 ; Map_Tile_AddrB?
 	STA.b $DA
-	LDA.w $0706
+	
+	LDA.w $0706 ; LL_ShapeDef
 	AND.b #$0F
 	TAX
 	LDA.w DATA_2A86D5,x
-	STA.b $DB
+	STA.b $DB	
 	STZ.b $DC
-	STZ.b $02
+	
+	STZ.b $02 ; height
+	
 	TXA
 	BNE.b CODE_2A86A7
-	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo]
-	STA.b $02
+	
+	; if LL_ShapeDef = 0
+	
+	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo] ; take extra byte (height)
+	STA.b $02 ; height
+	
 	REP.b #$20
 	INC.b !RAM_SMB3_Level_LevelDataPtrLo
 	SEP.b #$20
 CODE_2A86A7:
-	LDY.w $0700
+	LDY.w $0700 ; TileAddr_Off
+	
+; D8-DA = Map_Tile_Addr
+; DB-DC = amount to add to Y
+; DD/03 = width?
+; 
+	
 CODE_2A86AA:
 	LDA.w DATA_2A86E5,x
 	STA.b [$D8],y
-	JSR.w CODE_2A8AD2
+	JSR.w CODE_2A8AD2 ; store 1 in high byte?
 	JSR.w CODE_2A86F5
 	DEC.b $03
 	BNE.b CODE_2A86AA
+	
 	LDA.b $02
 	BEQ.b CODE_2A86D3
+	
 	DEC.b $02
+	
 	REP.b #$20
-	LDA.b $2E
+	LDA.b $2E ; Map_Tile_Addr
 	CLC
 	ADC.w #$0010
-	STA.b $2E
-	STA.b $D8
+	STA.b $2E ; next row of tiles
+	STA.b $D8 ; set as pointer
 	SEP.b #$20
+	
 	LDA.b $DD
-	STA.b $03
+	STA.b $03 ; restore width
+	
 	BRA.b CODE_2A86AA
 
 CODE_2A86D3:
 	PLB
 	RTL
 
+; amount to add to Y per tile drawn
 DATA_2A86D5:
 	db $01,$0F,$01,$11,$10,$10,$11,$01
 	db $0F,$0F,$11,$11,$0F,$01,$01,$01
 
+; tile to store into Map_Tile_Addr
 DATA_2A86E5:
 	db $13,$14,$15,$16,$17,$18,$19,$1A
 	db $1B,$1C,$1D,$1E,$1F,$20,$21,$22
 
 ;--------------------------------------------------------------------
 
+;Map_Tile_AddrL operations, move back to low byte and add additional index
 CODE_2A86F5:
 	REP.b #$20
 	LDA.b $D8
@@ -91853,7 +92776,9 @@ CODE_2A86F5:
 
 ;--------------------------------------------------------------------
 
-CODE_2A8705:
+;draws additional candle tiles above candle
+
+SNESLevelCandleAdditionalUpperTiles:
 	PHB
 	PHK
 	PLB
@@ -91862,23 +92787,23 @@ CODE_2A8705:
 	LDA.b $01
 	PHA
 	PHX
-	LDA.b $30
+	LDA.b $30 ; bank byte of Map_Tile_Addr
 	STA.b $DA
 	STA.b $DD
 	REP.b #$20
 	LDA.b $2E
 	STA.b $D8
 	CLC
-	ADC.w #$2000
+	ADC.w #$2000 ; get the high tile offset
 	STA.b $DB
 	SEP.b #$20
 	LDX.b #$00
 CODE_2A8725:
-	JSR.w CODE_2A8761
+	JSR.w SNESCandleMoveUpOneTile
 	LDA.b [$D8],y
-	CMP.b #$9C
+	CMP.b #$9C ;TILE2_SOLIDBRICK
 	BEQ.b CODE_2A8755
-	CMP.b #$E4
+	CMP.b #$E4 ;TILE2_DIAMONDBRIGHT
 	BEQ.b CODE_2A8755
 	LDA.w DATA_2A875E,x
 	STA.b [$D8],y
@@ -91888,15 +92813,15 @@ CODE_2A8725:
 	BRA.b CODE_2A8725
 
 CODE_2A873E:
-	JSR.w CODE_2A8761
+	JSR.w SNESCandleMoveUpOneTile
 	LDA.b [$D8],y
-	CMP.b #$9C
+	CMP.b #$9C ;TILE2_SOLIDBRICK
 	BEQ.b CODE_2A8755
-	CMP.b #$E4
+	CMP.b #$E4 ;TILE2_DIAMONDBRIGHT
 	BEQ.b CODE_2A8755
-	LDA.b #$04
+	LDA.b #$04 ; lo tile
 	STA.b [$D8],y
-	LDA.b #$01
+	LDA.b #$01 ; hi tile
 	STA.b [$DB],y
 	BRA.b CODE_2A873E
 
@@ -91912,7 +92837,7 @@ CODE_2A8755:
 DATA_2A875E:
 	db $06,$07,$08
 
-CODE_2A8761:
+SNESCandleMoveUpOneTile:
 	REP.b #$20
 	LDA.b $D8
 	SEC
@@ -92467,6 +93392,7 @@ CODE_2A8ACE:
 
 ;--------------------------------------------------------------------
 
+; move to high bytes of tiles, store 1 in high byte
 CODE_2A8AD2:
 	LDA.b $D9
 	CLC
@@ -93150,11 +94076,11 @@ DATA_2A913E:
 
 ;--------------------------------------------------------------------
 
-CODE_2A9144:
+SNES_L3BGDraw_AirshipClouds:
 	SEP.b #$10
 	STZ.w $02D9
 	LDA.w $0350
-	CMP.b #$23
+	CMP.b #$23 ; airship clouds (second bg)
 	BNE.b CODE_2A9155
 	LDA.b #$01
 	STA.w $02D9
@@ -93163,11 +94089,14 @@ CODE_2A9155:
 	LDA.b #$40
 	STA.b $00
 	LDA.b #$06
+	;loop 1: fill A0-DF with #$06
 CODE_2A915D:
 	JSR.w CODE_2A8D03
 	INX
 	DEC.b $00
 	BNE.b CODE_2A915D
+	
+	;loop 2: fill E0-F0 with #$0C,#$0D for first row, #$0E,#$0F for second
 	LDA.b #$0C
 	STA.b $02
 	LDA.b #$0D
@@ -93185,13 +94114,15 @@ CODE_2A9175:
 	JSR.w CODE_2A8D03
 	INX
 	DEC.b $00
-	BNE.b CODE_2A9175
+	BNE.b CODE_2A9175	
 	INC.b $02
 	INC.b $02
 	INC.b $03
 	INC.b $03
 	DEC.b $01
 	BNE.b CODE_2A9171
+	
+	;loop 3: fill next 4 rows with #$10
 	LDA.b #$04
 	STA.b $01
 CODE_2A9195:
@@ -93201,13 +94132,14 @@ CODE_2A9199:
 	LDA.b #$10
 	JSR.w CODE_2A8D25
 	INX
-	LDA.b #$10
+	LDA.b #$10 ; loaded twice?
 	JSR.w CODE_2A8D25
 	INX
 	DEC.b $00
 	BNE.b CODE_2A9199
 	DEC.b $01
 	BNE.b CODE_2A9195
+	
 CODE_2A91AD:
 	LDY.b #$00
 	LDA.b [!RAM_SMB3_Level_BGDataPtrLo],y
@@ -93227,7 +94159,7 @@ DATA_2A91BF:
 
 CODE_2A91C3:
 	LDA.w $0350
-	CMP.b #$23
+	CMP.b #$23 ; airship clouds (second bg)
 	BEQ.b CODE_2A9216
 	REP.b #$10
 	LDX.b $00
@@ -93782,7 +94714,7 @@ LoadLayer2BG1A_ScrewedPanels:
 	LDA.b #$08
 	STA.b $04
 	LDX.b #$E0
-	JSR.w CODE_2A973A
+	JSR.w CODE_2A973A ; strip of sky
 	LDA.b #$02
 	STA.b $00
 	LDA.b #$03
@@ -93808,7 +94740,7 @@ LoadLayer2BG1A_ScrewedPanels:
 	STA.b $04
 CODE_2A963E:
 	LDA.b #$13
-	JSR.w CODE_2A8D25
+	JSR.w CODE_2A8D25 ; strip of sky
 	INX
 	DEC.b $04
 	BNE.b CODE_2A963E
@@ -93817,12 +94749,12 @@ CODE_2A963E:
 	STA.b $04
 	LDA.b #$13
 CODE_2A9650:
-	JSR.w CODE_2A8D25
+	JSR.w CODE_2A8D25 ; strip of sky
 	INX
 	DEC.b $04
 	BNE.b CODE_2A9650
-	JSR.w CODE_2A96ED
-	JSR.w CODE_2A96AD
+	JSR.w CODE_2A96ED ; bushes
+	JSR.w CODE_2A96AD ; block base
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	CMP.b #$1A
 	BNE.b CODE_2A96AB
@@ -97975,10 +98907,12 @@ DATA_2AB476:
 
 ;--------------------------------------------------------------------
 
+; Background VRAM writing routine?
+
 CODE_2AB48E:
 	LDA.w $0350
 	BEQ.b CODE_2AB4FD
-	CMP.b #$12
+	CMP.b #$12 ; tower clouds
 	BNE.b CODE_2AB49E
 	JSL.l CODE_22E576
 	JMP.w CODE_2AB4FD
@@ -97996,15 +98930,17 @@ CODE_2AB49E:
 	STA.w $024B
 CODE_2AB4B3:
 	JSL.l CODE_2AB5B5
-	LDA.w $0350
-	CMP.b #$02
+	LDA.w $0350 ; Layer 2 background
+	CMP.b #$02 ;airship clouds
 	BEQ.b CODE_2AB4C8
-	CMP.b #$23
+	CMP.b #$23 ;airship clouds
 	BEQ.b CODE_2AB4C8
+;copy to layer 2
 	JSL.l CODE_29E9A3
 	BRA.b CODE_2AB4CC
 
 CODE_2AB4C8:
+;copy to layer 3
 	JSL.l CODE_22E2FE
 CODE_2AB4CC:
 	LDA.w $0249
@@ -98019,12 +98955,13 @@ CODE_2AB4CC:
 CODE_2AB4E3:
 	DEC.w $0612
 	BNE.b CODE_2AB4B3
+	
 	LDA.b #$FF
 	STA.w $0249
-	LDA.w $0350
-	CMP.b #$02
+	LDA.w $0350 ; Layer 2 check
+	CMP.b #$02 ;airship clouds
 	BEQ.b CODE_2AB4F8
-	CMP.b #$23
+	CMP.b #$23 ;airship clouds
 	BNE.b CODE_2AB4FD
 CODE_2AB4F8:
 	LDA.b #$51
@@ -98032,6 +98969,7 @@ CODE_2AB4F8:
 CODE_2AB4FD:
 	RTL
 
+;for vertical backgrounds
 CODE_2AB4FE:
 	STZ.b $25
 	LDA.b #$70
@@ -98039,7 +98977,7 @@ CODE_2AB4FE:
 	CLC
 	ADC.b #$08
 	STA.w $0249
-	STZ.w $024B
+	STZ.w $024B ; counter
 CODE_2AB50E:
 	JSR.w CODE_2AB67D
 	JSL.l CODE_29E9F8
@@ -98055,6 +98993,7 @@ CODE_2AB50E:
 	STA.w $024B
 	AND.b #$F0
 	BNE.b CODE_2AB53A
+	
 	INC.w $024B
 	LDA.b #$0F
 	AND.w $024B
@@ -98069,14 +99008,14 @@ CODE_2AB53A:
 ;--------------------------------------------------------------------
 
 ; Note: BG map16 pointers?
-
+;note: (current layer 2) - 1
 DATA_2AB546:
 	dl DATA_2ABD10
-	dl DATA_2ABE58
-	dl DATA_2ABF30
+	dl DATA_2ABE58 ; airship clouds
+	dl DATA_2ABF30 
 	dl DATA_2AC230
-	dl DATA_2AC058
-	dl DATA_2AC420
+	dl DATA_2AC058 ; 1-1 blocks
+	dl DATA_2AC420 
 	dl DATA_2AC5E8
 	dl DATA_2AC700
 	dl DATA_2AC888
@@ -98105,7 +99044,7 @@ DATA_2AB546:
 	dl DATA_2ADC68
 	dl DATA_2ABD10
 	dl DATA_2AD850
-	dl DATA_2ABE58
+	dl DATA_2ABE58 ; airship clouds
 	dl DATA_2ABF30
 	dl DATA_2ABD10
 
@@ -98148,12 +99087,12 @@ CODE_2AB5EE:
 	BEQ.b CODE_2AB5FB
 	LDA.b $0D
 	CLC
-	ADC.w #$01B0
+	ADC.w #$01B0 ;screen size
 	STA.b $0D
 	BRA.b CODE_2AB5EE
 
 CODE_2AB5FB:
-	LDA.w #$001A
+	LDA.w #$001A ; counter
 	STA.b $00
 	LDA.w $024B
 	AND.w #$000F
@@ -98162,7 +99101,7 @@ CODE_2AB5FB:
 	LDX.w #$0000
 CODE_2AB60D:
 	LDY.b $09
-	LDA.b [$0D],y
+	LDA.b [$0D],y ;
 	AND.w #$00FF
 	ASL
 	ASL
@@ -98207,15 +99146,16 @@ CODE_2AB65A:
 	ORA.b #$10
 	STA.l $7F2000
 	LDA.w $0350
-	CMP.b #$02
+	CMP.b #$02 ;airship clouds
 	BEQ.b CODE_2AB66B
-	CMP.b #$23
+	CMP.b #$23 ;airship clouds
 	BNE.b CODE_2AB67B
 CODE_2AB66B:
+; change buffer source address, skipping over tiles written for layer 3
 	REP.b #$20
 	LDA.l $7F2000
 	CLC
-	ADC.w #$0040
+	ADC.w #$0040 ; start address: $7F2040
 	STA.l $7F2000
 	SEP.b #$20
 CODE_2AB67B:
@@ -98226,7 +99166,7 @@ CODE_2AB67B:
 
 CODE_2AB67D:
 	REP.b #$20
-	LDA.w $024B
+	LDA.w $024B ; counter
 	AND.w #$00F0
 	ASL
 	ASL
@@ -98290,7 +99230,7 @@ CODE_2AB6F0:
 	REP.b #$10
 CODE_2AB6FE:
 	LDY.b $06
-	LDA.b [$D8],y
+	LDA.b [$D8],y ; get map16 tile
 	STA.b $0A
 	INC.b $06
 	LDA.b $0A
@@ -98421,7 +99361,7 @@ CODE_2AB7C6:
 	STA.b [$2E],y
 	JSR.w CODE_2A8AD2
 CODE_2AB7D0:
-	JSL.l CODE_23BEBB
+	JSL.l LoadLevel_NextColumn
 	LDA.b [$2E],y
 	CMP.b #$C2
 	BEQ.b CODE_2AB7D0
@@ -101087,7 +102027,7 @@ endif
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
 	JSL.l SMB3_UploadStripeImage_Main
 	LDA.b #$B0
-	STA.w $0216
+	STA.w !Vert_Scroll
 	STZ.w $0218
 	STZ.w $0219
 	STZ.w $021A
@@ -101198,10 +102138,10 @@ CODE_20CE1E:
 	JSR.w SMB3_WaitForVBlankDuringCutscene_Main
 	LDA.b $BD
 	BNE.b CODE_20CE32
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.b #$01
-	STA.w $0216
+	STA.w !Vert_Scroll
 	BNE.b CODE_20CE32
 	INC.b $BD
 CODE_20CE32:
@@ -101224,7 +102164,7 @@ CODE_20CE43:
 	STA.b !RAM_SMB3_WorldRollcall_CurrentWorld
 	STZ.w $02D3
 	LDA.b #$B0
-	STA.w $0216
+	STA.w !Vert_Scroll
 	STZ.w $0217
 	REP.b #$30
 	LDA.w #$0000
@@ -101245,8 +102185,8 @@ CODE_20CE66:
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 CODE_20CE85:
 	JSR.w SMB3_WaitForVBlankDuringCutscene_Main
-	DEC.w $0216
-	LDA.w $0216
+	DEC.w !Vert_Scroll
+	LDA.w !Vert_Scroll
 	BNE.b CODE_20CE85
 	LDA.b #$55
 	STA.b !RAM_SMB3_WorldRollcall_WaitBeforeDisplayingTheEndTimer
@@ -101652,7 +102592,7 @@ endmacro
 macro ROUTINE_SMB3_ExecutePtr(Address)
 namespace SMB3_ExecutePtr
 %InsertMacroAtXPosition(<Address>)
-
+;DynJump
 Absolute:
 	STY.b !RAM_SMB3_Global_ScratchRAM03
 	PLY
@@ -101958,7 +102898,7 @@ CODE_20F033:
 CODE_20F03B:
 	CMP.b #$80
 	BNE.b CODE_20F042
-	JMP.w CODE_20F0CF
+	JMP.w UpdSel_Vertical
 
 CODE_20F042:
 	CMP.b #$40
@@ -101981,7 +102921,9 @@ CODE_20F057:
 	JMP.w CODE_20F1C0
 
 CODE_20F05E:
-	JSR.w CODE_20F651
+;SNES: new\ 
+	JSR.w SNES_DoGFXDMATransfers
+;/
 	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag
 	BNE.b CODE_20F08F
 	JSL.l CODE_29E953
@@ -102000,12 +102942,16 @@ CODE_20F074:
 	STA.w SMB3_StripeImageUploadTable[$00].LowByte
 	STA.w SMB3_StripeImageUploadTable[$00].HighByte
 CODE_20F08D:
-	STZ.b $28
+	STZ.b $28	
 CODE_20F08F:
 	JSR.w CODE_20F20B
 	JSR.w CODE_20FCC0
 	LDA.w !REGISTER_IRQEnable
-	LDA.b #$C0
+	
+	; This sets the status bar scroll fix for everything after the title screen!
+	; At scanline 192, the name table scroll is fixed to always display the status bar
+	
+	LDA.b #$C0	; enable IRQ to trigger just above the status bar
 	STA.w !REGISTER_VCountTimerLo
 	STZ.w !REGISTER_VCountTimerHi
 	STZ.w !REGISTER_HCountTimerLo
@@ -102014,20 +102960,25 @@ CODE_20F08F:
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	CLI
 CODE_20F0AC:
-	LDA.b $1C
+	LDA.b $1C	; Check if VBlank occurred
 	BEQ.b CODE_20F0BA
 	JSR.w SMB3_PollJoypadInputs_Main
 	JSL.l SMB3_GetRand_Main
 CODE_20F0B7:
 	DEC.w !RAM_SMB3_Global_WaitForVBlankFlag
-CODE_20F0BA:
+	
+	;note: no sound engine code for SNES CPU
+	
+CODE_20F0BA: ; PRG031_F567
 	INC.b !RAM_SMB3_Global_FrameCounter
+;SNES: new \ 
 	LDA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	STA.w !REGISTER_ScreenDisplayRegister
 	LDA.w !RAM_SMB3_Global_HDMAEnableMirror
 	STA.w !REGISTER_HDMAEnable
 CODE_20F0C7:
-	JSL.l CODE_22E677
+	JSL.l SNES_NMI_SoundPortCheck	;moved here
+;/
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	REP.b #$30
 endif
@@ -102048,11 +102999,14 @@ EndofVBlank:
 	RTL
 endif
 
-CODE_20F0CF:
-	JSR.w CODE_20F651
+;CODE_20F0CF
+UpdSel_Vertical:
+	JSR.w SNES_DoGFXDMATransfers
+	
 	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag
 	BNE.b CODE_20F0FA
-	JSL.l CODE_29EA32
+	
+	JSL.l Scroll_ToVRAM_Apply
 	JSL.l CODE_29E9F8
 	JSL.l SMB3_UploadStripeImage_Main
 	JSL.l CODE_29EA69
@@ -102080,7 +103034,7 @@ CODE_20F0FA:
 	JMP.w CODE_20F0AC
 
 CODE_20F11A:
-	JSR.w CODE_20F651
+	JSR.w SNES_DoGFXDMATransfers
 	LDA.b $20
 	BEQ.b CODE_20F121
 CODE_20F121:
@@ -102098,7 +103052,7 @@ CODE_20F121:
 	JMP.w CODE_20F0B7
 
 CODE_20F141:
-	JSR.w CODE_20F651
+	JSR.w SNES_DoGFXDMATransfers
 	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag
 	BNE.b CODE_20F16C
 	JSL.l CODE_29E953
@@ -102129,7 +103083,7 @@ CODE_20F16C:
 	JMP.w CODE_20F0AC
 
 CODE_20F18C:
-	JSR.w CODE_20F651
+	JSR.w SNES_DoGFXDMATransfers
 	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag
 	BNE.b CODE_20F1B4
 	LDA.b $C2
@@ -102155,7 +103109,7 @@ CODE_20F1B4:
 	JMP.w CODE_20F0AC
 
 CODE_20F1C0:
-	JSR.w CODE_20F651
+	JSR.w SNES_DoGFXDMATransfers
 	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag
 	BNE.b CODE_20F1EB
 	JSL.l CODE_29E953
@@ -102242,7 +103196,7 @@ CODE_20F25A:
 	STA.w !REGISTER_BG1HorizScrollOffset
 	LDA.w $0211
 	STA.w !REGISTER_BG1HorizScrollOffset
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w !REGISTER_BG1VertScrollOffset
 	LDA.w $0217
 	STA.w !REGISTER_BG1VertScrollOffset
@@ -102751,7 +103705,7 @@ endmacro
 macro ROUTINE_SMB3_UpdateNormalSpritePosition(Address)
 namespace SMB3_UpdateNormalSpritePosition
 %InsertMacroAtXPosition(<Address>)
-
+;Object_AddVelFrac
 X:
 Y:
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
@@ -102865,6 +103819,7 @@ macro ROUTINE_SMB3_CheckPlayerPositionRelativeToSprite(Address)
 namespace SMB3_CheckPlayerPositionRelativeToSprite
 %InsertMacroAtXPosition(<Address>)
 
+;Level_ObjCalcXDiffs
 X:
 	LDA.b !RAM_SMB3_Level_Player_XPosLo
 	SEC
@@ -102878,6 +103833,7 @@ X:
 +:
 	RTL
 
+;Level_ObjCalcYDiffs
 Y:
 ;$27A849
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
@@ -102903,7 +103859,7 @@ endmacro
 macro ROUTINE_SMB3_UnnecessaryInvertARt(Address)
 namespace SMB3_UnnecessaryInvertARt
 %InsertMacroAtXPosition(<Address>)
-
+;Negate
 Main:
 	EOR.b #$FF
 	CLC
@@ -103617,7 +104573,7 @@ NoBG:
 DATA_2A8E08:					; Info: BG routine... 
 	dw SMB3_LoadLayer2BG00_NoBG_Main	; 00
 	dw CODE_2A8EBA				; 01
-	dw CODE_2A9144				; 02 (Clouds, like the ones seen in airship levels)
+	dw SNES_L3BGDraw_AirshipClouds				; 02 (Clouds, like the ones seen in airship levels)
 	dw CODE_2A9342				; 03 (Airship interior)
 	dw CODE_2A948E				; 04 (Level 1-5 BG)
 	dw LoadLayer2BG05_ScrewedPanels_Main	; 05 (Screwed panels)
@@ -103650,7 +104606,7 @@ DATA_2A8E08:					; Info: BG routine...
 	dw CODE_2AB3A1				; 20
 	dw CODE_2A8EBA				; 21
 	dw CODE_2AB3FE				; 22
-	dw CODE_2A9144				; 23
+	dw SNES_L3BGDraw_AirshipClouds				; 23
 	dw CODE_2A9342				; 24
 	dw CODE_2A8EBA				; 25
 namespace off
@@ -103779,8 +104735,8 @@ namespace SMB3_TitleScreenState00_CurtainRise
 Main:
 	LDY.b #$01
 CODE_20B3BF:
-	INC.w $0216
-	LDA.w $0216
+	INC.w !Vert_Scroll
+	LDA.w !Vert_Scroll
 	CMP.b #$D0
 	BEQ.b CODE_20B418
 	CMP.b #$4E
@@ -103853,7 +104809,15 @@ macro ROUTINE_SMB3_DMADataToVRAM(Address)
 namespace SMB3_DMADataToVRAM
 %InsertMacroAtXPosition(<Address>)
 
-Entry2:
+; inputs: 
+; 16-bit A - vram address destination lo/hi
+; $0B - size lo
+; $0C - size hi
+; $0D - source lo
+; $0E - source hi
+; $0F - source bank
+
+Entry2: ; for player graphics
 	LDA.w #$6000
 Main:
 	LDX.b #$80
@@ -103880,6 +104844,14 @@ endmacro
 macro ROUTINE_SMB3_CopyOfDMADataToVRAM(Address)
 namespace SMB3_CopyOfDMADataToVRAM
 %InsertMacroAtXPosition(<Address>)
+
+; inputs: 
+; 16-bit A - vram address destination lo/hi
+; $0B - size lo
+; $0C - size hi
+; $0D - source lo
+; $0E - source hi
+; $0F - source bank
 
 Main:
 	LDX.b #$80
@@ -104134,10 +105106,10 @@ namespace SMB3_BufferTitleScreenSpritePalettes
 Main:
 	REP.b #$30
 	PHB
-	LDX.w #SMB3_GlobalSpritePalette_Row08To0C
+	LDX.w #SMB3TitleScreenPalette_Row08To0C
 	LDY.w #SMB3_PaletteMirror[$80].LowByte
-	LDA.w #SMB3_GlobalSpritePalette_Row08To0CEnd-SMB3_GlobalSpritePalette_Row08To0C-$01
-	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3_GlobalSpritePalette_Row08To0C>>16
+	LDA.w #SMB3TitleScreenPalette_Row08To0CEnd-SMB3TitleScreenPalette_Row08To0C-$01
+	MVN SMB3_PaletteMirror[$80].LowByte>>16,SMB3TitleScreenPalette_Row08To0C>>16
 	LDX.w #SMB3TitleScreenPalette_Row0DTo0E
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
 	LDA.w #SMB3TitleScreenPalette_Row0DTo0EEnd-SMB3TitleScreenPalette_Row0DTo0E-$01
@@ -104158,7 +105130,7 @@ endmacro
 macro ROUTINE_SMB3_HandleNormalSpriteGravity(Address)
 namespace SMB3_HandleNormalSpriteGravity
 %InsertMacroAtXPosition(<Address>)
-
+;Object_Move
 Main:
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	PHA
@@ -104170,7 +105142,7 @@ Main:
 	ASL
 	ROR.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_27984E:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	JSL.l CODE_27A7E5
@@ -104212,9 +105184,9 @@ Main:
 	RTS
 
 Sub:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	INC.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
-	JSL.l CODE_279BB8
+	JSL.l Object_SetPaletteFromAttr
 	PHX
 	REP.b #$30
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -104431,11 +105403,13 @@ endmacro
 macro ROUTINE_RT00_SMB3_NorSprStatus02_Normal(Address)
 namespace SMB3_NorSprStatus02_Normal
 %InsertMacroAtXPosition(<Address>)
-
+;ObjState_Normal
 Main:
 	LDA.b $9C
-	BEQ.b CODE_279D40
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	BEQ.b Object_DoNormal
+	
+;SNES: new
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x	; if elevator platform
 	CMP.b #!Define_SMB3_SpriteID_NorSpr02E_ElevatorPlatform
 	BNE.b CODE_279D24
 	LDA.b $68,x
@@ -104443,19 +105417,21 @@ Main:
 CODE_279D24:
 	CMP.b #!Define_SMB3_SpriteID_NorSpr02F_Boo
 	BEQ.b CODE_279D2C
-	JSL.l CODE_279D6F
+	JSL.l Object_DoHaltedAction
 CODE_279D2C:
+;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
-	LDA.w DATA_21B1AF,y
+	LDA.w ObjectGroup_Attributes3,y
+;
 	AND.b #$0F
 	CMP.b #$05
-	BEQ.b CODE_279D40
+	BEQ.b Object_DoNormal
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$02
-	BEQ.b CODE_279D40
+	BEQ.b Object_DoNormal
 	RTS
 
-CODE_279D40:
+Object_DoNormal:
 	JSL.l CODE_279D45
 	RTS
 
@@ -104677,6 +105653,8 @@ endmacro
 macro ROUTINE_SMB3_LoadLevelRoutine(Address)
 namespace SMB3_LoadLevelRoutine
 %InsertMacroAtXPosition(<Address>)
+
+;LevelLoad_ByTileset
 
 Main:
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
@@ -105081,7 +106059,7 @@ endmacro
 macro ROUTINE_SMB3_LoadLevelDataAndHeader(Address)
 namespace SMB3_LoadLevelDataAndHeader
 %InsertMacroAtXPosition(<Address>)
-
+;LevelLoad:
 Main:
 	STZ.w $0700
 	STZ.w $0704
@@ -105109,7 +106087,7 @@ Main:
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	STA.w !RAM_SMB3_Level_SublevelSpriteDataBank
 	INY
-	LDA.w $0414
+	LDA.w !Level_JctCtl
 	BNE.b CODE_209939
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$E0
@@ -105125,11 +106103,11 @@ Main:
 	STA.b !RAM_SMB3_Level_Player_YPosLo
 	STZ.b !RAM_SMB3_Level_Player_XPosHi
 	LDA.w DATA_21CE3A,x
-	STA.w $0216
+	STA.w !Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
@@ -105173,27 +106151,29 @@ CODE_209939:
 	CMP.b #$02
 	BNE.b CODE_2099A0
 	LDX.b #$00
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	CMP.b #$B0
 	BCC.b CODE_209989
 	LDX.b #$EF
 CODE_209989:
-	STX.w $0216
+	STX.w !Vert_Scroll
 	TXA
 	STA.l $7E398E
+;SNES: new \ 
 	LSR
 	LSR
 	STA.w $0218
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
 	STA.w $0218
+;/
 CODE_2099A0:
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$10
 	STA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_2099CE
-	LDX.w $0414
+	LDX.w !Level_JctCtl
 	BNE.b CODE_2099B8
 	LDA.w $0376
 	STA.b $13
@@ -105204,18 +106184,24 @@ CODE_2099B8:
 	STZ.w $0376
 	LDA.b !RAM_SMB3_Level_Player_YPosHi
 	BEQ.b CODE_2099C8
+	
 	LDA.b !RAM_SMB3_Level_ScreensInLvl
 	STA.b $13
 	STA.b !RAM_SMB3_Level_Player_YPosHi
 	STA.w $0376
+	
 CODE_2099C8:
 	LDA.b $13
-	STA.l $7E398D
+	STA.l $7E398D ; Level_Jct_VSHi
+	
+		; Bits 0-3 set Level_AltTileset
 CODE_2099CE:
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$0F
 	STA.w !RAM_SMB3_Level_SublevelTilesetFromHeader
+	
 	INY
+	
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$E0
 	LSR
@@ -105224,17 +106210,24 @@ CODE_2099CE:
 	LSR
 	LSR
 	STA.w !RAM_SMB3_Level_EntranceSettings
+	
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$1F
 	STA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
+	
 	INY
+	
+;SNES new \ 
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$30
 	ASL
 	ORA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	STA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
-	LDA.w $0414
+;/
+	
+	LDA.w !Level_JctCtl
 	BNE.b CODE_209A0E
+	
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$C0
 	CLC
@@ -105246,22 +106239,26 @@ CODE_2099CE:
 	STA.w !RAM_SMB3_Level_TimerHundreds
 	BNE.b CODE_209A0E
 	INC.w !RAM_SMB3_Level_FreezeTimeLimitFlag
+	
+	;SNES check: check to see if entering the warp whistle toad house. if you are, queue music as level toad house rather than overworld toad house
 CODE_209A0E:
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$0F
-	CMP.b #$07
+	CMP.b #$07 ; overworld toad house index
 	BNE.b CODE_209A2F
 	LDA.w !RAM_SMB3_Global_CurrentWorld
-	BNE.b CODE_209A2F
+	BNE.b CODE_209A2F ; world 1
 	LDA.w !RAM_SMB3_Overworld_OWSprIDBeingEntered
 	BNE.b CODE_209A2F
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
-	LDA.l $7E3979,x
+	LDA.l $7E3979,x ; XPos on map
 	CMP.b #$A0
 	BNE.b CODE_209A2F
 	LDA.b #!Define_SMB3_LevelMusic_ToadHouse
 	BRA.b CODE_209A37
-
+;
+	
+	
 CODE_209A2F:
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$0F
@@ -105269,7 +106266,7 @@ CODE_209A2F:
 	LDA.w SMB3_LevelMusicTable,x
 CODE_209A37:
 	STA.w !RAM_SMB3_Global_MusicRegisterBackup
-	STA.w $1062
+	STA.w !Level_MusicQueueRestore
 	LDA.w !REGISTER_APUPort2
 	CMP.b #!Define_SMB3_LevelMusic_HaveStar
 	BNE.b CODE_209A47
@@ -105284,10 +106281,13 @@ CODE_209A47:
 	LSR
 	LSR
 	LSR
-	STA.w $02BE
+	STA.w !SNES_LevelHeaderL3Pal
 	INY
+	
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	STA.w !RAM_SMB3_Level_Layer2BGFromHeader
+	
+; Level_LayPtr_AddrL/H += 9 (i.e. move pointer to after the header)
 	LDA.b !RAM_SMB3_Level_LevelDataPtrLo
 	CLC
 	ADC.b #$0D
@@ -105295,28 +106295,30 @@ CODE_209A47:
 	LDA.b !RAM_SMB3_Level_LevelDataPtrHi
 	ADC.b #$00
 	STA.b !RAM_SMB3_Level_LevelDataPtrHi
+	
+; SNES - check for tileset override
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo]
 	AND.b #$E0
 	CMP.b #$C0
 	BNE.b CODE_209AA5
-	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo]
-	AND.b #$0F
+	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo] 
+	AND.b #$0F ; screen pos
 	CMP.w $0211
-	BNE.b CODE_209A94
+	BNE.b CODE_209A94 ; if not correct screen
 	LDY.b #$01
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	PHA
 	AND.b #$0F
-	STA.w $073B
+	STA.w $073B ; store layer 1 palette
 	PLA
 	LSR
 	LSR
 	LSR
 	LSR
-	STA.w !RAM_SMB3_Level_BackgroundColorSettingFromHeader
+	STA.w !RAM_SMB3_Level_BackgroundColorSettingFromHeader ; store layer 2 palette
 	INY
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
-	STA.w !RAM_SMB3_Global_TilesetFromHeader
+	STA.w !RAM_SMB3_Global_TilesetFromHeader ; store tileset
 CODE_209A94:
 	LDA.w !RAM_SMB3_Level_LevelDataPtrLo					; Optimization: Unnecessary absolute addressing
 	CLC
@@ -105325,6 +106327,8 @@ CODE_209A94:
 	LDA.b #$00
 	ADC.w !RAM_SMB3_Level_LevelDataPtrHi					;\ Optimization: Unnecessary absolute addressing
 	STA.w !RAM_SMB3_Level_LevelDataPtrHi					;/
+	
+	
 CODE_209AA5:
 	LDY.b #$00
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
@@ -105353,7 +106357,7 @@ CODE_209AA5:
 	BRA.b CODE_209AA5
 
 CODE_209AD5:
-	JSL.l CODE_209B2A
+	JSL.l LoadLevel_Set_TileMemAddr
 	LDA.w $0706
 	AND.b #$F0
 	BEQ.b CODE_209AE7
@@ -105365,13 +106369,14 @@ CODE_209AE7:
 CODE_209AEB:
 	JMP.w CODE_209AA5							; Optimization: BRA.
 
+;SNES: new\
 CODE_209AEE:
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	BEQ.b CODE_209B19
 	JSL.l SMB3_BufferBGTilemap_Main
 	LDA.w $034F
 	BEQ.b CODE_209B08
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	STA.w $0218
 	LDA.w $0217
 	STA.w $0219
@@ -105392,6 +106397,7 @@ CODE_209B19:
 	STZ.w !RAM_SMB3_Level_TimerTens
 	STZ.w !RAM_SMB3_Level_TimerOnes
 CODE_209B29:
+;SNES: new/
 	RTL
 namespace off
 endmacro
@@ -105399,6 +106405,7 @@ endmacro
 ;#############################################################################################################
 ;#############################################################################################################
 
+;LevelLoad_CopyObjectList
 macro ROUTINE_SMB3_BufferSpriteListData(Address)
 namespace SMB3_BufferSpriteListData
 %InsertMacroAtXPosition(<Address>)
@@ -105691,6 +106698,7 @@ macro ROUTINE_SMB3_UploadGraphicsFiles(Address)
 namespace SMB3_UploadGraphicsFiles
 %InsertMacroAtXPosition(<Address>)
 
+	;SP1-SP8
 CODE_20A58D:					; Note: Load the castle cutscene sprites
 	LDA.w #SMB3_Bank39Graphics_Sprite_ThroneRoom
 	STA.b $0D
@@ -105750,11 +106758,44 @@ DATA_20A721:
 	db SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>16,SMB3_Bank3AGraphics_FG_GrassPlain2>>16,SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>16,SMB3_Bank3AGraphics_FG_SkyPlains2>>16,SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>16,SMB3_Bank3AGraphics_BG_AirshipInterior>>16,SMB3_Bank3AGraphics_FG_SkyPlains2>>16,SMB3_Bank3AGraphics_FG_SkyPlains2>>16
 
 DATA_20A751:
-	dw SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8,SMB3_Bank3AGraphics_BG_Underwater1>>8,SMB3_Bank3AGraphics_BG_StormClouds>>8,SMB3_Bank3AGraphics_BG_AirshipInterior>>8,SMB3_Bank3AGraphics_BG_CavePillar1>>8,SMB3_Bank3AGraphics_BG_ConstructedPlain>>8,SMB3_Bank2DGraphics_BG_Fortress1>>8,SMB3_Bank2DGraphics_BG_CastleWall>>8
-	dw SMB3_Bank2DGraphics_BG_SnowTrees1>>8,SMB3_Bank2DGraphics_BG_Pipes1>>8,SMB3_Bank2DGraphics_BG_DottedHills1>>8,SMB3_Bank3AGraphics_BG_CavePillar2>>8,SMB3_Bank2DGraphics_BG_HillsAndTrees>>8,SMB3_Bank2DGraphics_BG_Desert1>>8,SMB3_Bank2DGraphics_BG_Desert1>>8,SMB3_Bank2DGraphics_BG_CheckeredHills1>>8
-	dw SMB3_Bank40Graphics_BG_Prison>>8,SMB3_Bank41Graphics_BG_Volcano1>>8,SMB3_Bank42Graphics_BG_Clouds>>8,SMB3_Bank3AGraphics_BG_BonusRoom>>8,SMB3_Bank43Graphics_BG_CrystalCave>>8,SMB3_Bank3AGraphics_BG_CavePillar2>>8,SMB3_Bank43Graphics_BG_WaterfallCliff>>8,SMB3_Bank3AGraphics_BG_ToadHouse>>8
-	dw SMB3_Bank2DGraphics_BG_SnowyCheckeredHills1>>8,SMB3_Bank2DGraphics_BG_Desert1>>8,SMB3_Bank3AGraphics_BG_ConstructedPlain>>8,SMB3_Bank44Graphics_BG_BowsersCastle1>>8,SMB3_Bank45Graphics_BG_Leaves1>>8,SMB3_Bank2DGraphics_BG_CheckeredHills1>>8,SMB3_Bank43Graphics_BG_WaterfallCliff>>8,SMB3_Bank40Graphics_BG_Prison>>8
-	dw SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8,SMB3_Bank3AGraphics_BG_Underwater1>>8,SMB3_Bank42Graphics_BG_PeachsRoom1>>8,SMB3_Bank3AGraphics_BG_StormClouds>>8,SMB3_Bank3AGraphics_BG_AirshipInterior>>8,SMB3_Bank3AGraphics_BG_Underwater1>>8
+	dw SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8
+	dw SMB3_Bank3AGraphics_BG_Underwater1>>8
+	dw SMB3_Bank3AGraphics_BG_StormClouds>>8
+	dw SMB3_Bank3AGraphics_BG_AirshipInterior>>8
+	dw SMB3_Bank3AGraphics_BG_CavePillar1>>8
+	dw SMB3_Bank3AGraphics_BG_ConstructedPlain>>8
+	dw SMB3_Bank2DGraphics_BG_Fortress1>>8
+	dw SMB3_Bank2DGraphics_BG_CastleWall>>8
+	dw SMB3_Bank2DGraphics_BG_SnowTrees1>>8
+	dw SMB3_Bank2DGraphics_BG_Pipes1>>8
+	dw SMB3_Bank2DGraphics_BG_DottedHills1>>8
+	dw SMB3_Bank3AGraphics_BG_CavePillar2>>8
+	dw SMB3_Bank2DGraphics_BG_HillsAndTrees>>8
+	dw SMB3_Bank2DGraphics_BG_Desert1>>8
+	dw SMB3_Bank2DGraphics_BG_Desert1>>8
+	dw SMB3_Bank2DGraphics_BG_CheckeredHills1>>8
+	dw SMB3_Bank40Graphics_BG_Prison>>8
+	dw SMB3_Bank41Graphics_BG_Volcano1>>8
+	dw SMB3_Bank42Graphics_BG_Clouds>>8
+	dw SMB3_Bank3AGraphics_BG_BonusRoom>>8
+	dw SMB3_Bank43Graphics_BG_CrystalCave>>8
+	dw SMB3_Bank3AGraphics_BG_CavePillar2>>8
+	dw SMB3_Bank43Graphics_BG_WaterfallCliff>>8
+	dw SMB3_Bank3AGraphics_BG_ToadHouse>>8
+	dw SMB3_Bank2DGraphics_BG_SnowyCheckeredHills1>>8
+	dw SMB3_Bank2DGraphics_BG_Desert1>>8
+	dw SMB3_Bank3AGraphics_BG_ConstructedPlain>>8
+	dw SMB3_Bank44Graphics_BG_BowsersCastle1>>8
+	dw SMB3_Bank45Graphics_BG_Leaves1>>8
+	dw SMB3_Bank2DGraphics_BG_CheckeredHills1>>8
+	dw SMB3_Bank43Graphics_BG_WaterfallCliff>>8
+	dw SMB3_Bank40Graphics_BG_Prison>>8
+	dw SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8
+	dw SMB3_Bank3AGraphics_BG_Underwater1>>8
+	dw SMB3_Bank42Graphics_BG_PeachsRoom1>>8
+	dw SMB3_Bank3AGraphics_BG_StormClouds>>8
+	dw SMB3_Bank3AGraphics_BG_AirshipInterior>>8
+	dw SMB3_Bank3AGraphics_BG_Underwater1>>8
 
 DATA_20A79D:
 	dw SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8,SMB3_Bank3AGraphics_BG_Underwater2>>8,SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8,SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8,SMB3_Bank3AGraphics_BG_CavePillar2>>8,SMB3_Bank46Graphics_FG_AnimatedLevelTiles2>>8,SMB3_Bank2DGraphics_BG_Fortress2>>8,SMB3_Bank2DGraphics_BG_Pipes2>>8
@@ -105898,15 +106939,21 @@ DATA_20AC71:
 	dw SMB3_Bank44Graphics_Sprite_KoopaKids1,SMB3_Bank44Graphics_Sprite_KoopaKids1,SMB3_Bank44Graphics_Sprite_KoopaKids2,SMB3_Bank44Graphics_Sprite_KoopaKids2,SMB3_Bank44Graphics_Sprite_KoopaKids3,SMB3_Bank44Graphics_Sprite_KoopaKids3,SMB3_Bank44Graphics_Sprite_KoopaKids4,SMB3_Bank44Graphics_Sprite_BroEnemies
 
 Main:
+
 	PHB
 	PHK
 	PLB
-	REP.b #$20
+	REP.b #$20 ; 16 bit A
+	
+; copying fg and bg tiles
+	
+	;FG1/FG2
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	STY.b $00
 	LDA.w DATA_20A601,y
 	AND.w #$00FF
 	TAX
+	
 	TYA
 	AND.w #$00FF
 	ASL
@@ -105915,12 +106962,14 @@ Main:
 	STA.b $0D
 	STX.b $0F
 	LDA.w #$1000
-	STA.b $0B
-	LDA.w #$2000
+	STA.b $0B ; size
+	LDA.w #$2000 ; dest
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
-	LDX.b $00
-	CPX.b #$0F
-	BNE.b CODE_20ACC7
+	
+	; FG2 - spade game room only: replace mario with luigi if second player
+	LDX.b $00 ; RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
+	CPX.b #$0F 
+	BNE.b CODE_20ACC7 ; branch if not spade game room
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_20ACC7
 	STZ.b $0D
@@ -105930,16 +106979,17 @@ Main:
 	STA.b $0B
 	LDA.w #$2400
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+	;FG3/FG4 (animated)
 CODE_20ACC7:
 	LDA.w !RAM_SMB3_Level_PSwitchTimer
 	AND.w #$00FF
 	BEQ.b CODE_20ACDA
-	LDY.b #SMB3_Bank43Graphics_FG_AnimatedLevelTiles1>>16
+	LDY.b #SMB3_Bank43Graphics_FG_AnimatedLevelTiles1>>16 ; get P-switch frames
 	STY.b $0F
-	LDA.w #SMB3_Bank43Graphics_FG_AnimatedLevelTiles1
+	LDA.w #SMB3_Bank43Graphics_FG_AnimatedLevelTiles1 ; get P-switch frames
 	STA.b $0D
 	BRA.b CODE_20ACE7
-
 CODE_20ACDA:
 	LDA.w DATA_20A631,y
 	STA.b $0D
@@ -105952,6 +107002,8 @@ CODE_20ACE7:
 	STA.b $0B
 	LDA.w #$2800
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+	;FG5
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20A721,y
 	AND.w #$00FF
@@ -105967,6 +107019,8 @@ CODE_20ACE7:
 	STA.b $0B
 	LDA.w #$3000
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+	;BG1
 	STZ.b $0D
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	AND.w #$00FF
@@ -105974,7 +107028,7 @@ CODE_20ACE7:
 	TAY
 	LDA.w DATA_20A751,y
 	STA.b $0E
-	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
+	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader ; force hardcoded page if layer 3 is set to 6
 	AND.w #$00FF
 	CMP.w #$0006
 	BNE.b CODE_20AD33
@@ -105985,6 +107039,8 @@ CODE_20AD33:
 	STA.b $0B
 	LDA.w #$3400
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+	;BG2
 	STZ.b $0D
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	AND.w #$00FF
@@ -105992,7 +107048,7 @@ CODE_20AD33:
 	TAY
 	LDA.w DATA_20A79D,y
 	STA.b $0E
-	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
+	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader ; force hardcoded page if layer 3 is set to 6
 	AND.w #$00FF
 	CMP.w #$0006
 	BNE.b CODE_20AD5D
@@ -106003,6 +107059,8 @@ CODE_20AD5D:
 	STA.b $0B
 	LDA.w #$3800
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+	;FG6
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20A849,y
 	AND.w #$00FF
@@ -106018,6 +107076,8 @@ CODE_20AD5D:
 	STA.b $0B
 	LDA.w #$3C00
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+	;FG7
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20A8D9,y
 	AND.w #$00FF
@@ -106033,6 +107093,8 @@ CODE_20AD5D:
 	STA.b $0B
 	LDA.w #$4000
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+	;FG8 (hardcoded)
 	LDA.w #SMB3_Bank42Graphics_FG_StandardTiles
 	STA.b $0D
 	LDX.b #SMB3_Bank42Graphics_FG_StandardTiles>>16
@@ -106041,11 +107103,16 @@ CODE_20AD5D:
 	STA.b $0B
 	LDA.w #$4400
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+	
+; copying sprites next
+	
+	;throne room check
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	CPY.b #$16
 	BNE.b CODE_20ADCA
 	BRL.w CODE_20A58D
-
+	
+	; SP1
 CODE_20ADCA:
 	LDA.w #SMB3_Bank3FGraphics_Sprite_Global1
 	STA.b $0D
@@ -106054,6 +107121,8 @@ CODE_20ADCA:
 	LDA.w #$0800
 	STA.b $0B
 	JSR.w SMB3_DMADataToVRAM_Entry2
+	
+	; SP2
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20A969,y
 	AND.w #$00FF
@@ -106069,6 +107138,8 @@ CODE_20ADCA:
 	STA.b $0B
 	LDA.w #$6400
 	JSR.w SMB3_DMADataToVRAM_Main
+	
+	; SP3
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20A9F9,y
 	AND.w #$00FF
@@ -106084,6 +107155,8 @@ CODE_20ADCA:
 	STA.b $0B
 	LDA.w #$6800
 	JSR.w SMB3_DMADataToVRAM_Main
+	
+	; SP4
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20AA89,y
 	AND.w #$00FF
@@ -106099,6 +107172,8 @@ CODE_20ADCA:
 	STA.b $0B
 	LDA.w #$6C00
 	JSR.w SMB3_DMADataToVRAM_Main
+	
+	; SP5
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20AB19,y
 	AND.w #$00FF
@@ -106114,13 +107189,15 @@ CODE_20ADCA:
 	STA.b $0B
 	LDA.w #$7000
 	JSR.w SMB3_DMADataToVRAM_Main
+	
+	; SP6
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	CPY.b #$0A
-	BNE.b CODE_20AE87
+	BNE.b CODE_20AE87 ; check if airship
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	AND.w #$00FF
 	TAY
-	LDA.w DATA_20AC69,y
+	LDA.w DATA_20AC69,y ; koopa kid sprites
 	AND.w #$00FF
 	TAX
 	TYA
@@ -106131,7 +107208,6 @@ CODE_20ADCA:
 	STA.b $0D
 	STX.b $0F
 	BRA.b CODE_20AE9B
-
 CODE_20AE87:
 	LDA.w DATA_20ABA9,y
 	AND.w #$00FF
@@ -106148,6 +107224,8 @@ CODE_20AE9B:
 	STA.b $0B
 	LDA.w #$7400
 	JSR.w SMB3_DMADataToVRAM_Main
+	
+	; SP7
 	LDY.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	LDA.w DATA_20AC39,y
 	AND.w #$00FF
@@ -106163,6 +107241,8 @@ CODE_20AE9B:
 	STA.b $0B
 	LDA.w #$7800
 	JSR.w SMB3_DMADataToVRAM_Main
+	
+	; SP8
 	LDA.w #SMB3_Bank3FGraphics_Sprite_Global3
 	STA.b $0D
 	LDX.b #SMB3_Bank3FGraphics_Sprite_Global3>>16
@@ -106171,6 +107251,10 @@ CODE_20AE9B:
 	STA.b $0B
 	LDA.w #$7C00
 	JSR.w SMB3_DMADataToVRAM_Main
+	
+; copying layer 3 graphics
+
+	; only LG1 is copied here
 CODE_20AEDC:
 	SEP.b #$20
 	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
@@ -106241,6 +107325,7 @@ CODE_20AF5E:
 	STA.w DMA[$00].SourceBank
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
+	
 CODE_20AF6D:
 	PLB
 	RTL
@@ -106306,22 +107391,22 @@ CODE_29BD8C:
 	ADC.b $00
 	TAX
 	LDA.w DATA_21E90D,x
-	STA.w $0242
+	STA.w $0242 ;source bank
 	LDA.w DATA_21E915,x
-	STA.w $0241
+	STA.w $0241 ;source hi
 	LDA.w DATA_21E91D,x
-	STA.w $0240
+	STA.w $0240 ;source lo
 	LDA.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 	ASL
 	TAY
 	REP.b #$20
-	LDA.w #$0200
-	STA.w $02CA
-	LDA.w $0240
+	LDA.w #$0200 ; upload one row at a time
+	STA.w $02CA	;size.
+	LDA.w $0240 ;source lo
 	CLC
 	ADC.w DATA_21E925,y
-	STA.w $0240
-	LDA.w #$2000
+	STA.w $0240 ;source lo
+	LDA.w #$2000 ; dest VRAM
 	CLC
 	ADC.w DATA_21E935,y
 	STA.w $023E
@@ -106348,24 +107433,24 @@ Main:
 	RTS
 
 CODE_20A04F:
-	LDX.w $0245
+	LDX.w $0245 ; frame index
 	LDA.w DATA_21CA14,x
 	STA.w $0242
 	LDA.w DATA_21CA19,x
 	STA.w $0241
 	LDA.w DATA_21CA1E,x
-	STA.w $0240
+	STA.w $0240 ;source lo
 	LDA.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 	ASL
 	TAY
 	REP.b #$20
-	LDA.w #$0200
-	STA.w $02CA
-	LDA.w $0240
+	LDA.w #$0200 ; upload one row at a time
+	STA.w $02CA 
+	LDA.w $0240 ;source lo
 	CLC
 	ADC.w DATA_21E925,y
-	STA.w $0240
-	LDA.w #$2800
+	STA.w $0240 ;source lo
+	LDA.w #$2800	;VRAM index
 	CLC
 	ADC.w DATA_21E935,y
 	STA.w $023E
@@ -106404,13 +107489,13 @@ CODE_20A09A:
 	ASL
 	TAY
 	REP.b #$20
-	LDA.w #$0400
+	LDA.w #$0400 ; upload two rows at a time
 	STA.w $02CA
 	LDA.w $0240
 	CLC
 	ADC.w DATA_21E925,y
 	STA.w $0240
-	LDA.w #$2800
+	LDA.w #$2800	;VRAM index
 	CLC
 	ADC.w DATA_21E935,y
 	STA.w $023E
@@ -108184,7 +109269,7 @@ LevelData_World5Fortress1_Level_Sub:
 ;--------------------------------------------------------------------
 
 LevelData_UnknownLevelData_26937A:
-;$26937A
+;$26936C
 	dl $000000
 	dl $000000
 	incbin "Levels/Unknown/UnknownLevelData_26937A.bin":6-
@@ -110227,6 +111312,7 @@ ADDR_20A1BF:								; Note: Unreferenced code
 	STA.b $01
 	LDA.b #$7F0000>>16
 	STA.b $02
+	;entry
 CODE_20A1CF:
 	REP.b #$10
 	LDY.w #$0000
@@ -110391,13 +111477,13 @@ namespace SMB3_NorSpr001_UnusedSprite_Status02
 Main:
 	LDA.w $0689,x
 	BNE.b CODE_2886EA
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	JMP.w CODE_2886EE
 
 CODE_2886EA:
 	JSL.l CODE_288715
 CODE_2886EE:
-	JSR.w CODE_288FAF
+	JSR.w Object_InteractWithWorld
 	LDA.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	STA.w $0669,x
@@ -110413,8 +111499,8 @@ CODE_2886EE:
 CODE_28870A:
 	STY.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28870C:
-	JSL.l CODE_279EBC
-	JSL.l CODE_279BC4
+	JSL.l Object_ShakeAndDraw
+	JSL.l Object_DeleteOffScreen
 	RTL
 namespace off
 endmacro
@@ -110496,7 +111582,7 @@ CODE_2887D3:
 	LDA.b #$88
 	STA.w $0689,x
 CODE_2887F3:
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTS				; Crash: This will cause the game to crash! It needs to be an RTL!
 namespace off
 endmacro
@@ -110529,12 +111615,12 @@ namespace SMB3_NorSpr004_UnusedStickySprite_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_27A317
-	JSR.w CODE_288FAF
+	JSL.l Object_HitTestRespond
+	JSR.w Object_InteractWithWorld
 	JSL.l CODE_279F70
 	INC.w $0518,x
-	JSL.l CODE_279F52
-	JSL.l CODE_279BC4
+	JSL.l Object_Draw16x32Sprite
+	JSL.l Object_DeleteOffScreen
 	RTL
 namespace off
 endmacro
@@ -110588,11 +111674,11 @@ CODE_288869:
 	BNE.b CODE_28889D
 	LDA.w $0689,x
 	BEQ.b CODE_288886
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	EOR.w $0679,x
 	AND.b #$40
 	BEQ.b CODE_2888AB
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 	BRA.b CODE_2888AB
 
 CODE_288886:
@@ -110620,12 +111706,12 @@ CODE_2888A6:
 	BRA.b CODE_2888AE
 
 CODE_2888AB:
-	JSR.w CODE_288FAF
+	JSR.w Object_InteractWithWorld
 CODE_2888AE:
 	JSL.l CODE_279F70
-	JSL.l CODE_27A317
-	JSL.l CODE_279EBC
-	JSL.l CODE_279BC4
+	JSL.l Object_HitTestRespond
+	JSL.l Object_ShakeAndDraw
+	JSL.l Object_DeleteOffScreen
 	RTL
 namespace off
 endmacro
@@ -110638,7 +111724,7 @@ namespace SMB3_NorSpr006_VerticalBounceSprite_Status01
 %InsertMacroAtXPosition(<Address>)
 
 ADDR_2888FE:							;\ Note: Unreferenced code?
-	JSL.l CODE_27A6EC					;/
+	JSL.l ObjectToObject_HitTest					;/
 Main:
 	LDA.w $057D
 	STA.w $0691,x
@@ -110843,10 +111929,10 @@ Main:
 ;$2893DE
 	LDA.b $9C
 	BNE.b CODE_28942C
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.w !RAM_SMB3_Level_Player_BehindLayer1Timer
 	BEQ.b CODE_28942C
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	LDA.b $0E
 	CLC
 	ADC.b #$04
@@ -110874,7 +111960,7 @@ Main:
 	LDA.b #SMB3_LevelData_SpecialToadHouse_Level_Main>>16
 	STA.b !RAM_SMB3_Level_LevelDataPtrBank
 	LDA.b #$05
-	STA.w $0414
+	STA.w !Level_JctCtl
 	STA.l $7E396E
 CODE_28942C:
 	RTL
@@ -110906,7 +111992,7 @@ namespace SMB3_NorSpr008_InvisiblePSwitchDoor_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.w !RAM_SMB3_Level_PSwitchTimer
 	BEQ.b SMB3_NorSpr007_SecretToadHouseWarp_Status02_CODE_28942C
 	LDA.b $9C
@@ -110916,7 +112002,7 @@ Main:
 	LDA.b !RAM_SMB3_Global_ControllerHold1
 	AND.b #!Joypad_DPadU>>8
 	BEQ.b CODE_28946C
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	LDA.b $0E
 	CLC
 	ADC.b #$02
@@ -110930,12 +112016,12 @@ Main:
 	BEQ.b CODE_289462
 	LDY.b #$03
 CODE_289462:
-	STY.w $0414
+	STY.w !Level_JctCtl
 	LDA.b #$00
 	STA.w $0713
 	STA.b !RAM_SMB3_Level_Player_XSpeed
 CODE_28946C:
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	RTL
 namespace off
 endmacro
@@ -110973,12 +112059,13 @@ CODE_288B12:
 	LDA.b #$B0
 	STA.b $C6,x
 	STZ.b $C7,x
-	JSL.l CODE_279F6C
+	JSL.l Object_DrawWide
+	
 	REP.b #$10
 	LDY.b $C6,x
 	LDA.w SMB3_OAMBuffer[$02].Prop,y
 	ORA.b #$40
-	STA.w SMB3_OAMBuffer[$02].Prop,y
+	STA.w SMB3_OAMBuffer[$02].Prop,y	
 	STA.w SMB3_OAMBuffer[$05].Prop,y
 	LDA.w $0543
 	STA.b $D8
@@ -111054,9 +112141,11 @@ CODE_288B6D:
 	SEC
 	SBC.b $D8
 	STA.b $D8
+	
 	SEP.b #$20
-	LDY.w #$00E0
-CODE_288BC2:
+	
+	LDY.w #$00E0	
+CODE_288BC2: ; PRG001_A6DF	
 	REP.b #$20
 	LDA.b $D8
 	SEC
@@ -111136,8 +112225,8 @@ namespace SMB3_NorSpr00A_UnusedPushableBlock_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_27A317
-	JSR.w CODE_288FAF
+	JSL.l Object_HitTestRespond
+	JSR.w Object_InteractWithWorld
 	LDA.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	LDA.b !RAM_SMB3_Global_FrameCounter
@@ -111146,8 +112235,8 @@ Main:
 	LSR
 	LSR
 	STA.w $0669,x
-	JSL.l CODE_279EBC
-	JSL.l CODE_279BC4
+	JSL.l Object_ShakeAndDraw
+	JSL.l Object_DeleteOffScreen
 	RTL
 namespace off
 endmacro
@@ -111242,7 +112331,7 @@ CODE_289534:
 	JMP.w CODE_28975A
 
 CODE_289549:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b #$A0
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	JSL.l CODE_27A7D9
@@ -111277,8 +112366,8 @@ CODE_289580:
 	BNE.b CODE_2895BD
 	JSR.w CODE_289C50
 	JSR.w CODE_28964E
-	JSL.l CODE_27A317
-	JSL.l CODE_27A7AE
+	JSL.l Object_HitTestRespond
+	JSL.l Object_CalcCoarseXDiff
 	LDA.w $0520,x
 	BEQ.b CODE_2895BE
 	CMP.b #$40
@@ -111598,7 +112687,7 @@ CODE_289AE0:
 	BEQ.b CODE_289AF7
 	LDY.b #$EF
 CODE_289AF7:
-	STY.w $0216
+	STY.w !Vert_Scroll
 	STY.w $0218
 	RTS
 
@@ -111682,7 +112771,7 @@ Main:
 	BNE.b CODE_28868F
 	INC.b $4D,x
 CODE_28868F:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	CMP.w $1CC8,x
@@ -111694,9 +112783,9 @@ CODE_28868F:
 	AND.b #$03
 	BEQ.b CODE_2886B9
 CODE_2886AD:
-	JSL.l CODE_279906
-	JSL.l CODE_27A7F0
-	JSL.l CODE_27A7F0
+	JSL.l Object_AboutFace
+	JSL.l Object_ApplyXVel
+	JSL.l Object_ApplyXVel
 CODE_2886B9:
 	JSL.l CODE_279B70
 	JSL.l CODE_279BCC
@@ -111710,7 +112799,7 @@ CODE_2886B9:
 	AND.b #$01
 	STA.w $0669,x
 CODE_2886CF:
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 CODE_2886D3:
 	RTL
 
@@ -111780,9 +112869,9 @@ Main:
 	BEQ.b CODE_28908C
 	JSL.l CODE_278B67
 CODE_28908C:
-	JSL.l CODE_27A317
-	JSL.l CODE_279EBC
-	JSL.l CODE_279BC4
+	JSL.l Object_HitTestRespond
+	JSL.l Object_ShakeAndDraw
+	JSL.l Object_DeleteOffScreen
 	RTL
 namespace off
 endmacro
@@ -111835,15 +112924,15 @@ namespace SMB3_NorSpr01C_UnusedStrangeRewardBlock_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279EBC
-	JSL.l CODE_279BC4
+	JSL.l Object_ShakeAndDraw
+	JSL.l Object_DeleteOffScreen
 	LDA.w $0518,x
 	BNE.b CODE_2891F0
-	JMP.w CODE_288FAF					; Crash: This should be a JSR and an RTL added after. Otherwise, this will crash the game!
+	JMP.w Object_InteractWithWorld					; Crash: This should be a JSR and an RTL added after. Otherwise, this will crash the game!
 
 CODE_2891F0:
 	JSL.l CODE_27A7D9
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	RTL
 namespace off
 endmacro
@@ -111874,7 +112963,7 @@ Main:
 	JSL.l CODE_27A7D9
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	BMI.b CODE_2892E9
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.w $064B
 	PHA
 	ASL
@@ -111912,9 +113001,9 @@ CODE_289312:
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	ASL
 	TAY
-	LDA.w DATA_218200,y
+	LDA.w Tile_Mem_Addr,y
 	STA.b $D8
-	LDA.w DATA_218200+$01,y
+	LDA.w Tile_Mem_Addr+$01,y
 	STA.b $D9
 	LDA.b #$7E2000>>16
 	STA.b $DA
@@ -112123,7 +113212,7 @@ CODE_28BB00:
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	ADC.w DATA_21BCAA,x
 	BMI.b CODE_28BB59
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	EOR.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	ASL
 	BPL.b CODE_28BB31
@@ -112159,11 +113248,11 @@ CODE_28BB4C:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28BB59:
 	JSR.w CODE_28B905
-	JSL.l CODE_279B6C
-	JSL.l CODE_279BC4
+	JSL.l Object_HandleBumpUnderneath
+	JSL.l Object_DeleteOffScreen
 CODE_28BB64:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDA.b $02
 	BPL.b CODE_28BB7F
 	LDX.b $9B
@@ -112175,7 +113264,7 @@ CODE_28BB64:
 	STA.b $00
 	LDX.b $05
 CODE_28BB7F:
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	LDY.b !RAM_SMB3_NorSpr029_Spike_HeldSpikeBallPositionIndex,x
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x
@@ -112230,7 +113319,7 @@ CODE_28BBB5:
 	STA.b $C6,x
 	SEP.b #$20
 	LDX.b #$6E
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	REP.b #$10
 	LDY.b $C6,x
@@ -112295,7 +113384,7 @@ namespace SMB3_NorSpr02B_KuribosShoe_Status02
 Main:
 	LDA.b $9C
 	BEQ.b CODE_28BEDD
-	JSL.l CODE_28BFD9
+	JSL.l Shoe_DrawGoomba
 	RTL
 
 CODE_28BEDD:
@@ -112306,13 +113395,13 @@ CODE_28BEDD:
 	LSR
 	AND.b #$01
 	STA.w !RAM_SMB3_NorSpr02B_KuribosShoe_AnimationFrame,x
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_28BFD9
+	JSL.l Shoe_DrawGoomba
 	LDA.w !RAM_SMB3_Level_Player_StarPowerTimer
 	STA.w $0689,x
 	STZ.w !RAM_SMB3_Level_Player_StarPowerTimer
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	LDA.w $0689,x
 	STA.w !RAM_SMB3_Level_Player_StarPowerTimer
 	LDA.w $1F76
@@ -112341,7 +113430,7 @@ CODE_28BF28:
 	BNE.b CODE_28BF67
 	DEY
 	BNE.b CODE_28BF4B
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	LDY.b #$10
 	ASL
@@ -112385,7 +113474,7 @@ CODE_28BF6A:
 	BMI.b CODE_28BFAF						; Note: This will always branch.
 
 CODE_28BF74:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$06
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr072_Goomba
@@ -112424,7 +113513,7 @@ namespace SMB3_NorSpr02D_BossBass_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279DDA
+	JSL.l Fish_FixedYIfAppro
 	JSR.w CODE_28C762
 	LDA.b $9C
 	BNE.b CODE_28C634
@@ -112436,7 +113525,7 @@ CODE_28C603:
 	BEQ.b CODE_28C617
 	LSR
 	BNE.b CODE_28C634
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	JMP.w CODE_28C5C4
@@ -112464,9 +113553,9 @@ CODE_28C635:
 	INY
 	STY.w !RAM_SMB3_Level_Player_FreezePlayerTimer
 CODE_28C63E:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7D9
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	LDA.w !RAM_SMB3_NorSpr02D_BossBass_AnimationFrame,x
 	BPL.b CODE_28C6A3
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x
@@ -112490,7 +113579,7 @@ CODE_28C66B:
 	AND.b #$40
 	EOR.b #$40
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	LDA.b $0E
 	CLC
 	ADC.w DATA_21BF43,y
@@ -112539,7 +113628,7 @@ CODE_28C6BD:
 CODE_28C6C9:
 	CPY.b #$02
 	BCS.b CODE_28C702
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	LDY.b !RAM_SMB3_NorSpr02D_BossBass_HorizontalMovementDirection,x
 	LDA.b $0E
 	CLC
@@ -112629,7 +113718,7 @@ CODE_28C762:
 	STA.w !RAM_SMB3_NorSpr02D_BossBass_AnimationFrame,x
 CODE_28C773:
 	INC.w !RAM_SMB3_NorSpr02D_BossBass_AnimationFrame,x
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
 	LDA.w !RAM_SMB3_NorSpr02D_BossBass_AnimationFrame,x
 	CMP.b #$05
@@ -112651,7 +113740,7 @@ CODE_28C788:
 	INX
 	INX
 CODE_28C79A:
-	JSL.l CODE_27A07A
+	JSL.l Object_Draw24x16Sprite
 	LDX.b $9B
 	REP.b #$20
 	LDA.b $C6,x
@@ -112671,7 +113760,7 @@ CODE_28C7B7:
 	CLC
 	ADC.b $00
 	STA.b $00
-	JSL.l CODE_27A07A
+	JSL.l Object_Draw24x16Sprite
 	LDX.b $9B
 	LDA.w !RAM_SMB3_NorSpr02D_BossBass_AnimationFrame,x
 	BPL.b CODE_28C7F9
@@ -112732,7 +113821,7 @@ namespace SMB3_NorSpr02E_ElevatorPlatform_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
 	LDA.b !RAM_SMB3_NorSpr02E_ElevatorPlatform_IsRisingFlag,x
 	BNE.b CODE_28B7FD
@@ -112741,7 +113830,7 @@ Main:
 	BEQ.b CODE_28B821						; Note: This will always branch.
 
 CODE_28B7FD:
-	JSR.w CODE_28B830
+	JSR.w InvisiLift_Draw
 	LDA.b $9C
 	BNE.b SMB3_NorSpr02E_ElevatorPlatform_Status01_CODE_28B7EA
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
@@ -112763,15 +113852,15 @@ CODE_28B81B:
 CODE_28B821:
 	LDA.b #$00
 	STA.w $074D
-	JSR.w CODE_28C8C5
+	JSR.w PlayerPlatform_Collide
 	BCC.b CODE_28B82F
 	LDA.b #$01
 	STA.b !RAM_SMB3_NorSpr02E_ElevatorPlatform_IsRisingFlag,x
 CODE_28B82F:
 	RTL
 
-CODE_28B830:
-	JSL.l CODE_279DF9
+InvisiLift_Draw:
+	JSL.l Object_ShakeAndCalcSprite
 	LDA.b $02
 	AND.b #$3F
 	STA.b $02
@@ -112789,7 +113878,7 @@ CODE_28B830:
 	SEP.b #$20
 	PLX
 CODE_28B850:
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	PLP
 	BCS.b CODE_28B869
 	PHX
@@ -112820,9 +113909,11 @@ CODE_28B879:
 	CLC
 	ADC.b $01
 	STA.b $01
+	
 	ASL.b $07
 	ASL.b $07
-	JSL.l CODE_279F91
+	
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	RTS
 namespace off
@@ -112836,7 +113927,7 @@ namespace SMB3_NorSpr02F_Boo_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSR.w CODE_28B6BC
+	JSR.w Boo_CheckPlayerSight
 	BCS.b CODE_28B6DE
 	LDA.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
@@ -112870,18 +113961,18 @@ CODE_28B707:
 	ADC.w DATA_21BCAF,y
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_28B714:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7D9
 	LDA.b #$01
 CODE_28B71E:
-	STA.w $0669,x
-	JSL.l CODE_27A317
-	JSL.l CODE_279DDA
+	STA.w $0669,x ;frame
+	JSL.l Object_HitTestRespond
+	JSL.l Fish_FixedYIfAppro
 CODE_28B729:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279EBC
-	JSL.l CODE_29A3C2
+	JSL.l Object_ShakeAndDraw
+	JSL.l SNES_RotoBooTrailDraw
 	RTL
 namespace off
 endmacro
@@ -112900,14 +113991,14 @@ FollowingHotFootEntry:
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b $A7,x
 	AND.b #$03
 	BNE.b CODE_28B5E1
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_28B5E1:
-	JSR.w CODE_28B91F
-	JSR.w CODE_28B6BC
+	JSR.w Object_HitFloorAlign
+	JSR.w Boo_CheckPlayerSight
 	LDY.b #$04
 	LDA.b $A7,x
 	AND.b #$04
@@ -112933,8 +114024,8 @@ CODE_28B60A:
 CODE_28B60C:
 	TYA
 	STA.w $0669,x
-	JSL.l CODE_279BC4
-	JSL.l CODE_27A317
+	JSL.l Object_DeleteOffScreen
+	JSL.l Object_HitTestRespond
 CODE_28B618:
 	LSR.w $0669,x
 	LDA.b !RAM_SMB3_Global_FrameCounter
@@ -112942,18 +114033,21 @@ CODE_28B618:
 	ROL.w $0669,x
 CODE_28B621:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
+;Bank2_HotFootHaltAction
 CODE_28B625:
 	LDA.w !RAM_SMB3_Level_NorSpr_YOffscreenFlag,x
 	BNE.b CODE_28B682
+	
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
 	LDY.w $0418
-	LDA.w DATA_21B4C1,y
+	LDA.w DATA_21B4C1,y ; ObjectGroup_PatternStarts
 	CLC
 	ADC.w $0669,x
 	TAY
+	
 	REP.b #$10
-	LDA.w DATA_21B5A2,y
-	LDY.b $C6,x
+	LDA.w DATA_21B5A2,y 
+	LDY.b $C6,x ; 16-bit index
 	STA.w SMB3_OAMBuffer[$00].Tile,y
 	INC
 	STA.w SMB3_OAMBuffer[$01].Tile,y
@@ -112971,6 +114065,7 @@ CODE_28B625:
 	LDA.b !RAM_SMB3_Level_NorSpr_OnScreenXPos,x
 	STA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
+	
 	PHY
 	REP.b #$20
 	TYA
@@ -112985,6 +114080,7 @@ CODE_28B625:
 	STA.w SMB3_OAMTileSizeBuffer[$00].Slot,y
 	STA.w SMB3_OAMTileSizeBuffer[$01].Slot,y
 	PLY
+	
 	SEP.b #$10
 CODE_28B682:
 	RTL
@@ -113013,7 +114109,7 @@ CODE_28B6A1:
 	AND.b #$5F
 	BNE.b CODE_28B6B8
 	BCC.b CODE_28B6B4
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	EOR.b #$40
 	STA.w $0679,x
 CODE_28B6B4:
@@ -113100,7 +114196,7 @@ CODE_28B797:
 	LSR
 	PHP
 	BCS.b CODE_28B7C6
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDY.w $0418
 	LDA.w DATA_21BB30,y
 	AND.b #$F0
@@ -113111,10 +114207,10 @@ CODE_28B797:
 	INY
 	INY
 CODE_28B7B0:
-	JSL.l CODE_278E13
+	JSL.l Object_DetectTile
 	CMP.b #$12
 	BEQ.b CODE_28B7BC
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_28B7BC:
 	LDA.b #$02
 	PLP
@@ -113135,7 +114231,7 @@ CODE_28B7C6:
 CODE_28B7D3:
 	STA.w $0669,x
 	JSL.l CODE_28B73A
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	RTL
 
 namespace off
@@ -113189,10 +114285,10 @@ namespace SMB3_NorSpr034_ToadHouseToad_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	JSR.w CODE_28C122
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	JSR.w CODE_28C122
 	RTL
 
@@ -113268,6 +114364,7 @@ CODE_28C19F:
 State01_WriteMessage:
 	LDA.w !RAM_SMB3_NorSpr034_ToadHouseToad_WaitBeforeWritingNextLetter,x
 	BNE.b CODE_28C217
+
 	LDY.w $02D4
 	LDA.w SMB3_ToadHouseToadText_TopHalf,y
 	PHA
@@ -113406,7 +114503,7 @@ CODE_28C25E:
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	CMP.b #$C8
 	BEQ.b CODE_28C28F
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7D9
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
@@ -113496,8 +114593,8 @@ ADDR_28C7FA:					; Optimization: Unused RTS
 	RTS
 
 Main:
-	JSL.l CODE_279DDA
-	JSL.l CODE_279EBC
+	JSL.l Fish_FixedYIfAppro
+	JSL.l Object_ShakeAndDraw
 	LDA.b $9C
 	BNE.b CODE_28C812
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
@@ -113513,9 +114610,9 @@ CODE_28C813:
 	LSR
 	AND.b #$01
 	STA.w $0669,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7D9
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.b $4D,x
 	BEQ.b CODE_28C82F
 	JMP.w CODE_28C89A
@@ -113542,7 +114639,7 @@ CODE_28C84B:
 	AND.b #$40
 	EOR.b #$40
 	STA.w $0679,x
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	LDA.b $0E
 	CLC
 	ADC.b #$40
@@ -113612,8 +114709,8 @@ namespace SMB3_NorSpr03D_FireBreathingNipper_Status02
 Main:
 	JSR.w CODE_28B905
 	JSL.l CODE_28B73A
-	JSL.l CODE_27A317
-	JSL.l CODE_27A7AE
+	JSL.l Object_HitTestRespond
+	JSL.l Object_CalcCoarseXDiff
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	LSR
@@ -113706,7 +114803,7 @@ namespace SMB3_NorSpr03E_BuoyantPlatform_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279DDA
+	JSL.l Fish_FixedYIfAppro
 	JSL.l CODE_28B960
 	LDA.b $9C
 	BNE.b SMB3_NorSpr03E_BuoyantPlatform_Status01_CODE_28B999
@@ -113735,7 +114832,7 @@ CODE_28B9BE:
 	STA.b !RAM_SMB3_NorSpr03E_BuoyantPlatform_YDispFromInitialYPos,x
 	LDA.b #$00
 	STA.w $074D
-	JSR.w CODE_28C8C5
+	JSR.w PlayerPlatform_Collide
 	BCC.b CODE_28B9F0
 	ROL.w $027F
 	LDA.b !RAM_SMB3_Level_Player_YSpeed
@@ -113766,10 +114863,10 @@ Main:
 	JSR.w CODE_28B257
 	BCS.b CODE_28C45D
 	JSR.w CODE_28B905
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l CODE_28C45D
-	JSL.l CODE_27A317
+	JSL.l Object_HitTestRespond
 	JSR.w CODE_28C527
 	LDA.b !RAM_SMB3_NorSpr03F_DryBones_CollapsedAnimationFrame,x
 	BNE.b CODE_28C43D
@@ -113801,7 +114898,7 @@ CODE_28C43D:
 	BNE.b CODE_28C45C
 	DEC.b !RAM_SMB3_NorSpr03F_DryBones_CollapsedAnimationFrame,x
 	BNE.b CODE_28C44E
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	RTL
 
@@ -113830,7 +114927,7 @@ CODE_28C45D:
 CODE_28C473:
 	LDY.b #$01
 	JSL.l SMB3_CheckIfSpriteIsVerticallyOffScreen_Entry2
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	PLA
@@ -113856,11 +114953,11 @@ CODE_28C48C:
 CODE_28C4A2:
 	LDY.b #$02
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Entry2
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
 	LDY.w !RAM_SMB3_NorSpr03F_DryBones_WalkingAnimationFrame,x
 	LDX.w DATA_21BF2C,y
-	JSL.l CODE_27A07A
+	JSL.l Object_Draw24x16Sprite
 	LDX.b $9B
 	BIT.b $02
 	BVC.b CODE_28C4CA
@@ -113926,8 +115023,8 @@ Main:
 	LDA.b $9C
 	BNE.b SMB3_NorSpr040_BusterBeetle_Status01_CODE_28B272
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
-	JSL.l CODE_279B6C
-	JSR.w CODE_28B91F
+	JSL.l Object_HandleBumpUnderneath
+	JSR.w Object_HitFloorAlign
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_28B2DA
@@ -113943,9 +115040,9 @@ Main:
 	BNE.b CODE_28B2D6
 	LDY.b #$01
 	LDA.w $1F77
-	CMP.b #$32
+	CMP.b #$32  ;ice brick tile
 	BEQ.b CODE_28B2AC
-	CMP.b #$F4
+	CMP.b #$F4	;!
 	BNE.b CODE_28B2D6
 	INY
 CODE_28B2AC:
@@ -113966,7 +115063,7 @@ CODE_28B2AC:
 	STA.w !RAM_SMB3_NorSpr040_BusterBeetle_PickupBlockAnimationTimer,x
 	BNE.b CODE_28B2DA
 CODE_28B2D6:
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_28B2DA:
 	LDA.w !RAM_SMB3_NorSpr040_BusterBeetle_ThrowAnimationTimer,x
 	BNE.b CODE_28B2E7
@@ -113977,8 +115074,8 @@ CODE_28B2DA:
 CODE_28B2E7:
 	LSR
 	STA.b !RAM_SMB3_NorSpr040_BusterBeetle_HeldBlockPositionIndex,x
-	JSL.l CODE_279BC4
-	JSL.l CODE_28B3A6
+	JSL.l Object_DeleteOffScreen
+	JSL.l Buster_DrawHoldingIceBrick
 	LDA.b !RAM_SMB3_NorSpr040_BusterBeetle_HoldingBlockFlag,x
 	ORA.w !RAM_SMB3_NorSpr040_BusterBeetle_ThrowAnimationTimer,x
 	BNE.b CODE_28B30F
@@ -114019,7 +115116,7 @@ CODE_28B32F:
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$07
 	BNE.b CODE_28B34B
-	JSL.l CODE_27A7AE
+	JSL.l Object_CalcCoarseXDiff
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	JSL.l CODE_27A7C5
 	LDA.b $0E
@@ -114040,7 +115137,7 @@ CODE_28B34E:
 	BMI.b CODE_28B3A3					; Note: This will always branch.
 
 CODE_28B358:
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDY.b $9B
 	LDA.b #$00
 	STA.w !RAM_SMB3_NorSpr040_BusterBeetle_HoldingBlockFlag,y
@@ -114077,9 +115174,9 @@ CODE_28B3A3:
 	LDX.b $9B
 	RTS
 
-CODE_28B3A6:
+Buster_DrawHoldingIceBrick:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDA.b $02
 	BPL.b CODE_28B3C1
 	LDX.b $9B
@@ -114091,7 +115188,7 @@ CODE_28B3A6:
 	STA.b $00
 	LDX.b $05
 CODE_28B3C1:
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	LDX.b $9B
 	LDA.b !RAM_SMB3_NorSpr040_BusterBeetle_HoldingBlockFlag,x
 	BNE.b CODE_28B3CE
@@ -114158,7 +115255,7 @@ CODE_28B3FD:
 	SEP.b #$20
 	PHX
 	LDX.b #$BE
-	JSL.l CODE_279F91
+	JSL.l Object_Draw16x16Sprite
 	PLX
 	REP.b #$10
 	LDY.b $C6,x
@@ -114214,8 +115311,8 @@ CODE_28C95F:
 	LDA.w $0669,x
 	STA.b $ED
 	STZ.w $0280
-	JSL.l CODE_27A317
-	JSL.l CODE_279BC4
+	JSL.l Object_HitTestRespond
+	JSL.l Object_DeleteOffScreen
 CODE_28C96F:
 	JSL.l CODE_28CE71
 	RTS
@@ -114256,7 +115353,7 @@ CODE_28C9B6:
 	AND.b #$0F
 	CMP.b #$07
 	BEQ.b CODE_28C9C2
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_28C9C2:
 	JSL.l CODE_27A7D9
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
@@ -114265,10 +115362,10 @@ CODE_28C9C2:
 	CMP.b #$10
 	BCS.b CODE_28C9E5
 CODE_28C9D0:
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	SEC
 	SBC.b #$03
-	STA.w $0216
+	STA.w !Vert_Scroll
 	STA.w $0543
 	CMP.b #$11
 	BCS.b CODE_28C9E5
@@ -114566,7 +115663,7 @@ CODE_28CC10:
 	STA.w SMB3_OAMBuffer[$00].Prop,y
 	STA.w SMB3_OAMBuffer[$01].Prop,y
 	LDA.w DATA_21BFBA,x
-	BIT.w $0216
+	BIT.w !Vert_Scroll
 	BPL.b CODE_28CC2D
 	CLC
 	ADC.b #$08
@@ -114642,7 +115739,7 @@ CODE_28CCAA:
 
 CODE_28CCAB:
 	LDY.b #$00
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	BPL.b CODE_28CCB3
 	INY
 CODE_28CCB3:
@@ -114651,7 +115748,7 @@ CODE_28CCB3:
 	ASL
 	ASL
 	TAY
-	LDA.w $0216
+	LDA.w !Vert_Scroll
 	BPL.b CODE_28CCC2
 	INY
 CODE_28CCC2:
@@ -115024,7 +116121,7 @@ namespace SMB3_NorSpr048_MiniBossBass_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.w $0565
 	LSR
 	LSR
@@ -115050,7 +116147,7 @@ CODE_28E2AD:
 	ADC.w DATA_21C1F7,y
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28E2B8:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	JSL.l CODE_279B70
 	LDA.w !RAM_SMB3_NorSpr048_MiniBossBass_SwimTimer,x
@@ -115097,7 +116194,7 @@ CODE_28E311:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28E313:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTL
 namespace off
 endmacro
@@ -115126,10 +116223,10 @@ namespace SMB3_NorSpr049_BGCloud_Status02
 Main:
 	;LDA.b $9C
 	;BNE.b ADDR_28D760
-	;JSL.l CODE_279BC4
+	;JSL.l Object_DeleteOffScreen
 	;JSL.l ADDR_28D760
-	;JSL.l CODE_27A7F0
-	;JSL.l CODE_279DD4
+	;JSL.l Object_ApplyXVel
+	;JSL.l Fish_FixedY_ExceptHitFloor
 	RTL
 
 ADDR_28D760:
@@ -115261,7 +116358,7 @@ CODE_28D6FC:
 	BNE.b CODE_28D723
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BMI.b CODE_28D723
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_28D723
 	INC.b !RAM_SMB3_NorSpr04A_GoalSphere_HasBeenCollectedFlag,x
 	LDA.b #$1E
@@ -115281,7 +116378,7 @@ CODE_28D723:
 	LDA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	AND.b #$7F
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 CODE_28D72F:
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
 	LDA.b $A7,x
@@ -115359,7 +116456,7 @@ CODE_28D825:
 
 CODE_28D83C:
 	JSR.w CODE_28DB79
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_28D145
 	BEQ.b CODE_28D860
 	LDA.b !RAM_SMB3_NorSprXXX_BoomBoom_CurrentState,x
@@ -115594,7 +116691,7 @@ CODE_28D9E7:
 	CMP.b #$E0
 	BCC.b CODE_28D9F1
 CODE_28D9ED:
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_28D9F1:
 	RTS
 
@@ -115628,7 +116725,7 @@ CODE_28DA13:
 CODE_28DA24:
 	LDA.w !RAM_SMB3_NorSprXXX_BoomBoom_DontSlideTowardsPlayerFlag,x
 	BEQ.b CODE_28DA2D
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_28DA2D:
 	RTS
 
@@ -115636,7 +116733,7 @@ CODE_28DA2E:
 	LDA.b $A7,x
 	AND.b #$04
 	BNE.b CODE_28DA38
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_28DA38:
 	JSR.w CODE_28D987
 	LDA.b $A7,x
@@ -115712,7 +116809,7 @@ DATA_28DAA8:
 	dw CODE_28DAED
 
 CODE_28DAAC:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDY.b #$00
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
@@ -115753,7 +116850,7 @@ CODE_28DAED:
 	RTS
 
 CODE_28DAF8:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	CMP.b #$50
@@ -115929,7 +117026,7 @@ CODE_28DBF0:
 	RTS
 
 CODE_28DC4D:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.w $0797,x
 	BEQ.b CODE_28DC95
 	LDA.w !RAM_SMB3_NorSprXXX_BoomBoom_AnimationFrame,x
@@ -116087,8 +117184,8 @@ CODE_28E753:
 	LSR
 	AND.b #$01
 	STA.w $0669,x
-	JSL.l CODE_278B93
-	JSL.l CODE_279B6C
+	JSL.l Object_WorldDetectN1
+	JSL.l Object_HandleBumpUnderneath
 	LDA.b $9C
 	BEQ.b CODE_28E770
 	JSR.w CODE_28E999
@@ -116097,7 +117194,7 @@ CODE_28E753:
 CODE_28E770:
 	LDA.w $0518,x
 	BNE.b CODE_28E7B2
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BMI.b CODE_28E785
@@ -116170,7 +117267,7 @@ CODE_28D02F:
 	LDA.b $4D,x
 	BNE.b CODE_28D065
 	JSL.l SMB3_NorSpr04A_GoalSphere_Status02_CODE_28D72F
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_28D05B
 	LDA.b #!Define_SMAS_Sound0063_RisingItem
 	STA.w !RAM_SMB3_Global_SoundCh3
@@ -116187,7 +117284,7 @@ CODE_28D02F:
 CODE_28D05B:
 	LDA.b #$00
 	STA.w $0669,x
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTL
 
 CODE_28D065:
@@ -116229,7 +117326,7 @@ CODE_28D09C:
 	RTL
 
 CODE_28D0AE:
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTL
 
 CODE_28D0B3:
@@ -116322,7 +117419,7 @@ CODE_28D137:
 	SBC.b #$02
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_28D13C:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_28D140:
 	JSL.l CODE_279EDE
 	RTL
@@ -116337,15 +117434,15 @@ namespace SMB3_NorSpr054_DonutBlock_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BB8
+	JSL.l Object_SetPaletteFromAttr
 	JSL.l SMB3_CheckIfNormalSpriteOffScreen_Main
 	BNE.b CODE_28D406
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	LDA.b $9C
 	BNE.b CODE_28D40B
 	LDA.w !RAM_SMB3_NorSpr054_DonutBlock_IsFallingFlag,x
 	BNE.b CODE_28D425
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	LDA.w $0797,x
 	BNE.b CODE_28D40C
 	LDA.w $0564
@@ -116381,7 +117478,7 @@ CODE_28D425:
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_28D433:
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_28D44E
 CODE_28D439:
 	LDA.b !RAM_SMB3_Level_Player_YSpeed
@@ -116450,7 +117547,7 @@ namespace SMB3_NorSpr0XX_SidewaysPiranhaPlant_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_28DDBE
 	JSL.l CODE_279B70
 	LDA.b $9C
@@ -116497,7 +117594,7 @@ CODE_28DD97:
 	LDA.b #$10
 CODE_28DDA2:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	RTS
 
 CODE_28DDA9:
@@ -116536,7 +117633,7 @@ CODE_28DDC9:
 	ADC.b #$08
 	STA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 CODE_28DDE0:
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
@@ -116618,7 +117715,7 @@ CODE_28ECBA:
 CODE_28ECBE:
 	LDA.w $0518,x
 	BNE.b CODE_28ED11
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BMI.b CODE_28ECD3
@@ -116701,10 +117798,10 @@ namespace SMB3_NorSpr05D_Whirlwind_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BNE.b CODE_28E379
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_28E379:
 	LDY.b !RAM_SMB3_NorSpr05D_Whirlwind_DespawnTimer,x
 	BNE.b CODE_28E382
@@ -117051,7 +118148,7 @@ Main:
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr062_Blooper
 	BNE.b CODE_28E5BC
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BEQ.b CODE_28E5B6
 	JSL.l CODE_279EDE
@@ -117117,11 +118214,11 @@ CODE_28E612:
 	LDA.b #$00
 CODE_28E61A:
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b $A7,x
 	AND.b #$03
 	BNE.b CODE_28E62A
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 CODE_28E62A:
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	PHA
@@ -117161,7 +118258,7 @@ CODE_28E663:
 CODE_28E667:
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b #$01
 	LDY.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BPL.b CODE_28E675
@@ -117271,7 +118368,7 @@ CODE_28E070:
 	BNE.b SMB3_NorSpr063_BigBertha_Status01_CODE_28E066
 	INC.b !RAM_SMB3_NorSpr063_BigBertha_SwimmingAnimationCounter,x
 	JSL.l CODE_279B70
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDY.b #$02
 	LDA.b !RAM_SMB3_Global_FrameCounter
@@ -117364,7 +118461,7 @@ CODE_28E111:
 	ADC.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 CODE_28E133:
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	PLA
@@ -117495,7 +118592,7 @@ CODE_28E223:
 CODE_28E22C:
 	TYA
 	TAX
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDX.b $9B
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -117558,9 +118655,9 @@ namespace SMB3_NorSpr064_WaterHoppingRedCheepCheep_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_28E6F7
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	LDA.b $9C
 	BNE.b CODE_28E35E
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
@@ -117596,7 +118693,7 @@ namespace SMB3_NorSpr0XX_AirCurrent_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckIfNormalSpriteOffScreen_Main
 	ORA.b $9C
 	BNE.b CODE_28DFFC
@@ -117731,7 +118828,7 @@ namespace SMB3_NorSpr067_LavaLotus_Status02
 Main:
 	JSR.w CODE_28D145
 	BNE.b CODE_28DE97
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BNE.b CODE_28DE97
 	JSL.l CODE_279B70
@@ -117773,7 +118870,7 @@ CODE_28DE8E:
 CODE_28DE97:
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	LDA.w !RAM_SMB3_Level_NorSpr_XOffscreenFlag,x
 	AND.b #$20
 	STA.b $D8
@@ -117904,7 +119001,7 @@ Main:
 	RTL
 
 CODE_28D154:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BEQ.b CODE_28D15F
 	BRL.w CODE_28D1EB
@@ -117935,7 +119032,7 @@ CODE_28D17B:
 	LDA.b #$28
 	STA.b !RAM_SMB3_NorSpr06B_JumpingFakeBrick_JumpingAnimationTimer,x
 CODE_28D191:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BMI.b CODE_28D1A3
@@ -117958,8 +119055,8 @@ CODE_28D1AF:
 	ADC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_28D1B6:
-	JSL.l CODE_278B93
-	JSL.l CODE_279B6C
+	JSL.l Object_WorldDetectN1
+	JSL.l Object_HandleBumpUnderneath
 	LDA.b $A7,x
 	AND.b #$08
 	BEQ.b CODE_28D1C8
@@ -117982,7 +119079,7 @@ CODE_28D1E1:
 	LDA.b $A7,x
 	AND.b #$03
 	BEQ.b CODE_28D1EB
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_28D1EB:
 	LDA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	AND.b #$BF
@@ -118127,13 +119224,13 @@ CODE_22B029:
 	LDA.w DATA_21C3F9,y
 	STA.b $C6,x
 	SEP.b #$20
-	JSL.l CODE_279BC4
-	JSL.l CODE_279EBC
+	JSL.l Object_DeleteOffScreen
+	JSL.l Object_ShakeAndDraw
 	JSL.l CODE_29FE8F
 	LDA.b $9C
 	BNE.b CODE_22B0AE
 	JSR.w CODE_22D34B
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.w $0797,x
 	BEQ.b CODE_22B057
 	JSL.l CODE_27A4C7
@@ -118144,7 +119241,7 @@ CODE_22B057:
 	CLC
 	ADC.b #$05
 	STA.w $0669,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b $4D,x
 	BNE.b CODE_22B09F
@@ -118153,7 +119250,7 @@ CODE_22B057:
 	CLC
 	ADC.w $077B,x
 	STA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	LDA.b $A7,x
@@ -118201,7 +119298,7 @@ CODE_22B0D1:
 	RTS
 
 CODE_22B0D2:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_22B1BF
 	LDA.b $9C
 	ORA.w $0769,x
@@ -118211,7 +119308,7 @@ CODE_22B0D2:
 	BEQ.b CODE_22B0E9
 	INC.w $1FD2,x
 CODE_22B0E9:
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	LDA.w $0797,x
 	BEQ.b CODE_22B122
 	LDA.b $68,x
@@ -118258,14 +119355,14 @@ CODE_22B135:
 	TAY
 	LDA.w DATA_21C3F5,y
 	STA.w $0679,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	CMP.b #$20
 	BPL.b CODE_22B14C
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_22B14C:
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b $A7,x
 	AND.b #$08
 	BEQ.b CODE_22B159
@@ -118288,9 +119385,9 @@ CODE_22B172:
 	RTS
 
 CODE_22B176:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDY.b !RAM_SMB3_Level_NorSpr_OnScreenYPos,x
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BPL.b CODE_22B18E
@@ -118322,7 +119419,7 @@ CODE_22B1AD:
 	CPY.b #$F0
 	BCC.b CODE_22B1B5
 CODE_22B1B1:
-	JSL.l CODE_279906
+	JSL.l Object_AboutFace
 CODE_22B1B5:
 	RTS
 
@@ -118335,7 +119432,7 @@ CODE_22B1B6:
 CODE_22B1BF:
 	LDA.b $68,x
 	BNE.b CODE_22B1C8
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	RTS
 
 CODE_22B1C8:
@@ -118359,17 +119456,17 @@ namespace SMB3_NorSpr076_FlyingRedCheepCheep_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BB8
+	JSL.l Object_SetPaletteFromAttr
 	LDA.b $9C
 	BNE.b CODE_22C080
 	INC.b $68,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	INC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	JSL.l CODE_279B70
 CODE_22C080:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_22C084:
 	LDA.b $68,x
 	LSR
@@ -118414,7 +119511,7 @@ CODE_22C0B9:
 	RTL
 
 CODE_22C0BD:
-	JSL.l CODE_279BB8
+	JSL.l Object_SetPaletteFromAttr
 	LDA.b $9C
 	BNE.b CODE_22C114
 	INC.b $68,x
@@ -118432,7 +119529,7 @@ CODE_22C0BD:
 	BNE.b CODE_22C0E1
 	INC.b $4D,x
 CODE_22C0E1:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.w $0689,x
 	BNE.b CODE_22C110
@@ -118446,9 +119543,9 @@ CODE_22C0E1:
 	AND.b #$03
 	BEQ.b CODE_22C110
 CODE_22C104:
-	JSL.l CODE_279906
-	JSL.l CODE_27A7F0
-	JSL.l CODE_27A7F0
+	JSL.l Object_AboutFace
+	JSL.l Object_ApplyXVel
+	JSL.l Object_ApplyXVel
 CODE_22C110:
 	JSL.l CODE_279B70
 CODE_22C114:
@@ -118469,9 +119566,9 @@ namespace SMB3_NorSpr0XX_BulletBills_Status02
 Main:
 	LDA.b $9C
 	BNE.b CODE_22C189
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l CODE_279B70
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr079_HomingBill
 	BNE.b CODE_22C189
@@ -118521,7 +119618,7 @@ CODE_22C189:
 	DEC.b $68,x
 	LDA.b #$03
 	STA.w $0669,x
-	JSR.w CODE_22CBA0
+	JSR.w GroundTroop_DrawMirrored
 	BRL.w CODE_22C1EA
 
 CODE_22C19A:
@@ -118565,7 +119662,7 @@ CODE_22C19A:
 	RTL
 
 CODE_22C1EA:
-	JSL.l CODE_279DD4
+	JSL.l Fish_FixedY_ExceptHitFloor
 	RTL
 namespace off
 	%SetDuplicateOrNullPointer(SMB3_NorSpr0XX_BulletBills_Status02_Main, SMB3_NorSpr078_BulletBill_Status02_Main)
@@ -118638,7 +119735,7 @@ CODE_22BC11:
 	LDA.w !RAM_SMB3_NorSpr083_Lakitu_InitialYPosHi,x
 	PHA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	PLA
 	STA.w !RAM_SMB3_NorSpr083_Lakitu_InitialYPosHi,x
 	PLA
@@ -118651,7 +119748,7 @@ CODE_22BC43:
 	BNE.b CODE_22BCB0
 	LDA.w !RAM_SMB3_NorSpr083_Lakitu_ChasePlayerFlag
 	BNE.b CODE_22BC50
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_22BC50:
 	JSL.l CODE_279B70
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
@@ -118699,7 +119796,7 @@ CODE_22BC9B:
 	ASL
 	ADC.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_22BCB0:
@@ -118721,7 +119818,7 @@ CODE_22BCC7:
 	BRL.w CODE_22BD73
 
 CODE_22BCCE:
-	JSR.w CODE_22CBA0
+	JSR.w GroundTroop_DrawMirrored
 	LDA.b #$F6
 	STA.b $00
 	LDA.w !RAM_SMB3_NorSpr083_Lakitu_PreparingToThrowTimer,x
@@ -118816,7 +119913,7 @@ CODE_22BD76:
 CODE_22BD7F:
 	STY.b $00
 	LDX.b $00
-	JSL.l CODE_279C97
+	JSL.l Level_PrepareNewObject
 	LDX.b $9B
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -119477,7 +120574,7 @@ CODE_22D108:
 CODE_22D10B:
 	JSL.l CODE_27A7E5
 	STA.b $00
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	STA.b $01
 	STZ.b $02
 	CMP.b #$80
@@ -119770,7 +120867,7 @@ Main:
 	BNE.b CODE_22B400
 	LDA.b $9C
 	BNE.b CODE_22B400
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l CODE_279B70
 	JSR.w CODE_22B41B
 	RTL
@@ -119806,7 +120903,7 @@ CODE_22B43F:
 	ADC.b #$04
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_22B44D:
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.b $A7,x
 	AND.b #$04
 	BEQ.b CODE_22B471
@@ -120217,7 +121314,7 @@ namespace SMB3_NorSprXXX_GiantQuestionMarkBlock_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_299994
 	LDA.b $9C
 	BNE.b SMB3_NorSprXXX_GiantQuestionMarkBlock_Status01_CODE_299888
@@ -120239,7 +121336,7 @@ CODE_2998AC:
 	LDA.w DATA_21C669,y
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	JSL.l CODE_27A7D9
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_299928
 	LDA.b !RAM_SMB3_Level_Player_OnScreenYPos
 	CLC
@@ -120362,7 +121459,7 @@ CODE_299959:
 	RTS
 
 CODE_299994:
-	JSL.l CODE_279DF9
+	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
 	REP.b #$10
 	LDY.b $C6,x
@@ -120632,7 +121729,7 @@ CODE_2980C9:
 CODE_2980E1:
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BMI.b CODE_298129
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.w $1F76
 	CMP.b #$94
 	BNE.b CODE_298129
@@ -120681,7 +121778,7 @@ CODE_29813A:
 	ADC.b #$02
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_29813F:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 CODE_298143:
 	JSL.l CODE_279EDE
 	RTL
@@ -120721,7 +121818,7 @@ CODE_2992E6:
 	ADC.b #$00
 CODE_2992EE:
 	STA.w $1FE9,x
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_2992C8
 	LDA.w !RAM_SMB3_NorSpr09F_Parabuzzy_AnimationFrameCounter,x
 	LSR
@@ -120729,12 +121826,12 @@ CODE_2992EE:
 	LSR
 	AND.b #$01
 	STA.w !RAM_SMB3_NorSpr09F_Parabuzzy_AnimationFrame,x
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	LDA.b $9C
 	BNE.b SMB3_NorSpr09F_Parabuzzy_Status01_CODE_2992DD
 	INC.w !RAM_SMB3_NorSpr09F_Parabuzzy_AnimationFrameCounter,x
 	JSL.l CODE_27A7E5
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.w $0797,x
 	STA.w $1CEF
 	INC.w !RAM_SMB3_Level_ConsecutiveEnemiesStompedCounter
@@ -120792,7 +121889,7 @@ CODE_299363:
 	LDA.b !RAM_SMB3_Global_ControllerHold1
 	AND.b #(!Joypad_DPadL>>8)|(!Joypad_DPadR>>8)
 	BNE.b CODE_299396
-	JSL.l CODE_279DDA
+	JSL.l Fish_FixedYIfAppro
 	LDA.b !RAM_SMB3_Level_Player_XSpeed
 	BEQ.b CODE_299396
 	BPL.b CODE_299394
@@ -120843,17 +121940,17 @@ CODE_299086:
 	DEC.b !RAM_SMB3_NorSprXXX_OutlinePlatform_DespawnTimer,x
 	BEQ.b CODE_299080
 CODE_299095:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDY.b !RAM_SMB3_NorSprXXX_OutlinePlatform_MovementDirection,x
 	LDA.w DATA_21C5F7,y
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	LDA.w DATA_21C5FB,y
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	JSL.l CODE_27A7E5
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_29912B
 	LDA.b !RAM_SMB3_Level_Player_OnScreenYPos
 	CLC
@@ -121177,7 +122274,7 @@ namespace SMB3_NorSpr0AA_AirshipPropeller_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.w !RAM_SMB3_Level_NorSpr_YOffscreenFlag,x
 	BNE.b SMB3_NorSpr0AA_AirshipPropeller_Status01_CODE_2988BB
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
@@ -121326,7 +122423,7 @@ CODE_298A11:
 	AND.b #$40
 	ORA.b #$10
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	XBA
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
@@ -121344,7 +122441,7 @@ CODE_298A30:
 	ADC.w #$0010
 	STA.b $C6,x
 	SEP.b #$20
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	LDA.w !RAM_SMB3_NorSpr0AD_RockyWrench_AnimationFrame,x
 	CMP.b #$01
 	BNE.b CODE_298A9D
@@ -121513,7 +122610,7 @@ CODE_298B58:
 	CMP.b #$06
 	BEQ.b CODE_298BA3
 	INC.w !RAM_SMB3_Level_ConsecutiveEnemiesStompedCounter
-	JSL.l CODE_279B6C
+	JSL.l Object_HandleBumpUnderneath
 	DEC.w !RAM_SMB3_Level_ConsecutiveEnemiesStompedCounter
 	LDA.w $0797,x
 	BEQ.b CODE_298BA3
@@ -121633,8 +122730,8 @@ namespace SMB3_NorSpr0AE_MetalLugnut_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
-	JSL.l CODE_279EBC
+	JSL.l Object_DeleteOffScreen
+	JSL.l Object_ShakeAndDraw
 	LDA.w !RAM_SMB3_Level_NorSpr_XOffscreenFlag,x
 	PHA
 	ASL
@@ -121655,7 +122752,7 @@ Main:
 	ADC.w #$0010
 	STA.b $C6,x
 	SEP.b #$20
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	PLA
@@ -121707,7 +122804,7 @@ CODE_298C9C:
 	DEC.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_298C9E:
 	JSR.w CODE_298D1D
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	LDA.w $1F77
 	CMP.b #$9D
 	BNE.b CODE_298CB2
@@ -121716,14 +122813,14 @@ CODE_298C9E:
 	INC.b $A7,x
 CODE_298CB2:
 	JSL.l CODE_298D58
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	BEQ.b CODE_298CC3
 	LDA.w !RAM_SMB3_NorSpr0AE_MetalLugnut_PlayerIsOnSpriteTimer,x
 	BNE.b CODE_298D17
 CODE_298CC3:
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
-	JSL.l CODE_27A313
+	JSL.l Object_HitTest
 	BCC.b CODE_298D17
 	LDA.b !RAM_SMB3_Level_Player_OnScreenYPos
 	ADC.b #$17
@@ -121801,7 +122898,7 @@ CODE_298D2E:
 	TYA
 	ADC.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
-	JSL.l CODE_278B93
+	JSL.l Object_WorldDetectN1
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	PLA
@@ -121840,7 +122937,7 @@ CODE_298D6E:
 	CMP.b #$C0
 	BEQ.b CODE_298DC9
 	JSL.l SMB3_GetNormalSpriteOnScreenPosition_Main
-	JSL.l CODE_27A414
+	JSL.l Object_CalcBoundBox
 	JSL.l CODE_27A460
 	BCC.b CODE_298DC9
 	LDY.b $9B
@@ -121897,7 +122994,7 @@ Main:
 	RTL
 
 CODE_298DDF:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	LDA.w !RAM_SMB3_NorSpr0AF_AngrySun_CurrentState,x
 	BEQ.b CODE_298DEC
 	JSL.l CODE_279B70
@@ -121990,7 +123087,7 @@ CODE_298E75:
 	RTS
 
 State03_SwoopRight:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	DEC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
@@ -122016,7 +123113,7 @@ CODE_298EA9:
 	RTS
 
 State06_SwoopLeft:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	DEC.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
@@ -122052,7 +123149,7 @@ CODE_298EE9:
 	RTS
 
 CODE_298EEA:
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_27A7E5
 	LDA.w $0776,x
 	AND.b #$01
@@ -122267,14 +123364,14 @@ namespace SMB3_NorSpr0B0_BigCannonBall_Status02
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSR.w CODE_2981E6
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$02
 	BNE.b SMB3_NorSpr0B3_UnusedSprite_Status02_CODE_2981CA
 	LDA.b $9C
 	BNE.b SMB3_NorSpr0B3_UnusedSprite_Status02_CODE_2981CA
-	JSL.l CODE_27A7F0
+	JSL.l Object_ApplyXVel
 	JSL.l CODE_279B70
 	RTL
 
@@ -122294,7 +123391,7 @@ CODE_2981E6:
 	ADC.b #$00
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	ASL.w !RAM_SMB3_Level_NorSpr_XOffscreenFlag,x
-	JSL.l CODE_279F52
+	JSL.l Object_Draw16x32Sprite
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	PLA
@@ -122415,7 +123512,7 @@ Main:
 	TAY
 	LDA.w DATA_21C560,y
 	STA.w $1FE9,x
-	JSL.l CODE_279EBC
+	JSL.l Object_ShakeAndDraw
 	LDA.w SMB3_OAMBuffer[$00].Tile,y
 	AND.b #$3F
 	STA.w SMB3_OAMBuffer[$00].Tile,y
@@ -122431,7 +123528,7 @@ Main:
 	NOP #2								; Optimization: NOPs
 	AND.b #$01
 	STA.w $0669,x
-	JSL.l CODE_279BC4
+	JSL.l Object_DeleteOffScreen
 	JSL.l CODE_279B70
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
 	LDA.b $A7,x
@@ -122454,9 +123551,9 @@ CODE_2981B3:
 CODE_2981B9:
 	LDA.b #$20
 	STA.w $0518,x
-	JSL.l CODE_279906
-	JSL.l CODE_27A7F0
-	JSL.l CODE_27A7F0
+	JSL.l Object_AboutFace
+	JSL.l Object_ApplyXVel
+	JSL.l Object_ApplyXVel
 CODE_2981CA:
 	RTL
 namespace off
@@ -122779,7 +123876,7 @@ CODE_27D59B:
 	LDA.w !RAM_SMB3_Level_ExtSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_ExtSpr0C_FireBroFire
 	BNE.b CODE_27D5A5
-	JSR.w CODE_27C442
+	JSR.w SObj_CheckHitSolid
 CODE_27D5A5:
 	JMP.w CODE_27D5B4
 
@@ -123544,7 +124641,7 @@ CODE_27CCBB:
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	REP.b #$20
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	SEC
 	SBC.w #$0013
 	STA.b $D8
@@ -123917,7 +125014,7 @@ Main:
 	BCC.b CODE_27C9AE
 	INC.w $1CFD
 CODE_27C9AE:
-	JSR.w CODE_27C442
+	JSR.w SObj_CheckHitSolid
 	BCC.b CODE_27C9F6
 	LDA.w !RAM_SMB3_Level_ExtSpr_YSpeed,x
 	BMI.b CODE_27C9F6
@@ -124078,7 +125175,7 @@ CODE_27C710:
 	JSR.w SMB3_UpdateExtendedSpritePosition_X
 	LDA.w !RAM_SMB3_Level_ExtSpr_YSpeed,x
 	BPL.b CODE_27C720
-	JSR.w CODE_27C442
+	JSR.w SObj_CheckHitSolid
 	LDA.w $1A68,x
 	BEQ.b CODE_27C723
 CODE_27C720:
@@ -124161,9 +125258,9 @@ endmacro
 macro ROUTINE_SMB3_ExtSpr15_Laser(Address)
 namespace SMB3_ExtSpr15_Laser
 %InsertMacroAtXPosition(<Address>)
-
+;SObj_Laser
 Main:
-	JSR.w CODE_27C67F
+	JSR.w Laser_PrepSpritesAndHit
 	LDA.b $9C
 	BNE.b CODE_27C65A
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
@@ -124180,7 +125277,7 @@ Main:
 	STA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
 	XBA
 	STA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
-	JSR.w CODE_27C442
+	JSR.w SObj_CheckHitSolid
 	BCC.b CODE_27C65A
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	AND.b #$F0
@@ -124192,6 +125289,7 @@ Main:
 	ADC.b #$0B
 	STA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
 	JSR.w CODE_27D382
+	
 	LDY.b #$01
 CODE_27C652:
 	LDA.w !RAM_SMB3_Level_MExtSpr_SpriteID,y
@@ -124210,16 +125308,18 @@ CODE_27C65B:
 	SEC
 	SBC.w $0210
 	STA.w !RAM_SMB3_Level_MExtSpr_XPosLo,y
+	
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	CLC
 	ADC.b #$04
 	SBC.w $0543
 	STA.w !RAM_SMB3_Level_MExtSpr_YPosLo,y
+	
 	LDA.b #$17
 	STA.w !RAM_SMB3_Level_MExtSpr_Table7E1FAE,y
 	RTS
 
-CODE_27C67F:
+Laser_PrepSpritesAndHit:
 	JSR.w CODE_27D72B
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
@@ -124490,7 +125590,7 @@ CODE_27E06D:
 	SEP.b #$20
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	SEC
-	SBC.w $0216
+	SBC.w !Vert_Scroll
 	STA.b $08
 	CLC
 	ADC.w DATA_27E16A,y
@@ -124620,7 +125720,7 @@ Main:
 	ADC.b #$11
 	CMP.b #$22
 	BCC.b SMB3_ShooterSpr03_RockyWrenchSpawner_CODE_27DBE6
-	JSR.w CODE_27DC88
+	JSR.w PrepareNewObjectOrAbort
 	LDY.b $9B
 	LDA.w !RAM_SMB3_Level_ShooterSpr_SpriteID,y
 	LSR
@@ -124691,7 +125791,7 @@ Main:
 	BCS.b CODE_27DBE6
 	LDA.b #$C0
 	STA.w $06E3,x
-	JSR.w CODE_27DC88
+	JSR.w PrepareNewObjectOrAbort
 	LDY.b $9B
 	LDA.b #!Define_SMB3_SpriteID_NorSpr0AD_RockyWrench
 	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -124783,7 +125883,7 @@ endmacro
 
 ;#############################################################################################################
 ;#############################################################################################################
-
+;CFire_GoombaPipe
 macro ROUTINE_SMB3_ShooterSprXX_PipeSpawningGoombas(Address)
 namespace SMB3_ShooterSprXX_PipeSpawningGoombas
 %InsertMacroAtXPosition(<Address>)
@@ -124799,7 +125899,7 @@ Main:
 	LDA.w $06DB,x
 	AND.b #$03
 	BEQ.b CODE_27DA52
-	JSR.w CODE_27DC88
+	JSR.w PrepareNewObjectOrAbort
 	LDA.w !RAM_SMB3_Level_ShooterSpr_XPosLo,y
 	STA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	LDA.w !RAM_SMB3_Level_ShooterSpr_XPosHi,y
@@ -124893,7 +125993,7 @@ CODE_27D92F:
 	RTS
 
 CODE_27D930:
-	JSR.w CODE_27DC88
+	JSR.w PrepareNewObjectOrAbort
 	LDA.b #!Define_SMB3_SpriteID_NorSpr0B0_BigCannonBall
 	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	INC.w $1FF9,x
@@ -124939,7 +126039,7 @@ CODE_27D966:
 	RTS
 
 CODE_27D98D:
-	JSR.w CODE_27DC88
+	JSR.w PrepareNewObjectOrAbort
 	LDA.b #!Define_SMB3_SpriteID_NorSpr050_BobOmb
 	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	LDA.b #$80
@@ -125010,7 +126110,7 @@ endmacro
 macro ROUTINE_SMB3_ShooterSpr15_LaserBowserStatue(Address)
 namespace SMB3_ShooterSpr15_LaserBowserStatue
 %InsertMacroAtXPosition(<Address>)
-
+;CFire_Laser
 Main:
 	LDA.w !RAM_SMB3_Level_ShooterSpr_XPosLo,x
 	CMP.w $0210
@@ -125036,8 +126136,10 @@ CODE_27D8BF:
 CODE_27D8C0:
 	LDA.b #!Define_SMAS_Sound0060_HitHead
 	STA.w !RAM_SMB3_Global_SoundCh1
+	
 	LDA.b #!Define_SMB3_SpriteID_ExtSpr15_Laser
 	STA.w !RAM_SMB3_Level_ExtSpr_SpriteID,y
+	
 	LDA.w !RAM_SMB3_Level_ShooterSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ShooterSpr_XPosLo,x
@@ -125775,7 +126877,7 @@ incbin "Graphics/GFX_Mario_Big.bin"
 
 Sprite_TitleScreen2:
 ;$3FA000
-	incbin "Graphics/GFX_Sprite_TitleScreen2.bin"
+incbin "Graphics/GFX_Sprite_TitleScreen2.bin"
 
 Sprite_Global1:
 ;$3FB000
@@ -126503,10 +127605,10 @@ macro DATATABLE_RT00_SMB3_Palettes(Address)
 
 SMB3_Palettes_Main:
 
-SMB3_GlobalSpritePalette_Row08To0C:
+SMB3TitleScreenPalette_Row08To0C:
 ;$3C8800
 	incbin "Palettes/GlobalSpritePalette_Row08To0C.bin"
-SMB3_GlobalSpritePalette_Row08To0CEnd:
+SMB3TitleScreenPalette_Row08To0CEnd:
 
 RegularMarioPalette:
 ;$3C88A0
@@ -127279,14 +128381,14 @@ namespace SMB3_HandleSPCUploads
 
 Main:
 	PHP
-	REP.b #$30
+	REP.b #$30 ; 16-bit A/X+Y
 	LDY.w #$0000
 	LDA.w #$BBAA
 CODE_008C06:
 	CMP.w !REGISTER_APUPort0
-	BNE.b CODE_008C06
-	SEP.b #$20
-	LDA.b #$CC
+	BNE.b CODE_008C06 ; loop
+	SEP.b #$20 ; 8-bit A
+	LDA.b #$CC ; next acknowledgement byte
 	BRA.b CODE_008C37
 
 CODE_008C11:
@@ -127319,27 +128421,27 @@ CODE_008C33:
 	BEQ.b CODE_008C33
 CODE_008C37:
 	PHA
-	REP.b #$20
-	LDA.b [!RAM_SMB3_Global_ScratchRAM00],y
+	REP.b #$20 ; 16-bit A
+	LDA.b [!RAM_SMB3_Global_ScratchRAM00],y ; get size word
 	INY
 	INY
 	TAX
-	LDA.b [!RAM_SMB3_Global_ScratchRAM00],y
+	LDA.b [!RAM_SMB3_Global_ScratchRAM00],y ; get address word
 	INY
 	INY
 	STA.w !REGISTER_APUPort2
-	SEP.b #$20
+	SEP.b #$20 ; 8-bit A
 	CPX.w #$0001
-	LDA.b #$00
-	ROL
+	LDA.b #$00 
+	ROL ; carry will be set if >= 1
 	STA.w !REGISTER_APUPort1
-	ADC.b #$7F
+	ADC.b #$7F ; set overflow
 	PLA
-	STA.w !REGISTER_APUPort0
+	STA.w !REGISTER_APUPort0 ; send acknowledgement byte
 CODE_008C57:
 	CMP.w !REGISTER_APUPort0
-	BNE.b CODE_008C57
-	BVS.b CODE_008C11
+	BNE.b CODE_008C57 ; loop
+	BVS.b CODE_008C11 ; if overflow set, will need to upload more bytes.
 	STZ.w !REGISTER_APUPort0
 	STZ.w !REGISTER_APUPort1
 	STZ.w !REGISTER_APUPort2
@@ -128028,7 +129130,7 @@ CODE_009A9B:
 	BEQ.b CODE_009AA5
 	JSR.w SMB3_HandleSplashScreenMarioCoinShine_Main
 CODE_009AA5:
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	DEC.b !RAM_SMB3_SplashScreen_DisplayTimer
 	BNE.b Loop
 -:
@@ -128050,7 +129152,7 @@ FadeOut:
 +:
 	STZ.b !RAM_SMB3_SplashScreen_PaletteAnimationTimer
 	JSR.w SMB3_SplashScreenGFXRt_Main
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	RTS
 
 SplashScreenPalette:
@@ -128427,7 +129529,7 @@ Sub:
 	ADC.w !RAM_SMB3_Global_StripeImageUploadIndexLo
 	STA.w !RAM_SMB3_Global_StripeImageUploadIndexLo
 	PLB
-	JSL.l CODE_20804D
+	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
 	RTS
 
 ShowLineFlags:

@@ -1,3 +1,16 @@
+
+!Scroll_VOffsetT = $000023
+;!Scroll_LastDir = $000025
+!Vert_Scroll = $000216
+!SNES_LevelHeaderL3Pal = $0002BE
+!Level_JctCtl = $000414
+!Scroll_UpdAttrFlag = $000707
+!Level_MusicQueueRestore = $001062
+
+;---------------------------------------------------------------------------
+
+
+
 ; RAM Define tags:
 ;!A_B_C_D_E
 ; A = RAM type (ex. RAM, ARAM, VRAM, OAM, SRAM, IRAM, BWRAM, etc)
