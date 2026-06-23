@@ -1,11 +1,13 @@
 
 !Scroll_VOffsetT = $000023
-;!Scroll_LastDir = $000025
+!Scroll_LastDir = $000025
 !Vert_Scroll = $000216
 !SNES_LevelHeaderL3Pal = $0002BE
+!Level_SizeOrig = $000376
 !Level_JctCtl = $000414
 !Scroll_UpdAttrFlag = $000707
 !Level_MusicQueueRestore = $001062
+!Level_Jct_VS = $7E398E
 
 ;---------------------------------------------------------------------------
 

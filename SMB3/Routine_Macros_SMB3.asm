@@ -1257,11 +1257,13 @@ CODE_2089D9: ; PRG030_8B51
 	LSR
 	STA.w $0213
 	ROR.w $0212
-	LDA.l $7E398E
+	LDA.l !Level_Jct_VS
 	STA.w !Vert_Scroll
 	LDA.l $7E398D
 	STA.b $13
 	STA.w $0217
+;\
+; set background position to 0.75 * Vert_Scroll
 	REP.b #$20
 	LDA.w !Vert_Scroll
 	LSR
@@ -1272,6 +1274,7 @@ CODE_2089D9: ; PRG030_8B51
 	SBC.w $0218
 	STA.w $0218
 	SEP.b #$20
+;/
 	
 	STZ.w !RAM_SMB3_Global_OpenReserveBoxFlag
 	STZ.w !Level_JctCtl
@@ -3050,6 +3053,7 @@ CODE_209776:
 Scroll_Update_Ranges:
 	LDY.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BNE.b CODE_2097D1
+	
 	LDX.b #$03
 CODE_2097C1:
 	LSR
@@ -3066,21 +3070,29 @@ CODE_2097C1:
 CODE_2097D1:
 	LDA.b $B7
 	BEQ.b CODE_2097E6
+	
 	SEC
 	SBC.b #$10
 	STA.b $B7
+	
 	CMP.b #$F0
 	BCC.b CODE_2097E6
+	
 	SEC
 	SBC.b #$11
 	STA.b $B7
+	
+;SNES:new\
 	CLC
 	ADC.b #$10
+;SNES:new/
 CODE_2097E6:
 	STA.b $23
+	
 	CLC
 	ADC.b #$E0
 	BCC.b CODE_2097EF
+	
 	ADC.b #$00
 CODE_2097EF:
 	STA.b $24
@@ -3410,14 +3422,14 @@ CODE_209CC1:
 	ADC.b #$08
 	STA.b $26
 	
-	LDY.w $0376
+	LDY.w !Level_SizeOrig
 	DEY
 	TYA
 	ORA.b #$E0
 	STA.b !Scroll_VOffsetT
 	
 ;SNES:new\
-	LDA.w $0376
+	LDA.w !Level_SizeOrig
 	BEQ.b CODE_209CE8
 	ASL
 	ASL
@@ -3713,8 +3725,8 @@ CODE_209E42:
 VScroll_CalcPatternVRAMAddr:
 	REP.b #$20
 	
-	LDX.b $25
-	LDA.b $23,x
+	LDX.b !Scroll_LastDir
+	LDA.b !Scroll_VOffsetT,x
 	AND.w #$00F0
 	ASL
 	ASL
@@ -3723,7 +3735,7 @@ VScroll_CalcPatternVRAMAddr:
 	
 	SEP.b #$20
 	
-	LDA.b $23,x
+	LDA.b !Scroll_VOffsetT,x
 	AND.b #$01
 	BEQ.b CODE_209E62
 	
@@ -3902,7 +3914,7 @@ Player_GetTileV:
 	TAY
 	LDA.b $0D
 	PHA
-	JSL.l CODE_209F86
+	JSL.l LevelJct_GetVScreenH
 	STA.b $0D
 	LDA.w Tile_Mem_AddrVL,y
 	STA.b $2E
@@ -3952,7 +3964,8 @@ CODE_209F83:
 	STA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
 	RTL
 
-CODE_209F86:
+;CODE_209F86
+LevelJct_GetVScreenH:
 	CPY.b #$00
 	BMI.b CODE_209F98
 	CLC
@@ -9826,7 +9839,7 @@ CODE_20E9FD:
 	CLC
 	ADC.b #$04
 	STA.b !RAM_SMB3_Level_Player_YSpeed
-	JSL.l CODE_23CFCA
+	JSL.l Player_DoScrolling
 	JSR.w CODE_20E9BE
 CODE_20EA0B:
 	RTS
@@ -10230,6 +10243,7 @@ CODE_20ECDD:
 	BCC.b CODE_20ECE8
 	INC.b !RAM_SMB3_Level_Player_YPosHi
 CODE_20ECE8:
+; set background position to 0.75 * Vert_Scroll \
 	LDA.w !Vert_Scroll
 	LSR
 	LSR
@@ -10238,6 +10252,7 @@ CODE_20ECE8:
 	SEC
 	SBC.w $0218
 	STA.w $0218
+;/
 	LDA.w $034F
 	BEQ.b CODE_20ED05
 	LDA.w !Vert_Scroll
@@ -10305,6 +10320,7 @@ CODE_20ED69:
 	STY.w $0217
 	STY.b $13
 	STY.w $0219
+; set background position to 0.75 * Vert_Scroll
 	REP.b #$20
 	LDA.w !Vert_Scroll
 	LSR
@@ -10315,6 +10331,7 @@ CODE_20ED69:
 	SBC.w $0218
 	STA.w $0218
 	SEP.b #$20
+;/
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
 	SEC
 	SBC.w $0543
@@ -37952,6 +37969,7 @@ CODE_23C2F0:
 	LDA.w !RAM_SMB3_Level_FreezeTimeLimitFlag
 	AND.b #$7F
 	BNE.b CODE_23C33D
+	
 	LDA.w !RAM_SMB3_Level_TimerHundreds
 	ORA.w !RAM_SMB3_Level_TimerTens
 	ORA.w !RAM_SMB3_Level_TimerOnes
@@ -37970,9 +37988,12 @@ CODE_23C317:
 	JMP.w CODE_23C33D
 
 CODE_23C324:
+	; Still have time left OR in debug mode...
+
 	LDA.b !RAM_SMB3_Level_Player_OnScreenXPos
 	CMP.b #$F8
 	BCC.b CODE_23C33D
+	
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	ORA.w !RAM_SMB3_Level_Player_GoalWalkAnimationTimer
 	BNE.b CODE_23C33D
@@ -38025,7 +38046,7 @@ CODE_23C37D:
 CODE_23C390:
 	JSR.w CODE_23C4FA
 	JSR.w CODE_23C3DE
-	JSL.l CODE_23CFCA
+	JSL.l Player_DoScrolling
 	JSL.l CODE_27A93D
 	JSR.w CODE_23D364
 	JSR.w CODE_23D810
@@ -39932,10 +39953,11 @@ CODE_23CFC9:
 
 ;--------------------------------------------------------------------
 
-CODE_23CFCA:
+;CODE_23CFCA
+Player_DoScrolling:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_23CFD2
-	JMP.w CODE_23D1FC
+	JMP.w PRG008_B2AB
 
 CODE_23CFD2:
 	LDA.w !RAM_SMB3_Level_DisableScrollingFlag
@@ -40129,6 +40151,7 @@ CODE_23D10E:
 	CMP.b #$05
 	BNE.b CODE_23D15A
 CODE_23D136:
+; set background position to 0.75 * Vert_Scroll
 	REP.b #$20
 	LDA.w !Vert_Scroll
 	LSR
@@ -40138,6 +40161,7 @@ CODE_23D136:
 	SEC
 	SBC.w $0218
 	STA.w $0218
+;/
 	LDA.w $034F
 	AND.w #$00FF
 	BEQ.b CODE_23D158
@@ -40224,6 +40248,7 @@ CODE_23D1CB:
 	LDA.b #$EF
 CODE_23D1D2:
 	STA.w !Vert_Scroll
+; set background position to 0.75 * Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
@@ -40231,6 +40256,7 @@ CODE_23D1D2:
 	SEC
 	SBC.w $0218
 	STA.w $0218
+;/
 	LDA.w $034F
 	BEQ.b CODE_23D1EF
 	LDA.w !Vert_Scroll
@@ -40243,21 +40269,27 @@ CODE_23D1F2:
 	STA.w $0542
 	RTL
 
-CODE_23D1FC:
+;CODE_23D1FC
+PRG008_B2AB:
 	LDA.b #$00
 	STA.b $43
+	
 	LDY.b !RAM_SMB3_Level_ScreensInLvl
+	
 	LDA.w DATA_21CEED,y
 	STA.b $00
 	LDA.w DATA_21CEFD,y
 	STA.b $01
+	
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
 	SEC
 	SBC.w $0543
 	TAY
+	
 	LDA.b !RAM_SMB3_Level_Player_YPosHi
 	SBC.w $0542
 	BEQ.b CODE_23D21D
+	
 	JMP.w CODE_23D2B5
 
 CODE_23D21D:
@@ -40326,18 +40358,27 @@ CODE_23D258:
 	LDA.w $0543
 	CMP.b $01
 	BCC.b CODE_23D28C
+	
 CODE_23D27D:
+
 	LDA.b $00
 	STA.w $0542
 	LDA.b $01
 	STA.w $0543
+	
 	LDA.b #$00
 	STA.w $0780
+	
 CODE_23D28C:
+;SNES:new \
 	REP.b #$20
+	
+	; direct placement in Vert_Scroll
 	LDA.w $0542
 	XBA
 	STA.w !Vert_Scroll
+; calculate L2 position
+; set background position to 0.75 * Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
@@ -40345,13 +40386,15 @@ CODE_23D28C:
 	SEC
 	SBC.w $0218
 	STA.w $0218
+;
 	SEP.b #$20
-	LDA.w $0542
+	LDA.w $0542 ; Level_VertScrollH
 	STA.b $13
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_23D2B5
 	LDA.b #$0F
 	STA.w !RAM_SMB3_Global_ScreenDisplayRegisterMirror
+;SNES:new/
 CODE_23D2B5:
 	RTL
 
@@ -62334,7 +62377,7 @@ BlockChange_Do:
 	BEQ.b CODE_278037
 	LDA.w $052B
 	LDY.w $052A
-	JSL.l CODE_209F86
+	JSL.l LevelJct_GetVScreenH
 	STA.w $052B
 	STY.w $052A
 	LDA.w Tile_Mem_AddrVL,y
@@ -67772,7 +67815,7 @@ CODE_27A75E:
 	BEQ.b CODE_27A77F
 	LDY.b $0C
 	LDA.b $0D
-	JSL.l CODE_209F86
+	JSL.l LevelJct_GetVScreenH
 	PHA
 	PHX
 	TYX
@@ -88562,7 +88605,7 @@ HandleLevelJunction:
 	LDA.b $12
 	STA.l $7E398B
 	LDA.w !Vert_Scroll
-	STA.l $7E398E
+	STA.l !Level_Jct_VS
 	LDA.b $13
 	STA.l $7E398D
 	LDA.b #$01
@@ -88741,7 +88784,7 @@ CODE_29E11A:
 	BEQ.b CODE_29E12B
 	LDY.b !RAM_SMB3_Level_Player_YPosHi
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
-	JSL.l CODE_209F86
+	JSL.l LevelJct_GetVScreenH
 	TYA
 	TAX
 CODE_29E12B:
@@ -88784,6 +88827,7 @@ CODE_29E14E:
 	STA.b !RAM_SMB3_Level_Player_YPosLo
 	LDA.w DATA_21EF96,y
 	STA.w !Vert_Scroll
+; set background position to 0.75 * Vert_Scroll \
 	REP.b #$20
 	LDA.w !Vert_Scroll
 	LSR
@@ -88794,6 +88838,7 @@ CODE_29E14E:
 	SBC.w $0218
 	STA.w $0218
 	SEP.b #$20
+;/
 	STZ.w $0210
 	STZ.w $0211
 	STZ.b $12
@@ -98973,7 +99018,7 @@ CODE_2AB4FD:
 CODE_2AB4FE:
 	STZ.b $25
 	LDA.b #$70
-	STA.w $0218
+	STA.w $0218 ; background vert scroll used as counter?
 	CLC
 	ADC.b #$08
 	STA.w $0249
@@ -99183,7 +99228,7 @@ CODE_2AB67D:
 	EOR.b #$08
 	STA.l $7F2000
 CODE_2AB6A7:
-	LDA.w $0218
+	LDA.w $0218 ; bg vertical scroll
 	AND.b #$08
 	BEQ.b CODE_2AB6B9
 	LDA.l $7F2001
@@ -99240,7 +99285,7 @@ CODE_2AB6FE:
 	ASL
 	TAY
 	LDX.b $08
-	LDA.w $0218
+	LDA.w $0218 ; bg vertical scroll
 	AND.w #$0008
 	BEQ.b CODE_2AB71B
 	INY
@@ -106104,6 +106149,7 @@ Main:
 	STZ.b !RAM_SMB3_Level_Player_XPosHi
 	LDA.w DATA_21CE3A,x
 	STA.w !Vert_Scroll
+; set background position to 0.75 * Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
@@ -106111,6 +106157,7 @@ Main:
 	SEC
 	SBC.w $0218
 	STA.w $0218
+;/
 CODE_209939:
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$0F
@@ -106158,11 +106205,13 @@ CODE_209939:
 CODE_209989:
 	STX.w !Vert_Scroll
 	TXA
-	STA.l $7E398E
+	STA.l !Level_Jct_VS
 ;SNES: new \ 
+; set background position to 0.75 * Vert_Scroll
 	LSR
 	LSR
 	STA.w $0218
+	
 	LDA.w !Vert_Scroll
 	SEC
 	SBC.w $0218
@@ -106173,8 +106222,11 @@ CODE_2099A0:
 	AND.b #$10
 	STA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_2099CE
+	
 	LDX.w !Level_JctCtl
 	BNE.b CODE_2099B8
+	
+	; Start at bottom of vertical level
 	LDA.w $0376
 	STA.b $13
 	STA.b !RAM_SMB3_Level_Player_YPosHi
