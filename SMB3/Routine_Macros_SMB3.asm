@@ -9593,9 +9593,11 @@ CODE_20E853:
 
 ;--------------------------------------------------------------------
 
-CODE_20E856:
+;CODE_20E856
+Player_DrawAndDoActions:
 	LDA.w !RAM_SMB3_Level_Player_FreezePlayerTimer
 	BEQ.b CODE_20E86C
+	
 	DEC.w !RAM_SMB3_Level_Player_FreezePlayerTimer
 	JSL.l Player_Draw
 	LDA.w $05FC
@@ -9606,13 +9608,13 @@ CODE_20E86B:
 
 CODE_20E86C:
 	LDA.b !RAM_SMB3_Level_Player_DeathState
-	BEQ.b CODE_20E874
+	BEQ.b CODE_20E874 ; If Player is not dying, jump to PRG029_D1D5
 	JSR.w CODE_20EE03
 	RTL
 
 CODE_20E874:
 	LDA.w !RAM_SMB3_Level_WarpToCoinHeavenTimer
-	BPL.b CODE_20E8A4
+	BPL.b CODE_20E8A4 ; If Level_CoinHeav >= 0, jump to PRG029_D205
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_Player_ShowCarryingAnimationFlag
 	STA.b !RAM_SMB3_Level_Player_XSpeed
@@ -9636,13 +9638,13 @@ CODE_20E88D:
 
 CODE_20E8A4:
 	LDA.w !RAM_SMB3_Level_Player_SmokePuffAnimationTimer
-	BEQ.b CODE_20E8AD
+	BEQ.b CODE_20E8AD ; If Player_SuitLost = 0, jump to PRG029_D20E
 	JSR.w CODE_20EF39
 	RTL
 
 CODE_20E8AD:
 	LDA.w !RAM_SMB3_Level_Player_FireFlowerGetPaletteAnimationTimer
-	BEQ.b CODE_20E8C4
+	BEQ.b CODE_20E8C4  ; If Player_StarOff = 0 (invincibility is not wearing off), jump to PRG029_D224
 	CMP.b #$1F
 	BNE.b CODE_20E8BC
 	DEC.w !RAM_SMB3_Level_Player_FireFlowerGetPaletteAnimationTimer
@@ -9655,7 +9657,7 @@ CODE_20E8BC:
 
 CODE_20E8C4:
 	LDA.w !RAM_SMB3_Level_Player_SizeChangeAnimationTimer
-	BEQ.b CODE_20E8F3
+	BEQ.b CODE_20E8F3 ; If Player is not transforming into "Super", jump to PRG029_D257
 	LSR
 	LSR
 	TAX
@@ -9684,7 +9686,8 @@ CODE_20E8D8:
 
 CODE_20E8F3:
 	LDA.w !RAM_SMB3_Level_Player_GoalWalkAnimationTimer
-	BEQ.b CODE_20E928
+	BEQ.b CODE_20E928 ; If we're not doing the end of level run, jump to PRG029_D279
+	
 	LDA.w !RAM_SMB3_Level_Player_InKuriboShoeFlag
 	BEQ.b CODE_20E905
 	STZ.w !RAM_SMB3_Level_Player_InKuriboShoeFlag
@@ -9709,8 +9712,8 @@ CODE_20E927:
 
 CODE_20E928:
 	LDA.w !RAM_SMB3_Level_Player_BoardAirshipAnimationState
-	BNE.b CODE_20E930
-	BRL.w CODE_20EA0C
+	BNE.b CODE_20E930  ; If Level_AirshipCtl <> 0, jump to PRG029_D281
+	BRL.w CODE_20EA0C  ; Otherwise, jump to PRG029_D33E
 
 CODE_20E930:
 	PHA
@@ -9847,7 +9850,7 @@ CODE_20EA0B:
 CODE_20EA0C:
 	LDA.w $07BE
 	CMP.b #$03
-	BMI.b CODE_20EA31
+	BMI.b CODE_20EA31  ; If Level_GetWandState < 3 (wand grabbed), jump to PRG029_D361
 	CMP.b #$07
 	BMI.b CODE_20EA22
 	LDA.b !RAM_SMB3_Level_Player_YPosLo
@@ -9866,12 +9869,12 @@ CODE_20EA22:
 
 CODE_20EA31:
 	LDA.w $0571
-	BPL.b CODE_20EA3A
-	JSR.w CODE_20EBBA
+	BPL.b CODE_20EA3A ; If not transiting or exiting, jump to PRG029_D369
+	JSR.w CODE_20EBBA  ; Otherwise jump to Level_PipeTransitOrExit
 	RTL
 
 CODE_20EA3A:
-	BNE.b CODE_20EA3F
+	BNE.b CODE_20EA3F  ; If Level_PipeMove is not zero (and not in the $8x range), jump to Level_PipeEnter
 	JMP.w CODE_20EADB
 
 CODE_20EA3F:
@@ -9955,7 +9958,9 @@ CODE_20EAC5:
 CODE_20EADA:
 	RTL
 
-CODE_20EADB:
+CODE_20EADB: 
+; Nothing to do with pipes...
+; SNES: new: no jumping back to PRG008_A224
 	RTL
 
 CODE_20EADC:
@@ -37598,9 +37603,11 @@ Player_Draw29:
 
 ; Note: Seems to be responsible for temporarily disabling the level timer (ex. During the player power up animation.
 
-CODE_23C08F:
+;CODE_23C08F
+Player_DrawAndDoActions29:
 	STZ.w !RAM_SMB3_Level_TemporarilyDisableTimeLimitFlag
-	JSL.l CODE_20E856
+	JSL.l Player_DrawAndDoActions
+;SNES:new\
 	LDA.w $0280
 	BEQ.b CODE_23C09F
 	STZ.b !RAM_SMB3_Global_ControllerHold1
@@ -37622,6 +37629,7 @@ CODE_23C09F:
 	ORA.w !RAM_SMB3_Level_Player_BoardAirshipAnimationState
 	BEQ.b CODE_23C0CB
 CODE_23C0C6:
+;SNES:new/
 	INC.w !RAM_SMB3_Level_TemporarilyDisableTimeLimitFlag
 	PLA
 	PLA
@@ -38003,7 +38011,7 @@ CODE_23C324:
 	JMP.w CODE_23C317
 
 CODE_23C33D:
-	JSR.w CODE_23C08F
+	JSR.w Player_DrawAndDoActions29
 	LDA.l !SRAM_SMAS_Global_EnableSMASDebugModeFlag
 	BEQ.b CODE_23C37D
 	LDA.b !RAM_SMB3_Global_ControllerPress1P1
@@ -38044,7 +38052,7 @@ CODE_23C37D:
 	STZ.b !RAM_SMB3_Global_ControllerHold1
 	STZ.b !RAM_SMB3_Global_ControllerPress1
 CODE_23C390:
-	JSR.w CODE_23C4FA
+	JSR.w Player_Control
 	JSR.w CODE_23C3DE
 	JSL.l Player_DoScrolling
 	JSL.l CODE_27A93D
@@ -38270,7 +38278,9 @@ CODE_23C4F9:
 
 ; Note: Routine that handles the player physics?
 
-CODE_23C4FA:
+;CODE_23C4FA
+Player_Control:
+;SNES:new\
 	LDA.l !SRAM_SMAS_Global_EnableSMASDebugModeFlag
 	BEQ.b CODE_23C538
 	LDA.w $023D
@@ -38304,6 +38314,7 @@ CODE_23C52D:
 	JMP.w Player_Draw29
 
 CODE_23C538:
+;SNES:new/
 	LDA.b $BD
 	STA.w $056C
 	LDA.w !RAM_SMB3_Level_Player_GoalWalkAnimationTimer
@@ -41872,7 +41883,7 @@ CODE_23DC31:
 	LDA.w !RAM_SMB3_Level_Player_HitCeilingFlag
 	BEQ.b CODE_23DC40
 CODE_23DC3B:
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 	RTS
 
 CODE_23DC40:
@@ -41889,7 +41900,7 @@ CODE_23DC4E:
 	LDA.w !RAM_SMB3_Level_Player_HitCeilingFlag
 	BEQ.b CODE_23DC60
 CODE_23DC58:
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 	RTS
 
 CODE_23DC5D:
@@ -41925,7 +41936,7 @@ CODE_23DC77:
 CODE_23DC8F:
 	LDA.w !RAM_SMB3_Level_Player_InKuriboShoeFlag
 	BNE.b CODE_23DC98
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_23DC98:
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_Player_OnSlipperyGroundFlag
@@ -63305,7 +63316,7 @@ CODE_2787D2:
 	CMP.b #$02
 	BCS.b CODE_278827
 CODE_278823:
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_278827:
 	LDA.b #$81
 	STA.w $05FC
@@ -66024,7 +66035,7 @@ CODE_279B4C:
 CODE_279B64:
 	STA.w $0679,x
 CODE_279B67:
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_279B6B:
 	RTS
 
@@ -67442,7 +67453,8 @@ Object_DoCollision:
 
 ;--------------------------------------------------------------------
 
-CODE_27A4C7:
+;CODE_27A4C7
+Player_GetHurt:
 	LDA.w !RAM_SMB3_Level_Player_HurtTimer
 	ORA.w !RAM_SMB3_Level_Player_IsTanookiStatueTimer
 	ORA.w !RAM_SMB3_Level_Player_StarPowerTimer
@@ -71899,7 +71911,7 @@ endif
 CODE_27D378:
 	LDA.w !RAM_SMB3_Level_Player_StarPowerTimer
 	BNE.b CODE_27D388
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 	RTS
 
 CODE_27D382:
@@ -73099,7 +73111,7 @@ CODE_2888F6:
 	RTL
 
 CODE_2888F9:
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 	RTL
 
 ;--------------------------------------------------------------------
@@ -74241,7 +74253,7 @@ CODE_2897AE:
 	LDA.b $0B
 	LSR
 	BCS.b CODE_2897B8
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_2897B7:
 	RTL
 
@@ -75041,7 +75053,7 @@ CODE_289DD3:
 	BCS.b CODE_289E29
 	LDA.w $0583
 	BNE.b CODE_289E29
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_289E29:
 	RTS
 
@@ -76938,7 +76950,7 @@ CODE_28CEA7:
 ;--------------------------------------------------------------------
 
 CODE_28CEA8:
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 	RTL
 
 ;--------------------------------------------------------------------
@@ -78325,7 +78337,7 @@ CODE_28EC8C:
 	ORA.w $0583
 	ORA.w !RAM_SMB3_Level_Player_BehindLayer1Flag
 	BNE.b CODE_28EC9B
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_28EC9B:
 	RTS
 
@@ -119285,7 +119297,7 @@ CODE_22B029:
 	JSL.l Object_HandleBumpUnderneath
 	LDA.w $0797,x
 	BEQ.b CODE_22B057
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_22B057:
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	LSR
@@ -119390,7 +119402,7 @@ endif
 	BRA.b CODE_22B122
 
 CODE_22B11E:
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_22B122:
 	LDA.b $68,x
 	BNE.b CODE_22B176
@@ -122061,7 +122073,7 @@ CODE_299100:
 	SBC.b $00
 	CMP.b #$02
 	BCS.b CODE_29912B
-	JSL.l CODE_27A4C7
+	JSL.l Player_GetHurt
 CODE_29912B:
 	RTL
 
