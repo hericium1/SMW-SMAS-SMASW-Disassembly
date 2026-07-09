@@ -125612,9 +125612,9 @@ incbin "Graphics/GFX_FG_EndOfLevelDecor.bin"
 BG_ToadHouse:
 ;$3AB000
 ;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	;%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/Layer2/GFX_BG_ToadHouse_, USA.bin, )
+	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/Layer2/GFX_BG_ToadHouse_, USA.bin, )
 ;else
-	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/Layer2/GFX_BG_ToadHouse_, SMASU.bin, )
+	;%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/Layer2/GFX_BG_ToadHouse_, SMASU.bin, )
 ;endif
 
 BG_TitleScreen:
@@ -126220,9 +126220,9 @@ incbin "Graphics/GFX_UnknownEndingGraphics.bin"
 TitleScreen:
 ;$47C000
 ;if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	;%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/GFX_TitleScreen_, USA.bin, )
+	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/GFX_TitleScreen_, USA.bin, )
 ;else
-	%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/GFX_TitleScreen_, SMASU.bin, )
+	;%InsertVersionExclusiveFile(incbin, ../SMB3/Graphics/GFX_TitleScreen_, SMASU.bin, )
 ;endif
 TitleScreenEnd:
 
