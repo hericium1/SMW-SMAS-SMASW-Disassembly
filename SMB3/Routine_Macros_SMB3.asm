@@ -34,14 +34,14 @@ GraphicsBuf_Prep_And_WaitVSync: ; CODE_20801F
 	ADC.b !RAM_SMB3_Global_StripeImageDataLo
 	TAY
 	PHB
-	LDA.b #DATA_228B5C>>16
+	LDA.b #Video_Upd_Table>>16
 	PHA
 	PLB
-	LDA.w DATA_228B5C,y
+	LDA.w Video_Upd_Table,y
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.w DATA_228B5C+$01,y
+	LDA.w Video_Upd_Table+$01,y
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
-	LDA.w DATA_228B5C+$02,y
+	LDA.w Video_Upd_Table+$02,y
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
 	PLB
 	LDA.b #$01
@@ -346,13 +346,13 @@ CODE_20829A:
 	LDA.b #$20
 	STA.w $0612
 	LDA.b #$02
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	JSL.l CODE_20F58D
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 	JSL.l SMB3_DrawPlayerLetterOnStatusBar_Main
 	JSL.l SMB3_DrawWorldNumberOnStatusBar_Main
 	LDA.b #$00
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	JSR.w Scroll_Dirty_Update
 	JSR.w CODE_20957E
 	JSL.l CODE_2A8B4B
@@ -366,7 +366,7 @@ CODE_2082DF:
 	CMP.b #$08
 	BNE.b CODE_2082F1
 	LDA.b #$2D
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 CODE_2082F1:
 	LDY.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $0722,y
@@ -386,10 +386,10 @@ CODE_2082F1:
 	INX
 CODE_20831A:
 	TXA
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	JSL.l CODE_238036
 	LDA.b #$00
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	
 	LDX.w !RAM_SMB3_Global_CurrentWorld
 	LDY.w SMB3_InitialWorldMapMusic,x
@@ -541,7 +541,7 @@ CODE_208475:
 	LDA.w !RAM_SMB3_Overworld_CurrentProcess
 	CMP.b #$02
 	BCC.b CODE_208484
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 CODE_208484:
 	LDY.w !RAM_SMB3_Overworld_CurrentProcess
 	CPY.b #$0D
@@ -961,15 +961,15 @@ CODE_20878C:							; Note: Sliding Picture spade game code start
 	JSL.l CODE_239D00
 	JSL.l SMB3_DrawSpadeGameSideBorders_Main
 	LDA.b #$07
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	LDA.b #$02
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	JSL.l CODE_20F58D
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 	JSL.l SMB3_DrawPlayerLetterOnStatusBar_Main
 	JSL.l SMB3_DrawWorldNumberOnStatusBar_Main
 	LDA.b #$00
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	LDA.b #$C0
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
 	JSR.w CODE_20F9EC
@@ -1002,22 +1002,22 @@ CODE_2087F7:						; Note: N-Spade game code start
 	STZ.b $01
 	JSR.w CODE_20FA1B
 	LDA.b #$0D
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 CODE_208811:
 	JSL.l SMB3_ProcessInitializationOfCardFlipGame_Main
 	LDA.b $28
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	LDA.w !RAM_SMB3_CardFlipGame_CurrentInitializationState
 	CMP.b #$03
 	BNE.b CODE_208811
 	LDA.b #$02
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	JSL.l CODE_20F58D
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 	JSL.l SMB3_DrawPlayerLetterOnStatusBar_Main
 	JSL.l SMB3_DrawWorldNumberOnStatusBar_Main
 	LDA.b #$00
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	LDA.b #$C0
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
 	JSR.w CODE_20F9EC
@@ -1032,7 +1032,7 @@ CODE_208811:
 CODE_20885B:
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l SMB3_ProcessCardFlipSpadeGame_Main
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 	LDA.b $14
 	BEQ.b CODE_20885B
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
@@ -1045,14 +1045,22 @@ CODE_208876:
 	BNE.b CODE_20887D
 	JMP.w CODE_209473
 
-CODE_20887D:
-	STZ.w $0427
+CODE_20887D: ; PRG030_8AE7
+	; Normal gameplay... 
+
+	; Clear Update_Request
+	STZ.w !Update_Request
+
+	; SNES: remove LDA #$02/#$01 for Video_Do_Update
 	LDX.b #$C0
 	LDY.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_208889
 	LDX.b #$80
 CODE_208889:
-	STX.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
+	STX.w !RAM_SMB3_Global_CurrentVBlankRoutinePath ; 
+
+;SNES:new \ 
+;(registers setting)
 	LDA.b #$15
 	STA.w !RAM_SMB3_Global_MainScreenLayersMirror
 	LDA.b #$02
@@ -1210,15 +1218,17 @@ CODE_20896F:
 ;;;
 ;end layer 3 background check	
 
-CODE_208982:
-	LDA.b #$02
-	JSR.w CODE_2095D5
+CODE_208982: 
+;SNES:new/
+
+	LDA.b #$02 ; SNES new: only #$02 here, #$01 for vertical is left unused
+	JSR.w Video_Do_Update
 	JSL.l CODE_20F58D
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 	JSL.l SMB3_DrawPlayerLetterOnStatusBar_Main
 	JSL.l SMB3_DrawWorldNumberOnStatusBar_Main
 	LDA.b #$00
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	INC.b $24
 	INC.b $24
 	DEC.b $23
@@ -1976,20 +1986,27 @@ CODE_208F17:
 	STZ.w $07BE
 CODE_208F26:
 	JSL.l BlockChange_Do
+
 	LDA.w $0380
 	CMP.b #$FF
 	BNE.b CODE_208F51
 	LDA.w $03EE
 	BNE.b CODE_208F51
+
 	LDA.w $037B
 	BNE.b CODE_208F51
+
 	LDA.b $28
 	BNE.b CODE_208F51
+
 	LDA.w !RAM_SMB3_Global_ReserveBoxState
 	BNE.b CODE_208F4D
-	JSL.l CODE_29EAA5
+
+	JSL.l StatusBar_UpdateValues ; Just update values on the status bar
+
 	LDA.w !RAM_SMB3_Global_OpenReserveBoxFlag
 	BEQ.b CODE_208F57
+
 CODE_208F4D:
 	JSL.l CODE_29D8E0
 CODE_208F51:
@@ -2373,7 +2390,7 @@ CODE_209261:
 	CMP.b #$02
 	BNE.b CODE_2092A2
 	INY
-CODE_2092A2:
+CODE_2092A2: ; PRG030_91D1
 	STY.w !RAM_SMB3_Overworld_EnableDarknessFlag
 	LDY.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $0722,y
@@ -2386,13 +2403,15 @@ CODE_2092A2:
 	LDA.b #$20
 	STA.w $0612
 	LDA.b #$02
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	JSL.l CODE_20F58D
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 	JSL.l SMB3_DrawPlayerLetterOnStatusBar_Main
 	JSL.l SMB3_DrawWorldNumberOnStatusBar_Main
+
 	LDA.b #$00
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
+
 	LDA.w !RAM_SMB3_Overworld_EnableDarknessFlag
 	BNE.b CODE_2092E2
 	JSR.w Scroll_Dirty_Update
@@ -2434,7 +2453,7 @@ CODE_2092E2:
 	STA.w $1DCB
 CODE_20933F:
 	TXA
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 	JSL.l CODE_2AF867
 CODE_209347:
 	LDA.b #$EF
@@ -2708,7 +2727,7 @@ CODE_20957E:
 	CMP.b #$01
 	BNE.b CODE_209593
 	LDA.b #$31
-	JSR.w CODE_2095D5
+	JSR.w Video_Do_Update
 CODE_209593:
 	RTS
 
@@ -2758,32 +2777,45 @@ CODE_2095D4:
 
 ;--------------------------------------------------------------------
 
-CODE_2095D5:
+; CODE_2095D5
+Video_Do_Update:
 	PHA
+
+;SNES:new\ (multiply index by 3)
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
 	ASL
 	CLC
 	ADC.b !RAM_SMB3_Global_StripeImageDataLo
+;SNES:new/
 	TAY
+
 	PHB
-	LDA.b #DATA_228B5C>>16
+
+	LDA.b #Video_Upd_Table>>16
 	PHA
 	PLB
-	LDA.w DATA_228B5C,y
-	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.w DATA_228B5C+$01,y
+
+	LDA.w Video_Upd_Table,y
+	STA.b !RAM_SMB3_Global_StripeImageDataLo ; 
+	LDA.w Video_Upd_Table+$01,y
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
-	LDA.w DATA_228B5C+$02,y
+	LDA.w Video_Upd_Table+$02,y
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
+
 	PLB
+
 	JSL.l SMB3_UploadStripeImage_Main
+
 	PLA
+
 	BNE.b CODE_209606
 	STA.w !RAM_SMB3_Global_StripeImageUploadIndexLo
 	STA.w !RAM_SMB3_Global_StripeImageUploadIndexHi
+;SNES: new\
 	DEC
 	STA.w SMB3_StripeImageUploadTable[$00].LowByte
 	STA.w SMB3_StripeImageUploadTable[$00].HighByte
+;SNES: new/
 CODE_209606:
 	RTS
 
@@ -20734,26 +20766,23 @@ UNK_21F018:
 
 ;--------------------------------------------------------------------
 
-DATA_21F02A:
+;DATA_21F02A
+StatusBar_UpdTemplate:
 	db $0F,$28,$00,$17
-	db $9F,$22,$9F,$22,$9F,$22,$9F,$22,$9F,$22,$9F,$22,$8C,$22,$8D,$22
-	db $AD,$22,$A6,$22,$90,$22,$90,$22
+	dw $229F,$229F,$229F,$229F,$229F,$229F,$228C,$228D
+	dw $22AD,$22A6,$2290,$2290
 
 	db $0F,$45,$00,$1D
-	db $AD,$22,$90,$22,$AD,$22,$AD,$22,$90,$22,$90,$22,$90,$22,$90,$22
-	db $90,$22,$90,$22,$AD,$22,$A5,$22,$90,$22,$90,$22,$90,$22
+	dw $22AD,$2290,$22AD,$22AD,$2290,$2290,$2290,$2290
+	dw $2290,$2290,$22AD,$22A5,$2290,$2290,$2290
 
 	db $FF
 
+; letter palette, unused?
+;Letter_Palette
 UNK_21F069:
-	db $00,$00,$00,$00,$FF,$7F,$F6,$6B
-	db $00,$00,$B5,$56,$BF,$56,$FF,$7F
-	db $00,$00,$4A,$29,$B5,$56,$FF,$7F
-	db $00,$00,$EB,$2E,$34,$67,$F6,$6B
-	db $00,$00,$FF,$7F,$1F,$00,$00,$00
-	db $00,$00,$1F,$00,$5F,$62,$FF,$7F
-	db $00,$00,$FF,$7F,$F1,$76,$00,$00
-	db $00,$00,$FF,$7F,$FF,$02,$00,$00
+	dw $0000,$0000,$7FFF,$6BF6,$0000,$56B5,$56BF,$7FFF,$0000,$294A,$56B5,$7FFF,$0000,$2EEB,$6734,$6BF6
+	dw $0000,$7FFF,$001F,$0000,$0000,$001F,$625F,$7FFF,$0000,$7FFF,$76F1,$0000,$0000,$7FFF,$02FF,$0000
 
 ;--------------------------------------------------------------------
 
@@ -22346,13 +22375,14 @@ endif
 
 ;--------------------------------------------------------------------
 
-DATA_228B5C:
+;DATA_228B5C
+Video_Upd_Table:
 	dl SMB3_StripeImageUploadTable[$00].LowByte		; 00
-	dl DATA_228BF2		; 03
-	dl DATA_228BF2		; 06
-	dl DATA_229021		; 09
-	dl DATA_229021		; 0C
-	dl DATA_228BF2		; 0F
+	dl Video_DoStatusBar		; 03 - status bar vertical (unused for SNES?)
+	dl Video_DoStatusBar		; 06 - status bar
+	dl DATA_229021		; 09 ; unused?
+	dl DATA_229021		; 0C ; unused?
+	dl Video_DoStatusBar		; 0F - status bar HM
 	dl $0007BF		; 12
 	dl DATA_2282D0		; 15
 	dl DATA_228AFD		; 18
@@ -22402,44 +22432,45 @@ DATA_228B5C:
 
 ;Note: Seems to be the non-updating parts of the status bar
 
-DATA_228BF2:
+;DATA_228BF2
+Video_DoStatusBar:
 	db $0F,$00,$00,$03
-	db $AE,$22,$80,$22
+	dw $22AE,$2280
 
 	db $0F,$02,$40,$22
-	db $81,$22
+	dw $2281
 
 	db $0F,$14,$00,$17
-	db $80,$62,$80,$22,$81,$22,$81,$22,$82,$22,$81,$22,$81,$22,$82,$22
-	db $81,$22,$81,$22,$80,$62,$AE,$22
+	dw $6280,$2280,$2281,$2281,$2282,$2281,$2281,$2282
+	dw $2281,$2281,$6280,$22AE
 
 	db $0F,$20,$00,$3F
-	db $AE,$22,$83,$22,$84,$22,$85,$22,$86,$22,$87,$22,$AD,$22,$AD,$22
-	db $9E,$22,$9E,$22,$9E,$22,$9E,$22,$9E,$22,$9E,$22,$8C,$22,$8D,$22
-	db $AD,$22,$A6,$22,$96,$22,$96,$22,$83,$62,$83,$22,$AD,$22,$AD,$22
-	db $9A,$22,$AD,$22,$AD,$22,$9A,$22,$AD,$22,$AD,$22,$83,$62,$AE,$22
+	dw $22AE,$2283,$2284,$2285,$2286,$2287,$22AD,$22AD
+	dw $229E,$229E,$229E,$229E,$229E,$229E,$228C,$228D
+	dw $22AD,$22A6,$2296,$2296,$6283,$2283,$22AD,$22AD
+	dw $229A,$22AD,$22AD,$229A,$22AD,$22AD,$6283,$22AE
 
 	db $0F,$40,$00,$3F
-	db $AE,$22,$83,$22,$AD,$22,$AD,$22,$A4,$22,$AD,$22,$AD,$22,$AD,$22
-	db $90,$22,$90,$22,$90,$22,$90,$22,$90,$22,$90,$22,$90,$22,$AD,$22
-	db $A5,$22,$90,$22,$90,$22,$90,$22,$83,$62,$83,$22,$AD,$22,$AD,$22
-	db $9A,$22,$AD,$22,$AD,$22,$9A,$22,$AD,$22,$AD,$22,$83,$62,$AE,$22
+	dw $22AE,$2283,$22AD,$22AD,$22A4,$22AD,$22AD,$22AD
+	dw $2290,$2290,$2290,$2290,$2290,$2290,$2290,$22AD
+	dw $22A5,$2290,$2290,$2290,$6283,$2283,$22AD,$22AD
+	dw $229A,$22AD,$22AD,$229A,$22AD,$22AD,$6283,$22AE
 
 	db $0F,$60,$00,$03
-	db $AE,$22,$80,$A2
+	dw $22AE,$A280
 
 	db $0F,$62,$40,$22
-	db $81,$A2
+	dw $A281
 
 	db $0F,$74,$00,$17
-	db $80,$E2,$80,$A2,$81,$A2,$81,$A2,$82,$A2,$81,$A2,$81,$A2,$82,$A2
-	db $81,$A2,$81,$A2,$80,$E2,$AE,$22
+	dw $E280,$A280,$A281,$A281,$A282,$A281,$A281,$A282
+	dw $A281,$A281,$E280,$22AE
 
 	db $0F,$80,$40,$3E
-	db $AE,$22
+	dw $22AE
 
 	db $0F,$A0,$40,$3E
-	db $AE,$22
+	dw $22AE
 
 	db $FF
 
@@ -89914,80 +89945,106 @@ CODE_29EA69:
 
 ;--------------------------------------------------------------------
 
-CODE_29EAA5:
+;CODE_29EAA5
+StatusBar_UpdateValues:
 	JSR.w CODE_29E86A
 	JSR.w CODE_29E6E0
 	JSR.w CODE_29E6AA
 	JSL.l CODE_29E7AA
 	JSR.w SMB3_UpdateLevelTimer_Main
+
 	LDX.b #$00
-	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+	LDY.w !Grapihcs_BufCnt
 	BEQ.b CODE_29EAC3
+
+    ; Graphics buffer has content... skips delay functionality:
 	TXA
-	STA.l $7E3954
+	STA.l !StatusBar_UpdFl
 	BRA.b CODE_29EAD7
 
 CODE_29EAC3:
-	LDA.l $7E3954
+; SNES: new\ - cannot increase long memory
+	LDA.l !StatusBar_UpdFl 
 	INC
-	STA.l $7E3954
+	STA.l !StatusBar_UpdFl
+; SNES: new/
 	AND.b #$01
 	BNE.b CODE_29EAD7
+
 	LDA.b #$00
-	STA.l $7E3954
+	STA.l !StatusBar_UpdFl
+
+	;SNES: new - remove storing #$06 into Graphics_Queue 
+
 	RTL
 
-CODE_29EAD7:
-	LDA.l DATA_21F02A,x
-	STA.w SMB3_StripeImageUploadTable[$00].LowByte,y
+	; copy
+CODE_29EAD7: ; PRG026_B47A
+	LDA.l StatusBar_UpdTemplate,x
+	STA.w !Graphics_Buffer,y
 	INY
 	INX
-	CPX.b #$3F
+	CPX.b #$3F ; SNES: new value
 	BNE.b CODE_29EAD7
-	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
+	; *** Power meter copy loop
+	LDY.w !Grapihcs_BufCnt
 	LDX.b #$00
 CODE_29EAE9:
-	LDA.w $1F40,x
-	STA.w SMB3_StripeImageUploadTable[$02].LowByte,y
+	LDA.w !StatusBar_PMT,x
+	STA.w !Graphics_Buffer+($02*2),y
 	INY
 	INY
 	INX
 	CPX.b #$08
 	BNE.b CODE_29EAE9
-	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
-	LDA.w $1F48
-	STA.w SMB3_StripeImageUploadTable[$0C].LowByte,y
-	LDA.w $1F49
-	STA.w SMB3_StripeImageUploadTable[$0D].LowByte,y
-	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
-	LDA.w $1F4A
-	STA.w SMB3_StripeImageUploadTable[$10].LowByte,y
-	LDA.w $1F4B
-	STA.w SMB3_StripeImageUploadTable[$11].LowByte,y
-	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
+	; *** Coins copy
+	LDY.w !Grapihcs_BufCnt
+	LDA.w !StatusBar_CoinH
+	STA.w !Graphics_Buffer+($0C*2) ,y
+	LDA.w !StatusBar_CoinL
+	STA.w !Graphics_Buffer+($0D*2),y
+
+	; *** Lives copy
+	LDY.w !Grapihcs_BufCnt
+	LDA.w !StatusBar_LivesH
+	STA.w !Graphics_Buffer+($10*2),y
+	LDA.w !StatusBar_LivesL
+	STA.w !Graphics_Buffer+($11*2),y
+
+	; *** Score copy loop
+	LDY.w !Grapihcs_BufCnt
 	LDX.b #$00
 CODE_29EB19:
-	LDA.w $1F4C,x
-	STA.w SMB3_StripeImageUploadTable[$13].LowByte,y
+	LDA.w !StatusBar_Score,x
+	STA.w !Graphics_Buffer+($13*2),y
 	INY
 	INY
 	INX
 	CPX.b #$06
 	BNE.b CODE_29EB19
-	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
+	; *** Time copy loop
+	LDY.w !Grapihcs_BufCnt
 	LDX.b #$00
 CODE_29EB2B:
-	LDA.w $1F52,x
-	STA.w SMB3_StripeImageUploadTable[$1C].LowByte,y
+	LDA.w !StatusBar_Time,x
+	STA.w !Graphics_Buffer+($1C*2),y
 	INY
 	INY
 	INX
 	CPX.b #$03
 	BNE.b CODE_29EB2B
-	LDA.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
+;SNES: remove NES VRAM high updates in buffer
+
+	; Update graphics buffer count
+
+	LDA.w !Grapihcs_BufCnt
 	CLC
-	ADC.b #$3E
-	STA.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+	ADC.b #$3E ; SNES: new value
+	STA.w !Grapihcs_BufCnt
 	RTL
 
 ;--------------------------------------------------------------------
@@ -103297,7 +103354,7 @@ CODE_20F2E2:
 	STA.w !REGISTER_ScreenDisplayRegister
 	LDA.w !RAM_SMB3_Global_HDMAEnableMirror
 	STA.w !REGISTER_HDMAEnable
-	JSL.l CODE_29EAA5
+	JSL.l StatusBar_UpdateValues
 	JMP.w CODE_20F0C7
 namespace off
 endmacro
@@ -115474,11 +115531,11 @@ CODE_28CA09:
 	CLC
 	ADC.b $D8
 	TAX
-	LDA.l DATA_228B5C,x
+	LDA.l Video_Upd_Table,x
 	STA.b $D8
-	LDA.l DATA_228B5C+$01,x
+	LDA.l Video_Upd_Table+$01,x
 	STA.b $D9
-	LDA.l DATA_228B5C+$02,x
+	LDA.l Video_Upd_Table+$02,x
 	STA.b $DA
 	JSL.l CODE_2AFDFA
 	LDA.b #$01

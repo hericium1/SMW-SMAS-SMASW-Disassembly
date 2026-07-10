@@ -1,12 +1,26 @@
 
 !Scroll_VOffsetT = $000023
 !Scroll_LastDir = $000025
+!Video_Upd_AddrL = $000036 ; !RAM_SMB3_Global_StripeImageDataLo 
+!Video_Upd_AddrH = $000037 ; !RAM_SMB3_Global_StripeImageDataHi
+!SNES_Video_Upd_AddrB = $000038 ; !RAM_SMB3_Global_StripeImageDataBank
 !Vert_Scroll = $000216
 !SNES_LevelHeaderL3Pal = $0002BE
 !Level_SizeOrig = $000376
 !Level_JctCtl = $000414
+!Update_Request = $000427
 !Scroll_UpdAttrFlag = $000707
 !Level_MusicQueueRestore = $001062
+!Grapihcs_BufCnt = $001600 ; !RAM_SMB3_Global_StripeImageUploadIndexLo
+!Graphics_Buffer = $001602 ; !RAM_SMB3_Global_StripeImageUploadTable
+!StatusBar_PMT = $001F40
+!StatusBar_CoinH = $001F48 ; SNES: now low
+!StatusBar_CoinL = $001F49 ; SNES: now high
+!StatusBar_LivesH = $001F4A ; SNES: now low
+!StatusBar_LivesL = $001F4B ; SNES: now high
+!StatusBar_Score = $001F4C
+!StatusBar_Time = $001F52
+!StatusBar_UpdFl = $7E3954
 !Level_Jct_VS = $7E398E
 
 ;---------------------------------------------------------------------------
