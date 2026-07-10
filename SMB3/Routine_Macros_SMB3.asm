@@ -90002,7 +90002,7 @@ CODE_29EAE9:
 	; *** Coins copy
 	LDY.w !Grapihcs_BufCnt
 	LDA.w !StatusBar_CoinH
-	STA.w !Graphics_Buffer+($0C*2) ,y
+	STA.w !Graphics_Buffer+($0C*2),y
 	LDA.w !StatusBar_CoinL
 	STA.w !Graphics_Buffer+($0D*2),y
 
