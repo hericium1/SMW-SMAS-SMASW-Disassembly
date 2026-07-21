@@ -15298,8 +15298,9 @@ DATA_21BAD7:
 	db $C0,$D5,$C9,$D3,$DF
 
 DATA_21BADC:
-	db $03,$02,$02,$03,$03,$AF,$BF,$81
-	db $41
+	db $03,$02,$02,$03,$03
+;unused table? PRG001_B4B5
+	db $AF,$BF,$81,$41
 
 DATA_21BAE5:
 	db $01,$02,$04,$08
@@ -16195,6 +16196,7 @@ DATA_21C331:
 
 DATA_21C333:
 	db $50,$70,$00,$70,$50,$00,$00,$00
+;?
 	db $16,$15,$16,$15,$17,$15,$17,$15
 	db $17,$15,$15,$16,$17,$17,$2A,$29
 	db $2B,$2A,$2A,$29,$16,$1B,$1A,$15
@@ -22768,11 +22770,15 @@ SMB3_NorSpr081_HammerBro_Status01:
 	LDA.w !RAM_SMB3_Level_GenSpr_SpriteID
 	CMP.b #!Define_SMB3_SpriteID_GenSpr07_SpawnMiniChest
 	BNE.b CODE_22B1F8
+	
 	LDY.w !RAM_SMB3_Overworld_OWSprIDBeingEntered
+	
 	LDA.w DATA_21C405,y
 	CMP.b #!Define_SMB3_SpriteID_NorSpr081_HammerBro
 	BEQ.b CODE_22B1F9
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
+	
 	DEC.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	RTL
 
@@ -24085,7 +24091,7 @@ CODE_22BB56:
 	AND.b #$04
 	BEQ.b CODE_22BB7C
 	LDA.b #!Define_SMB3_SpriteID_NorSpr071_Spiny
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
 	LDA.w DATA_21C43E,y
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
@@ -24576,7 +24582,7 @@ SMB3_NorSpr07B_GiantRedKoopa_Status02:
 	LSR
 	AND.b #$01
 	STA.w $0669,x
-	JSR.w CODE_22C48B
+	JSR.w GroundTroop_Draw
 	LDA.b $9C
 	BNE.b CODE_22C276
 	INC.b $68,x
@@ -24730,7 +24736,7 @@ CODE_22C329:
 	JSL.l Object_DeleteOffScreen
 	LDA.b $9C
 	BEQ.b CODE_22C335
-	JSR.w CODE_22C48B
+	JSR.w GroundTroop_Draw
 	RTL
 
 CODE_22C335:
@@ -24776,13 +24782,13 @@ CODE_22C34B:
 CODE_22C37E:
 	CMP.b #$02
 	BCS.b CODE_22C389
-	JSR.w CODE_22C48B
+	JSR.w GroundTroop_Draw
 	JSL.l CODE_279B70
 CODE_22C389:
 	RTL
 
 CODE_22C38A:
-	JSR.w CODE_22C48B
+	JSR.w GroundTroop_Draw
 	JSL.l SMB3_HandleNormalSpriteGravity_Main
 	LDA.w $07B5
 	STA.w $0776,x
@@ -24806,7 +24812,7 @@ CODE_22C3AD:
 	LDA.b #$01
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 CODE_22C3BD:
-	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CPY.b #!Define_SMB3_SpriteID_NorSpr06E_BouncingGreenParakoopa
 	BEQ.b CODE_22C3CC
 	CPY.b #!Define_SMB3_SpriteID_NorSpr07E_BouncingGiantGreenParakoopa
@@ -24820,7 +24826,7 @@ CODE_22C3CC:
 
 CODE_22C3D0:
 	JSL.l CODE_278B67
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07E_BouncingGiantGreenParakoopa
 	BEQ.b CODE_22C3DF
 	CMP.b #!Define_SMB3_SpriteID_NorSpr06E_BouncingGreenParakoopa
@@ -24925,8 +24931,9 @@ CODE_22C48A:
 
 ;--------------------------------------------------------------------
 
-CODE_22C48B:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+;CODE_22C48B
+GroundTroop_Draw:
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr070_BuzzyBeetle
 	BCC.b CODE_22C4BF
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07A_GiantGreenKoopa
@@ -25028,7 +25035,7 @@ CODE_22C537:
 	STA.w $0A1A,y
 	PLY
 CODE_22C546:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr06E_BouncingGreenParakoopa
 	BCC.b CODE_22C5B7
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
@@ -25262,7 +25269,7 @@ CODE_22C718:
 	RTS
 
 CODE_22C71D:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07C_GiantGoomba
 	BNE.b CODE_22C741
 	LDA.w $0679,x
@@ -25419,7 +25426,7 @@ CODE_22C832:
 	STA.w SMB3_OAMTileSizeBuffer[$07].Slot,y
 	PLY
 	REP.b #$10
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07C_GiantGoomba
 	BNE.b CODE_22C84D
 	JMP.w CODE_22C902
@@ -25495,7 +25502,7 @@ CODE_22C8D5:
 	STA.w SMB3_OAMBuffer[$05].Tile,y
 	INC
 	STA.w SMB3_OAMBuffer[$07].Tile,y
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr07E_BouncingGiantGreenParakoopa
 	BCC.b CODE_22C8F4
 	LDA.w $0669,x
@@ -40880,7 +40887,7 @@ CODE_23D553:
 	LDA.b #$04
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$80
 	STA.w !RAM_SMB3_NorSpr05C_ThrowBlock_DespawnTimer,x
 	RTS
@@ -65975,7 +65982,7 @@ CODE_279AB5:
 	CMP.b #$08
 	BNE.b CODE_279ACF
 	LDA.b $D8
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; 
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	INC.w $1CF6,x
 	JMP.w CODE_279AE7
 
@@ -67758,7 +67765,7 @@ CODE_27A69E:
 	CMP.b #$08
 	BNE.b CODE_27A6C4
 	LDA.b $D8
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 CODE_27A6C4:
 	LDA.b #$FF
 	STA.w $06A6,x
@@ -68102,7 +68109,7 @@ CODE_27A905:
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus
 	LDA.b #!Define_SMB3_SpriteID_NorSpr035_ToadHouseChestItem
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID ; hijack
 	LDA.b #$90
 	STA.b !RAM_SMB3_Level_NorSpr_YPosLo
 	LDA.w DATA_21B040,x
@@ -68474,7 +68481,7 @@ CODE_27B0A9:
 	BNE.b CODE_27B07F
 	JSR.w PrepareNewObjectOrAbort
 	LDA.b #!Define_SMB3_SpriteID_NorSpr054_DonutBlock
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b $04
 	SEC
 	SBC.b #$01
@@ -68581,7 +68588,7 @@ CODE_27B14E:
 CODE_27B169:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	BEQ.b CODE_27B17F
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr0A8_StaticOutlinePlatform
 	BCC.b CODE_27B181
 	CMP.b #!Define_SMB3_SpriteID_NorSpr0A9_SwitchableOutlinePlatform+$01
@@ -68599,7 +68606,7 @@ CODE_27B181:
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.w DATA_21C6C9,y
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.w DATA_21C6D2,y
 	STA.b !RAM_SMB3_NorSprXXX_OutlinePlatform_MovementDirection,x
 	LDA.b $00
@@ -72890,7 +72897,7 @@ ObjectGroup_CollideJumpTable:
 	dl SMB3_NorSpr03E_BuoyantPlatform_SteppedOnRt_Main
 	dl CODE_28C4FD				; 3F
 	dl SMB3_NorSpr040_BusterBeetle_SteppedOnRt_Main
-	dl CODE_28CD6E				; 41
+	dl ObjHit_EndLevelCard				; 41
 	dl CODE_28CEA8				; 42
 	dl CODE_28CEA8				; 43
 	dl SMB3_NorSpr044_FallingWoodPlatform_SteppedOnRt_Main
@@ -74004,7 +74011,7 @@ CODE_289126:
 	LDY.b #$05
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	LDA.b $00
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	STA.w !RAM_SMB3_Level_NorSpr_XPosLo,y
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
@@ -74302,7 +74309,7 @@ endif
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$05
 	BNE.b CODE_2897D0
-	JSR.w CODE_289E2A
+	JSR.w Lemmy_SpawnBall
 CODE_2897D0:
 	LDA.b #$00
 	STA.b $8C,x
@@ -74956,7 +74963,7 @@ CODE_289D0D:
 	AND.b #$3F
 	ORA.b #$80
 	STA.w $1FD2,x
-	JSR.w CODE_289E2A
+	JSR.w Lemmy_SpawnBall
 CODE_289D27:
 	LDA.w $0776,x
 	AND.b #$01
@@ -75090,7 +75097,8 @@ CODE_289E29:
 
 ;--------------------------------------------------------------------
 
-CODE_289E2A:
+;CODE_289E2A
+Lemmy_SpawnBall:
 	LDY.b #$02
 CODE_289E2C:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -75107,7 +75115,7 @@ CODE_289E35:
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	LDA.b #!Define_SMB3_SpriteID_NorSpr075_BossProjectile
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	LDA.b $71,x
 	CLC
 	ADC.b #$20
@@ -75135,7 +75143,7 @@ CODE_289E35:
 ;--------------------------------------------------------------------
 
 CODE_289E79:
-	JSR.w CODE_289E2A
+	JSR.w Lemmy_SpawnBall
 	BMI.b CODE_289EA6
 	LDA.b #$01
 	STA.w $0068,y
@@ -75977,9 +75985,11 @@ CODE_28BC7D:
 SMB3_NorSpr02A_Ptooie_Status02:
 .Main:
 ;$28BCC6
+;SNES: new\
 	LDA.b $9C
 	BEQ.b CODE_28BCCB
 	RTL
+;SNES: new/
 
 CODE_28BCCB:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
@@ -76059,7 +76069,7 @@ Bank2_PiranhaSpikeHaltAction:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l Object_ShakeAndCalcSprite
 	LDX.b $9B
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijacked
 	CMP.b #!Define_SMB3_SpriteID_NorSpr046_BlowingPiranhaPlant
 	BEQ.b CODE_28BD6A
 	LDA.b $00
@@ -76111,7 +76121,7 @@ CODE_28BDAF:
 	ORA.b #$40
 	STA.w SMB3_OAMBuffer[$01].Prop-$10,y
 	STA.w SMB3_OAMBuffer[$03].Prop-$10,y
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijacked
 	CMP.b #!Define_SMB3_SpriteID_NorSpr046_BlowingPiranhaPlant
 	BNE.b CODE_28BDDD
 	LDA.w SMB3_OAMBuffer[$04].Prop-$10,y
@@ -76213,10 +76223,10 @@ CODE_28BE80:
 	BNE.b CODE_28BEAF
 	JSL.l SMB3_CheckIfNormalSpriteOffScreen_Main
 	BNE.b CODE_28BEAF
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	PHA
 	LDA.b #!Define_SMB3_SpriteID_NorSpr042_3SpotHoppingRedCheepCheep
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	JSL.l Object_HitTest
 	BCC.b CODE_28BEAB
 	LDA.w !RAM_SMB3_Level_Player_StarPowerTimer
@@ -76224,7 +76234,7 @@ CODE_28BE80:
 	JSL.l Object_DoCollision
 CODE_28BEAB:
 	PLA
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 CODE_28BEAF:
 	PLA
 	STA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
@@ -76240,7 +76250,7 @@ CODE_28BEAF:
 
 CODE_28BEC6:
 	LDX.b $9B
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDX.b #$82
 	CMP.b #!Define_SMB3_SpriteID_NorSpr02A_Ptooie
 	BEQ.b CODE_28BED3
@@ -76533,7 +76543,8 @@ CODE_28C522:
 
 ; Note: Something related to sprite to sprite collisions.
 
-CODE_28C527:
+;CODE_28C527
+DryBones_BumpOffOthers:
 	TXA
 	CLC
 	ADC.b !RAM_SMB3_Global_FrameCounter
@@ -76605,7 +76616,7 @@ CODE_28C5A4:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$02
 	BNE.b CODE_28C5BE
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr03F_DryBones
 	BNE.b CODE_28C5B7
 	LDA.w !RAM_SMB3_NorSpr03F_DryBones_CollapsedAnimationFrame,x
@@ -76826,7 +76837,8 @@ CODE_28CD63:
 
 ;--------------------------------------------------------------------
 
-CODE_28CD6E:
+;CODE_28CD6E
+ObjHit_EndLevelCard:
 	STZ.w !RAM_SMB3_Level_Player_StarPowerTimer
 	STZ.w !RAM_SMB3_Level_ConsecutiveEnemiesStompedCounter
 	STZ.w !RAM_SMB3_Level_PSwitchTimer
@@ -76845,7 +76857,7 @@ CODE_28CD8A:
 CODE_28CD92:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	BEQ.b CODE_28CDE5
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr007_SecretToadHouseWarp
 	BEQ.b CODE_28CDE0
 	LDY.b #$00
@@ -77059,17 +77071,20 @@ CODE_28D2AC:
 	LDA.b #$00
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 CODE_28D2B8:
-	JSR.w CODE_28D2C0
+	JSR.w BustBlock_Segment
 	DEC.b $0F
 	BPL.b CODE_28D2B8
 	RTS
 
-CODE_28D2C0:
-	LDY.b #$09
+;CODE_28D2C0
+BustBlock_Segment:
+	LDY.b #$09 ; SNES: orig count was 07
 	JSL.l SMB3_FindFreeExtendedSpriteSlot_VariablePriority
-	BMI.b CODE_28D322
+	BMI.b CODE_28D322 ; SNES: new
+	
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	STA.b $00
+	
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	STA.b $02
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
@@ -77102,7 +77117,7 @@ CODE_28D309:
 	STA.w $06C7,y
 	STA.w $06D1,y
 	LDX.b $9B
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
 	BEQ.b CODE_28D322
 	LDA.b #$00
@@ -77142,7 +77157,7 @@ SMB3_NorSpr069_UpsideDownSpiny_Status02:
 	LDA.b $9C
 	BNE.b CODE_28D3BC
 	JSL.l Object_HandleBumpUnderneath
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr070_BuzzyBeetle
 	BNE.b CODE_28D356
 	JSL.l CODE_279B78
@@ -77199,7 +77214,7 @@ CODE_28D39B:
 	SEP.b #$30
 	PLX
 ;
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijacked
 	STZ.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 CODE_28D3BC:
 	LDA.b $A7,x
@@ -77733,7 +77748,7 @@ CODE_28E809:
 SMB3_NorSpr058_FireChomp_Status02:
 .Main:
 ;$28E820
-	JSR.w CODE_28ED19
+	JSR.w TailEnemy_DoStandard
 	LDA.b $9C
 	BEQ.b CODE_28E82A
 	JMP.w SMB3_NorSpr059_FireSnake_Status02_CODE_28ECBA
@@ -77770,9 +77785,10 @@ CODE_28E85F:
 	JSR.w CODE_28E86A
 CODE_28E862:
 	JSL.l Object_DeleteOffScreen
-	JSR.w CODE_28E91B
+	JSR.w Tail_DrawAndHurtPlayer
 	RTL
 
+;FireChomp_MoveAndExplodeDeath
 CODE_28E86A:
 	LDA.b !RAM_SMB3_NorSpr058_FireChomp_WaitBeforeExplosionTimer,x
 	BEQ.b CODE_28E883
@@ -77783,7 +77799,7 @@ CODE_28E86A:
 	CMP.b #$01
 	BNE.b CODE_28E897
 	LDA.b #!Define_SMB3_SpriteID_NorSpr055_WindupBobOmb
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	JMP.w CODE_28D53B
 
 CODE_28E883:
@@ -77870,7 +77886,8 @@ CODE_28E900:
 
 ;--------------------------------------------------------------------
 
-CODE_28E91B:
+;CODE_28E91B
+Tail_DrawAndHurtPlayer:
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	LDA.w $0771,x
 	LSR
@@ -77942,7 +77959,7 @@ CODE_28E97B:
 	BPL.b CODE_28E964
 CODE_28E999:
 	LDX.b $9B
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr06A_LaunchingBlooperNanny
 	BEQ.b CODE_28E9A6
 	CMP.b #!Define_SMB3_SpriteID_NorSpr061_FollowingBlooperNanny
@@ -78028,7 +78045,7 @@ CODE_28EA0F:
 	LDA.b $01
 	STA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr05A_SingleClockwiseRotoDisc
 	BCS.b CODE_28EAB3
 	CMP.b #!Define_SMB3_SpriteID_NorSpr058_FireChomp
@@ -78380,11 +78397,13 @@ CODE_28EC9B:
 
 CODE_28ED16:
 	JSR.w CODE_28E6F7
-CODE_28ED19:
+TailEnemy_DoStandard: ; CODE_28ED19
 	LDA.w $0689,x
 	BEQ.b CODE_28ED2F
+	
 	LDY.b $9C
 	BEQ.b CODE_28ED25
+	
 	JMP.w CODE_28E999
 
 CODE_28ED25:
@@ -78410,7 +78429,7 @@ CODE_28ED2F:
 	RTS
 
 CODE_28ED49:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijacked
 	CMP.b #!Define_SMB3_SpriteID_NorSpr059_FireSnake
 	BNE.b CODE_28ED55
 	JSL.l Object_HandleBumpUnderneath
@@ -78696,7 +78715,7 @@ CODE_2982EF:
 	LDA.b #!Define_SMAS_Sound0063_FireSpit
 	STA.w !RAM_SMB3_Global_SoundCh3
 CODE_298301:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	CMP.b #!Define_SMB3_SpriteID_NorSpr09D_UpwardFacingFireJet
 	BEQ.b CODE_298310
 	CMP.b #!Define_SMB3_SpriteID_NorSpr0B2_DownwardFacingFireJet
@@ -78891,11 +78910,13 @@ CODE_29841E:
 CODE_298453:
 	LSR.b $02
 	PHP
+	; SNES: new, use 16-bit ID load?\
 	REP.b #$20
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	AND.w #$00FF
 	TAX
 	SEP.b #$20
+	; /
 	LDA.b #$22
 	CPX.w #!Define_SMB3_SpriteID_NorSpr0B1_RightwardFacingFireJet
 	BNE.b CODE_29846A
@@ -78915,7 +78936,7 @@ CODE_29846F:
 	LDA.b $0F
 	STA.b $D8
 	STZ.b $D9
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr0B1_RightwardFacingFireJet
 	BNE.b CODE_298493
 	LDA.b #$05
@@ -79082,7 +79103,7 @@ CODE_29854A:
 	LSR
 	AND.b #$01
 	STA.w $0669,x
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	SEC
 	SBC.b #!Define_SMB3_SpriteID_NorSpr0A0_GreenClassicPiranhaPlant
 	TAY
@@ -79405,7 +79426,7 @@ CODE_2987C9:
 CODE_2987E6:
 	INC.b $4D,x
 	LDA.b #$30
-	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CPY.b #!Define_SMB3_SpriteID_NorSpr0A4_GreenVenusFireTrap
 	BCC.b CODE_2987F2
 	ASL
@@ -80018,6 +80039,7 @@ CODE_299872:
 
 ; Note: Routine that spawns in sprites from the sprite list?
 
+;Level_SpawnObjsAndBounce
 CODE_299A9A:
 	JSR.w CODE_299A9E
 	RTL
@@ -80045,7 +80067,7 @@ CODE_299ABB:
 	LDY.b #!Define_SMB3_SpriteID_NorSpr01B_HorizontalBounceSprite
 CODE_299AC8:
 	TYA
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$01
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	JMP.w CODE_299ADF
@@ -80382,7 +80404,7 @@ CODE_299CCB:
 CODE_299D12:
 	LDA.b #!Define_SMB3_SpriteID_NorSpr06E_BouncingGreenParakoopa
 CODE_299D14:
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #$02
@@ -80478,6 +80500,7 @@ CODE_299DB5:
 
 ;--------------------------------------------------------------------
 
+;Level_ObjectsSpawnByScrollV
 CODE_299DCD:
 	LDY.b $25
 	LDA.w $0543
@@ -80540,7 +80563,7 @@ CODE_299E13:
 	DEX
 	STX.b $01
 	STA.b $00
-	LDA.w $1B3F,y
+	LDA.w $1B3F,y ;SNES: fixing repeat, yet incorrect read still remains.
 	CMP.b #!Define_SMB3_SpriteID_NorSpr0B4_StartOfGeneratorSprites
 	BCC.b CODE_299E3F
 	SBC.b #!Define_SMB3_SpriteID_NorSpr0B4_StartOfGeneratorSprites-$01
@@ -80572,7 +80595,7 @@ CODE_299E4C:
 	STA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	DEY
 	LDA.w !RAM_SMB3_Level_SpriteListData,y
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDY.b $01
 	LDA.w $1B10,y
 	ORA.b #$80
@@ -80610,7 +80633,7 @@ CODE_29A0D2:
 	RTS
 
 ;--------------------------------------------------------------------
-
+;Level_CountNotDeadObjs
 CODE_29A0DD:
 	STA.b $00
 	LDY.b #$00
@@ -80618,7 +80641,7 @@ CODE_29A0DD:
 CODE_29A0E3:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	BEQ.b CODE_29A0F0
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	CMP.b $00
 	BNE.b CODE_29A0F0
 	INY
@@ -80639,7 +80662,7 @@ CODE_29A0F6:
 ;--------------------------------------------------------------------
 
 ; Note: Routine that initializes RAM during level load?
-
+;Level_DoChangeReset
 CODE_29A100:
 	LDA.w $0561
 	BEQ.b CODE_29A106
@@ -80760,7 +80783,7 @@ CODE_29A1D0:
 	LDA.b #$01
 	STA.w $0665
 	LDA.b #$47
-	STA.w $0675
+	STA.w $0675 ; hijack
 CODE_29A1EE:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BNE.b CODE_29A24A
@@ -91266,7 +91289,7 @@ CODE_29FAAA:
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr075_BossProjectile
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijacked
 	LDA.b #$02
 	STA.b $68,x
 	LDA.b #$10
@@ -111959,7 +111982,7 @@ CODE_2889B0:
 	STA.b $00
 	LDY.b #$05
 	LDA.b $00
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijacked
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	STA.w !RAM_SMB3_Level_NorSpr_XPosLo,y
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
@@ -113020,7 +113043,7 @@ CODE_2891AD:
 	LDA.b #$01
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	LDA.b #!Define_SMB3_SpriteID_NorSpr00D_Mushroom
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
 	STA.w !RAM_SMB3_Level_NorSpr_XPosLo,y
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
@@ -113599,7 +113622,7 @@ CODE_28BF74:
 	LDA.b #$06
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr072_Goomba
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijacked
 	LDA.b #$01
 	STA.w $1FE9,x
 	LDY.b $9B
@@ -114983,12 +115006,14 @@ namespace SMB3_NorSpr03F_DryBones_Status02
 Main:
 	JSR.w CODE_28B257
 	BCS.b CODE_28C45D
+	
 	JSR.w CODE_28B905
 	JSL.l Object_DeleteOffScreen
 	JSL.l SMB3_CheckIfSpriteIsHorizontallyOffScreen_Main
 	JSL.l CODE_28C45D
 	JSL.l Object_HitTestRespond
-	JSR.w CODE_28C527
+	JSR.w DryBones_BumpOffOthers
+	
 	LDA.b !RAM_SMB3_NorSpr03F_DryBones_CollapsedAnimationFrame,x
 	BNE.b CODE_28C43D
 	JSL.l CODE_278B48
@@ -115266,7 +115291,7 @@ CODE_28B358:
 	LDA.b #$05
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr05C_ThrowBlock
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$02
 	STA.w $0669,x
 	LDA.b #$FF
@@ -116071,7 +116096,7 @@ CODE_28B111:
 	LDA.b #!Define_SMB3_SpriteID_NorSpr00D_Mushroom
 CODE_28B120:
 	LDY.b #$05
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijacked
 	LDA.b #$01
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
@@ -116274,10 +116299,12 @@ CODE_28E2B8:
 	LDA.w !RAM_SMB3_NorSpr048_MiniBossBass_SwimTimer,x
 	BNE.b CODE_28E313
 	LDY.w !RAM_SMB3_NorSpr048_MiniBossBass_SpriteSlotOfParent,x
+	
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	CMP.b #$02
 	BNE.b CODE_28E308
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr063_BigBertha
 	BNE.b CODE_28E308
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosLo,x
@@ -116505,7 +116532,7 @@ CODE_28D72F:
 	LDA.b $A7,x
 	AND.b #$04
 	BEQ.b CODE_28D75E
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijacked
 	CMP.b #!Define_SMB3_SpriteID_NorSpr04A_GoalSphere
 	BNE.b CODE_28D746
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
@@ -116615,7 +116642,7 @@ CODE_28D87A:
 	BEQ.b CODE_28D883
 	INY
 CODE_28D883:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	CMP.b #!Define_SMB3_SpriteID_NorSpr04C_FlyingBoomBoom
 	BNE.b CODE_28D895
 	LDA.b !RAM_SMB3_NorSprXXX_BoomBoom_CurrentState,x
@@ -116817,7 +116844,7 @@ CODE_28D9F1:
 	RTS
 
 CODE_28D9F2:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	CMP.b #!Define_SMB3_SpriteID_NorSpr04C_FlyingBoomBoom
 	BNE.b CODE_28D9FC
 	JMP.w CODE_28DA87
@@ -117198,7 +117225,7 @@ CODE_28DC96:
 CODE_28DCA3:
 	STA.w !RAM_SMB3_Level_NorSpr_YXPPCCCT,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr04A_GoalSphere
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$04
 	STA.w $1FE9,x
 	LDA.b #$01
@@ -117288,7 +117315,7 @@ namespace SMB3_NorSpr04F_FreeChainChomp_Status02
 Main:
 	JSR.w CODE_28D145
 	BEQ.b CODE_28E74B
-	JSR.w CODE_28E91B
+	JSR.w Tail_DrawAndHurtPlayer
 	RTL
 
 CODE_28E74B:
@@ -117823,10 +117850,13 @@ Main:
 	TAY
 	LDA.w DATA_21C329,y
 	STA.w $0679,x
+	
 	LDA.w DATA_21C32D,y
 	STA.w $0669,x
+	
 	JSL.l CODE_278B9B
-	JSR.w CODE_28ED19
+	JSR.w TailEnemy_DoStandard
+	
 	LDA.b $9C
 	BEQ.b CODE_28ECBE
 CODE_28ECBA:
@@ -118280,7 +118310,7 @@ CODE_28E5B6:
 	BRA.b CODE_28E5C7
 
 CODE_28E5BC:
-	JSR.w CODE_28ED19
+	JSR.w TailEnemy_DoStandard
 	LDA.b $9C
 	BEQ.b CODE_28E5C7
 	JSR.w CODE_28E999
@@ -118405,7 +118435,7 @@ CODE_28E675:
 CODE_28E69F:
 	INC.w !RAM_SMB3_NorSprXXX_Blooper_NumberOfTrailingMiniBloopers,x
 CODE_28E6A2:
-	JSR.w CODE_28E91B
+	JSR.w Tail_DrawAndHurtPlayer
 	RTL
 
 CODE_28E6A6:
@@ -118504,7 +118534,7 @@ CODE_28E096:
 	BNE.b CODE_28E0AA
 	JSL.l SMB3_CheckIfNormalSpriteOffScreen_Main
 	BNE.b CODE_28E0AF
-	JSR.w CODE_28E221
+	JSR.w BigBertha_SpitOutCheepCheep
 CODE_28E0AA:
 	LDA.b #$01
 	STA.w $0669,x
@@ -118701,7 +118731,8 @@ CODE_28E20C:
 	LDX.b $9B
 	RTS
 
-CODE_28E221:
+;CODE_28E221
+BigBertha_SpitOutCheepCheep:
 	LDY.b #$04
 CODE_28E223:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -118718,7 +118749,7 @@ CODE_28E22C:
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	LDA.b #!Define_SMB3_SpriteID_NorSpr048_MiniBossBass
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	ADC.b #$0E
 	STA.w !RAM_SMB3_Level_NorSpr_YPosLo,y
@@ -118825,7 +118856,7 @@ Main:
 	CMP.b #$20
 	BCS.b CODE_28DFF1
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_Y
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	CMP.b #!Define_SMB3_SpriteID_NorSpr066_DownwardsAirCurrent
 	BEQ.b CODE_28DFBD
 	LDA.b $0F
@@ -118842,7 +118873,7 @@ CODE_28DFBD:
 	LSR
 	LSR
 	TAY
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	CMP.b #!Define_SMB3_SpriteID_NorSpr066_DownwardsAirCurrent
 	BNE.b CODE_28DFDC
 	LDA.b !RAM_SMB3_Level_Player_YSpeed
@@ -118895,7 +118926,7 @@ CODE_28DFFD:
 	LDA.b !RAM_SMB3_Level_NorSpr_XPosHi,x
 	ADC.b #$00
 	STA.w !RAM_SMB3_Level_ExtSpr_XPosHi,y
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	CMP.b #!Define_SMB3_SpriteID_NorSpr066_DownwardsAirCurrent
 	BEQ.b CODE_28E047
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
@@ -119906,7 +119937,7 @@ CODE_22BC92:
 	LDY.w !RAM_SMB3_NorSpr083_Lakitu_PreparingToThrowTimer,x
 	DEY
 	BNE.b CODE_22BC9B
-	JSR.w CODE_22BD74
+	JSR.w Lakitu_TossEnemy
 CODE_22BC9B:
 	LDA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
 	PHA
@@ -120022,7 +120053,8 @@ CODE_22BD26:
 CODE_22BD73:
 	RTL
 
-CODE_22BD74:
+; CODE_22BD74
+Lakitu_TossEnemy:
 	LDY.b #$04
 CODE_22BD76:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -120048,7 +120080,7 @@ CODE_22BD7F:
 	STA.w $1FE9,y
 	LDA.b #!Define_SMB3_SpriteID_NorSpr085_GreenSpinyEgg
 CODE_22BDA3:
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosLo,x
 	SBC.b #$0C
 	STA.w !RAM_SMB3_Level_NorSpr_YPosLo,y
@@ -120142,7 +120174,7 @@ CODE_22CD18:
 
 CODE_22CD21:
 	LDA.b #!Define_SMB3_SpriteID_NorSpr04F_FreeChainChomp
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$04
 	STA.w $1021,x
 	LDA.b #$01
@@ -121534,7 +121566,7 @@ CODE_29992B:
 	BNE.b CODE_299958
 	LDY.b #$05
 	JSR.w CODE_299959
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack not required
 	CMP.b #!Define_SMB3_SpriteID_NorSpr094_GiantQuestionMarkBlockWithThree1ups
 	BNE.b CODE_299940
 	LDA.b #$02
@@ -121566,10 +121598,10 @@ CODE_299959:
 	STA.w !RAM_SMB3_Level_NorSpr_YPosLo,y
 	LDA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	STA.w !RAM_SMB3_Level_NorSpr_YPosHi,y
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x; hijack not required
 	TAX
 	LDA.w DATA_21C673-!Define_SMB3_SpriteID_NorSpr094_GiantQuestionMarkBlockWithThree1ups,x
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	LDA.w DATA_21C67A-!Define_SMB3_SpriteID_NorSpr094_GiantQuestionMarkBlockWithThree1ups,x
 	STA.w $0586
 	LDA.b #$01
@@ -123048,7 +123080,7 @@ CODE_298D6E:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$02
 	BNE.b CODE_298DC9
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ;hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr0AE_MetalLugnut
 	BNE.b CODE_298DC9
 	LDA.w !RAM_SMB3_Level_NorSpr_YOffscreenFlag,x
@@ -123741,7 +123773,7 @@ CODE_27D1BA:
 	INC.b $00
 	INC.b $00
 CODE_27D1D3:
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr086_SledgeBro
 	BNE.b CODE_27D1E1
 	LDA.b $00
@@ -123878,7 +123910,7 @@ CODE_27D4BB:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	CMP.b #$02
 	BNE.b CODE_27D50A
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr082_BoomerangBro
 	BNE.b CODE_27D50A
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
@@ -125027,7 +125059,7 @@ CODE_27CABF:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	CMP.b #$02
 	BNE.b CODE_27CAEF
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr067_LavaLotus
 	BNE.b CODE_27CAEF
 	LDA.w !RAM_SMB3_NorSpr067_LavaLotus_FireballSpawnTimer,y
@@ -125849,7 +125881,7 @@ Main:
 	BCS.b CODE_27DC3A
 	LDA.b #!Define_SMB3_SpriteID_NorSpr079_HomingBill
 CODE_27DC3A:
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$00
 	STA.w $1FE9,x
 	LDA.w !RAM_SMB3_Level_ShooterSpr_YPosLo,y
@@ -125915,7 +125947,7 @@ Main:
 	JSR.w PrepareNewObjectOrAbort
 	LDY.b $9B
 	LDA.b #!Define_SMB3_SpriteID_NorSpr0AD_RockyWrench
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.w !RAM_SMB3_Level_ShooterSpr_YPosLo,y
 	SEC
 	SBC.b #$06
@@ -126116,7 +126148,7 @@ CODE_27D92F:
 CODE_27D930:
 	JSR.w PrepareNewObjectOrAbort
 	LDA.b #!Define_SMB3_SpriteID_NorSpr0B0_BigCannonBall
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	INC.w $1FF9,x
 	LDY.b $9B
 	LDA.w !RAM_SMB3_Level_ShooterSpr_YPosLo,y
@@ -126162,7 +126194,7 @@ CODE_27D966:
 CODE_27D98D:
 	JSR.w PrepareNewObjectOrAbort
 	LDA.b #!Define_SMB3_SpriteID_NorSpr050_BobOmb
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.b #$80
 	STA.w $06A6,x
 	INC.w $1021,x
@@ -126299,7 +126331,7 @@ Main:
 	BCS.b CODE_29A029
 	JSR.w CODE_29A0D0
 	LDA.b #!Define_SMB3_SpriteID_NorSpr076_FlyingRedCheepCheep
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.w $0543
 	CLC
 	ADC.b #$C0
@@ -126356,7 +126388,7 @@ Main:
 	LDX.b #$02
 	JSR.w CODE_29A0D2
 	LDA.b #!Define_SMB3_SpriteID_NorSpr077_GreenCheepCheep
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.w !RAM_SMB3_Global_RandomByte02,x
 	AND.b #$01
 	TAY
@@ -126428,7 +126460,7 @@ Main:
 	BCS.b CODE_29A0CF
 	JSR.w CODE_29A0D0
 	LDA.b #!Define_SMB3_SpriteID_NorSpr09F_Parabuzzy
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.w !RAM_SMB3_Global_RandomByte02,x
 	AND.b #$01
 	TAY
@@ -126483,8 +126515,10 @@ Main:
 	CPY.b #$02
 	BCS.b CODE_299F7D
 	JSR.w CODE_29A0D0
+	
 	LDA.b #!Define_SMB3_SpriteID_NorSpr049_BGCloud
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
+	
 	LDA.w !RAM_SMB3_Global_RandomByte02,x
 	AND.b #$7F
 	CLC
@@ -126531,7 +126565,7 @@ Main:
 	BCS.b CODE_299F23
 	JSR.w CODE_29A0D0
 	LDA.b #!Define_SMB3_SpriteID_NorSpr000_UnusedSprite
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 	LDA.w !RAM_SMB3_Global_RandomByte02,x
 CODE_299EC0:
 	AND.b #$7F
@@ -126584,7 +126618,7 @@ CODE_299EF2:
 	LDA.b #$03
 	STA.w $1FE9,x
 	LDA.b #!Define_SMB3_SpriteID_NorSpr036_LeftFlyingWoodPlatformThatFalls
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID,x ; hijack
 CODE_299F23:
 	RTS
 namespace off
@@ -126615,7 +126649,7 @@ CODE_299F93:
 	BNE.b CODE_299FD0
 	CPY.b #$05
 	BCS.b CODE_299FA8
-	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y
+	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,y ; hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr047_GiantBlockHandler
 	BEQ.b CODE_299FA8
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
@@ -126626,7 +126660,7 @@ CODE_299FA8:
 	LDA.b #$01
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus
 	LDA.b #!Define_SMB3_SpriteID_NorSpr052_MiniChest
-	STA.w !RAM_SMB3_Level_NorSpr_SpriteID
+	STA.w !RAM_SMB3_Level_NorSpr_SpriteID ; hijack
 	LDA.b #$01
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi
 	LDA.b #$70
