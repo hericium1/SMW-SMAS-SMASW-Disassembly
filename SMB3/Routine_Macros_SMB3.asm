@@ -1094,7 +1094,7 @@ CODE_2088AD:
 CODE_2088C3:
 	CMP.b #$06
 	BNE.b CODE_2088D0
-;L3 BG6
+;L3 BG6, maze water 
 	STX.w !RAM_SMB3_Global_MainScreenLayersMirror
 	JSL.l CODE_22E499
 	BRA.b CODE_2088DD
@@ -1104,7 +1104,7 @@ CODE_2088C3:
 CODE_2088D0:
 	CMP.b #$05
 	BNE.b CODE_2088F6
-;L3 BG5
+;L3 BG5, maze water 2
 	LDX.b #$17
 	STX.w !RAM_SMB3_Global_MainScreenLayersMirror
 	JSL.l CODE_22E483
@@ -1182,6 +1182,7 @@ CODE_208935:
 CODE_208941:
 	CMP.b #$0D
 	BNE.b CODE_208953
+;L3 battleship mud
 	JSL.l CODE_22E518
 	STZ.w $021A
 	LDA.b #$01
@@ -1197,7 +1198,7 @@ CODE_208953:
 	BEQ.b CODE_20896F
 	CMP.b #$08
 	BNE.b CODE_208982
-;L3 BG8
+;L3 BG8, airship mist
 	JSL.l CODE_22E4B1 
 	LDA.b #$24
 	STA.w !RAM_SMB3_Global_ColorMathSelectAndEnableMirror
@@ -1257,16 +1258,20 @@ CODE_2089D6:
 	JMP.w CODE_208A48
 
 CODE_2089D9: ; PRG030_8B51
+	; Level junction override!  Copy in junction variables as appropriate
 	LDA.l $7E398C
 	STA.w $0210
-	STA.w $0212
+	STA.w $0212 ; SNES: new
 	LDA.l $7E398B
 	STA.b $12
 	STA.w $0211
 	
+	;SNES: new
 	LSR
 	STA.w $0213
 	ROR.w $0212
+	;SNES: /
+	
 	LDA.l !Level_Jct_VS
 	STA.w !Vert_Scroll
 	LDA.l $7E398D
@@ -26424,7 +26429,7 @@ CODE_22E173:
 	CMP.w #SMB3_LevelData_World3Fortress1_Level_Sub
 	BNE.b CODE_22E189
 	LDY.b #$2A
-	LDA.w $0210
+	LDA.w $0210 ; horz pos
 	CMP.w #$0580
 	BCC.b CODE_22E1C2
 	JMP.w CODE_22E29D
@@ -26437,7 +26442,7 @@ CODE_22E190:
 	CMP.w #SMB3_LevelData_World3Fortress2_Level_Sub
 	BNE.b CODE_22E1C2
 	LDY.b #$03
-	LDA.w $0210
+	LDA.w $0210 ; horz pos
 	CMP.w #$0380
 	BCC.b CODE_22E1C2
 	JMP.w CODE_22E29D
@@ -26462,6 +26467,7 @@ CODE_22E1BB:
 	LDY.b #$34
 CODE_22E1C2:
 	STY.w $02C1
+	
 CODE_22E1C5:
 	REP.b #$10
 	LDX.w #$0FFE
@@ -26622,7 +26628,7 @@ CODE_22E2E4:
 
 ;--------------------------------------------------------------------
 
-;background copy (airship, Layer 3)
+;copying background (airship, Layer 3)
 
 CODE_22E2FE:
 	LDA.l $7F2000
@@ -26655,6 +26661,7 @@ CODE_22E337:
 
 CODE_22E338:
 	REP.b #$30
+	
 	LDX.w #$0FFE
 	LDA.w #$20FF ;tile from tilemap
 CODE_22E340:
@@ -26663,6 +26670,7 @@ CODE_22E340:
 	DEX
 	DEX
 	BPL.b CODE_22E340
+	
 	LDX.w #$069A
 	LDA.w #$25D1 ;tile from tilemap
 CODE_22E352:
@@ -26671,6 +26679,7 @@ CODE_22E352:
 	INX
 	CPX.w #$0800
 	BNE.b CODE_22E352
+	
 	LDX.w #$0EDA
 CODE_22E360:
 	STA.l $7F2000,x
@@ -26838,7 +26847,7 @@ CODE_22E483:
 	LDA.b #$51
 	STA.w !REGISTER_BG3AddressAndSize
 	STZ.b $00
-	STZ.b $01
+	STZ.b $01 ; use upper half of tilemap
 	JMP.w CODE_22E2A0
 
 ;--------------------------------------------------------------------
@@ -26854,7 +26863,7 @@ CODE_22E499:
 	STA.w !REGISTER_BG3AddressAndSize
 	STZ.b $00
 	LDA.b #$10
-	STA.b $01
+	STA.b $01 ; use lower half of tilemap
 	JMP.w CODE_22E2A0
 
 ;--------------------------------------------------------------------
@@ -40236,14 +40245,29 @@ CODE_23D16D:
 CODE_23D176:
 	RTL
 
+
+;PRG008_B246:
+
+	; VERTICAL SCROLL LOCK LOGIC
+
+	; Checking whether vertical scrolling should be allowed in levels that explicitly disable it.
+	; When set to not allow it by default, so long as no raster effects are going on (see above),
+	; then we may allow it if the Player is flying (or high speed jumping) or climbing a vine.
+
+	; Once the scroll point has reached Vert_Scroll = $EF (lowest scroll point) it stays there
+	; unless one of the above specified overrides occur.  And here we go...
+
 CODE_23D177:
 	LDA.w !Vert_Scroll
 	CMP.b #$EF
 	BNE.b CODE_23D18A
+	
 	LDA.w !RAM_SMB3_Level_Player_FlightTimer
 	ORA.w !RAM_SMB3_Level_Player_IsClimbingFlag
 	PHP
+	
 	LDA.b #$EF
+	
 	PLP
 	BEQ.b CODE_23D1F2
 CODE_23D18A:
@@ -86264,12 +86288,15 @@ CODE_29CACB:
 	; rows 6-7, two rows
 	PHB
 	TAX
+	
+	; HARDCODED: force palette if underground background
 	LDA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	AND.w #$00FF
 	CMP.w #$000B
-	BNE.b CODE_29CAF8
+	BNE.b CODE_29CAF8	
 	LDX.w #DATA_3C94C0
 CODE_29CAF8:
+
 	LDY.w #SMB3_PaletteMirror[$60].LowByte
 	LDA.w #$003F
 	MVN SMB3_PaletteMirror[$60].LowByte>>16,SMB3_Palettes_Main>>16
