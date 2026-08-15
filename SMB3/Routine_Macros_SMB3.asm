@@ -129,8 +129,9 @@ CODE_2080DF:
 	DEX
 	BPL.b CODE_2080DF
 	
-;SNES: new (upload music bank)
+;PRG030_84D7
 CODE_2080E5:
+;SNES: new (upload music bank)
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	LDA.w !RAM_SMB3_Global_LoadOverworldMusicBank
 	BEQ.b CODE_2080F1
@@ -146,8 +147,8 @@ CODE_2080F1:
 	STZ.b $01
 	JSR.w CODE_20FA0B
 	
-		; Init for lost bonus game??
-	LDA.b #$0B ; changed from 2B in NES to 0B?
+	; Init for lost bonus game??
+	LDA.b #$0B ; SNES: changed from 2B in NES to 0B?
 	STA.w $070B
 	LDA.b #$35
 	STA.w $070C
@@ -1225,7 +1226,7 @@ CODE_208982:
 	LDA.b #$02 ; SNES new: only #$02 here, #$01 for vertical is left unused
 	JSR.w Video_Do_Update
 	JSL.l CODE_20F58D
-	JSL.l StatusBar_UpdateValues
+	JSL.l StatusBar_UpdateValues ; 
 	JSL.l SMB3_DrawPlayerLetterOnStatusBar_Main
 	JSL.l SMB3_DrawWorldNumberOnStatusBar_Main
 	LDA.b #$00
@@ -1829,16 +1830,16 @@ CODE_208DBE:
 	LDA.w !RAM_SMB3_Global_MusicRegisterBackup
 	BNE.b CODE_208E19
 	LDA.b !RAM_SMB3_Level_Player_CurrentPose
-	CMP.b #$A4
+	CMP.b #$A4 ; pause frame
 	BEQ.b CODE_208DFE
 	STA.l $7FC520
 CODE_208DFE:
-	LDY.b #$A4
+	LDY.b #$A4 ; pause frame
 	LDA.w $037A
 	EOR.b #$01
 	STA.w $037A
 	BNE.b CODE_208E0F
-	LDA.l $7FC520
+	LDA.l $7FC520 ; backup frame
 	TAY
 CODE_208E0F:
 	STY.b !RAM_SMB3_Level_Player_CurrentPose
@@ -1915,9 +1916,10 @@ CODE_208E7B:
 	
 	; Level junction!
 
-;SNES: new \ 
+;SNES: new \ ; extra door animation?
 	LDA.w $034E
 	BEQ.b CODE_208EDB			
+
 	LDY.b #$08
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	BNE.b CODE_208E90
@@ -1932,6 +1934,7 @@ CODE_208E9C:
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JMP.w CODE_208EBA
 
+; debug?
 CODE_208EA2:
 	LDA.b !RAM_SMB3_Global_ControllerPress2P1
 	AND.b #!Joypad_L
@@ -1957,8 +1960,9 @@ CODE_208EBA:
 	CMP.b #$20
 	BCC.b CODE_208E9C
 	STZ.b $9C
+
 CODE_208EDB:
-	STZ.w $034E
+	STZ.w $034E ; reset door animation variable
 	JSL.l SNES_Setup_PalData
 ;/
 	JML.l HandleLevelJunction
@@ -2056,17 +2060,19 @@ CODE_208F95:
 	STA.w !RAM_SMB3_Global_MusicCh1
 	LDA.w $0713
 	BNE.b CODE_208FB8
+
 	LDA.w !RAM_SMB3_Level_TriggerEndingFlag
 	BEQ.b CODE_208FB8
+
 	LDA.b #$A8
-	STA.b $FF
+	STA.b !PPU_CTL1_Copy
 	LDA.b #$20
-	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
+	STA.w !Update_Select
 	JMP.w SMB3_ProcessPart1OfEnding_Main
 
 CODE_208FB8:
 	LDA.b #$28
-	STA.b $FF
+	STA.b !PPU_CTL1_Copy
 	JMP.w CODE_2090BF
 
 CODE_208FBF:
@@ -7073,9 +7079,11 @@ CODE_20C5A5:
 SMB3_ProcessPart1OfEnding:
 .Main:
 ;$20C614
+;SNES: new \
 	STZ.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	JSL.l SMB3_UploadMusicBank_Overworld
+
 	REP.b #$20
 	LDX.b #$80
 	STX.w !REGISTER_VRAMAddressIncrementValue
@@ -7103,6 +7111,7 @@ SMB3_ProcessPart1OfEnding:
 	STA.w DMA[$00].SizeLo
 	LDX.b #$01
 	STX.w !REGISTER_DMAEnable
+
 	REP.b #$10
 	PHB
 	LDX.w #SpadeLevelPalette_Row01To07
@@ -7134,6 +7143,7 @@ CODE_20C6AC:
 	MVN SMB3_PaletteMirror[$F0].LowByte>>16,RegularMarioPalette>>16
 	PLB
 	SEP.b #$30
+
 	REP.b #$20
 	LDX.b #$00
 	LDA.w #$00FF
@@ -7168,6 +7178,7 @@ CODE_20C6BF:
 	STX.w HDMA[$06].IndirectSourceBank
 	STZ.w !REGISTER_BGWindowLogicSettings
 	SEP.b #$20
+
 	LDA.b #$25
 	STA.w !RAM_SMB3_Global_FixedColorData1Mirror
 	LDA.b #$45
@@ -7182,32 +7193,48 @@ CODE_20C6BF:
 	STA.w !RAM_SMB3_Global_ColorMathSelectAndEnableMirror
 	LDX.b #$01
 	STX.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
+
 	LDA.b #$FF
 	STA.b $00
 	STZ.b $01
-	JSR.w CODE_20FA0B
+	JSR.w CODE_20FA0B ;??
+
+;SNES: new /
+
+;SNES: remove disable display
+
+    ; Disable raster effects
 	LDA.b #$80
 	STA.w !RAM_SMB3_Global_CurrentRasterEffect
+
+    ; Clears RAM $00-$F5
 	LDX.b #$F5
 CODE_20C749:
 	STZ.b $00,x
 	DEX
 	BNE.b CODE_20C749
+
+    ; Scroll at lowest point
 	LDA.b #$EF
 	STA.w !Vert_Scroll
+
 	LDA.b #$B0
 	STA.w $0218
 	JSR.w SMB3_UploadCurtainTilemap_Main
+
 	LDA.b #$51
 	ASL
 	TAX
+
 	LDA.l DATA_20D2FE,x
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
 	LDA.l DATA_20D2FE+$01,x
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
 	LDA.b #DATA_20DEFA>>16
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
+
 	JSL.l SMB3_UploadStripeImage_Main
+
 	LDA.b #$22
 	STA.w !RAM_SMB3_Level_Layer2BGFromHeader
 	JSL.l SMB3_BufferBGTilemap_Main
@@ -7234,89 +7261,120 @@ CODE_20C749:
 	STA.w !RAM_SMB3_Global_MainScreenLayersMirror
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
+;SNES: new/
 CODE_20C7B8:
 	JSR.w SMB3_WaitForVBlankDuringCutscene_Main
-	JSR.w CODE_20C7C7
+	JSR.w Ending_ChamberScene  
 	LDA.b !RAM_SMB3_PeachRescued_CurrentState
 	CMP.b #$07
 	BNE.b CODE_20C7B8
 	JMP.w SMB3_ProcessEndingWorldRollcallScreen_Main
 
-CODE_20C7C7:
+Ending_ChamberScene:
 	JSL.l SMB3_ResetSpriteOAMRt_Main
+
 	LDA.b #$10
-	STA.b !RAM_SMB3_PeachRescued_Player_OAMIndex
+	STA.b !RAM_SMB3_PeachRescued_Player_OAMIndex; Mario's sprite RAM starts at Sprite_RAM + $10
+
 	LDA.b #$40
-	STA.b !RAM_SMB3_PeachRescued_Peach_OAMIndex
+	STA.b !RAM_SMB3_PeachRescued_Peach_OAMIndex ; Princess's sprite RAM starts at Sprite_RAM + $40
+
 	LDX.b #$02
 CODE_20C7D5:
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer1,x
 	BEQ.b CODE_20C7DB
+
 	DEC.b !RAM_SMB3_PeachRescued_PhaseTimer1,x
+
 CODE_20C7DB:
 	DEX
 	BPL.b CODE_20C7D5
-	JSR.w CODE_20C806
+
+	JSR.w Ending_DoChamberScene
 	LDX.b #$00
 	STX.b !RAM_SMB3_PeachRescued_Player_SpriteIndex
+
 	JSR.w SMB3_DrawCutscenePlayerSprites_EndingEntry
+
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_20C7FF
+
 	LDY.b #$24
 CODE_20C7EF:
 	LDA.w SMB3_OAMBuffer[$00].Prop,y
 	ORA.b #$02
 	STA.w SMB3_OAMBuffer[$00].Prop,y
+
 	DEY
 	DEY
 	DEY
 	DEY
+
 	CPY.b #$10
 	BPL.b CODE_20C7EF
+
 CODE_20C7FF:
 	INX
 	STX.b !RAM_SMB3_PeachRescued_Player_SpriteIndex
 	JSR.w SMB3_DrawCutscenePlayerSprites_CODE_20BE96
 	RTS
 
-CODE_20C806:
+Ending_DoChamberScene:
 	LDA.b !RAM_SMB3_PeachRescued_CurrentState
 	JSL.l SMB3_ExecutePtr_Absolute
 
 DATA_20C80C:
-	dw CODE_20C81C
-	dw CODE_20C853
-	dw CODE_20C860
-	dw CODE_20C892
-	dw CODE_20C8B2
-	dw CODE_20C983
-	dw CODE_20C9C3
-	dw CODE_20C9CB
+	dw Ending_Init
+	dw Ending_FadeIn
+	dw SNES_Ending_ExtraEnter
+	dw Ending_MarioAppears
+	dw Ending_LightsOn
+	dw Ending_WalkToCenter
+	dw Ending_PrincessSpeech
+	dw Ending_FadeOut
 
-CODE_20C81C:
+Ending_Init:
+    ; Set Mario's X
+;SNES: new\ ; Mario offscreen (walks in)
 	LDA.b #$EC
 	STA.b !RAM_SMB3_PeachRescued_Player_XPosLo
 	LDA.b #$FF
 	STA.b !RAM_SMB3_PeachRescued_Player_XPosHi
+;SNES: new/
+
+    ; Set Princess's X
 	LDA.b #$C8
 	STA.b !RAM_SMB3_PeachRescued_Peach_XPosLo
+
+    ; Set both Y = 160
 	LDA.b #$A0
 	STA.b !RAM_SMB3_PeachRescued_Player_YPosLo
 	STA.b !RAM_SMB3_PeachRescued_Peach_YPosLo
+
+    ; Mario standing
 	LDA.b #$18
 	STA.b !RAM_SMB3_PeachRescued_Player_CurrentPose
+
+    ; Princess sobbing
 	LDA.b #$19
 	STA.b !RAM_SMB3_PeachRescued_Peach_CurrentPose
+
 	LDA.b #$40
 	STA.b !RAM_SMB3_PeachRescued_Player_YXPPCCCT
 	STA.b !RAM_SMB3_PeachRescued_Peach_YXPPCCCT
+
 	LDA.b #$01
 	STA.b $8F
+
 	LDA.b #$0F
 	STA.b !RAM_SMB3_PeachRescued_PhaseTimer1
+
 	INC.b !RAM_SMB3_PeachRescued_CurrentState
+
+    ; Initialize the princess speech dialog box
 	LDA.b #$00
 	STA.b $A6
+
 	LDA.b #$50
 	STA.b $A5
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
@@ -7327,38 +7385,49 @@ endif
 	STA.b $A4
 	RTS
 
-CODE_20C853:
+Ending_FadeIn:
+;SNES: new\, logic for fade
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer1
 	EOR.b #$0F
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	CMP.b #$0F
 	BNE.b CODE_20C85F
 	INC.b !RAM_SMB3_PeachRescued_CurrentState
+;SNES: new/
 CODE_20C85F:
 	RTS
 
-CODE_20C860:
+;CODE_20C860:
+SNES_Ending_ExtraEnter:
 	LDA.b !RAM_SMB3_PeachRescued_Player_XPosLo
 	CLC
 	ADC.b #$01
 	STA.b !RAM_SMB3_PeachRescued_Player_XPosLo
+
 	LDA.b !RAM_SMB3_PeachRescued_Player_XPosHi
 	ADC.b #$00
 	STA.b !RAM_SMB3_PeachRescued_Player_XPosHi
+
 	PHX
+
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$0C
 	LSR
 	LSR
 	TAX
+
 	LDA.l DATA_20BB22,x
 	STA.b !RAM_SMB3_PeachRescued_Player_CurrentPose
+
 	LDX.b #$00
 	JSR.w SMB3_CheckWhichTitleScreenPlayerTilesAreOffScreen_Main
+
 	PLX
+
 	LDA.b !RAM_SMB3_PeachRescued_Player_XPosLo
 	CMP.b #$20
 	BNE.b CODE_20C891
+
 	LDA.b #$02
 	STA.b !RAM_SMB3_PeachRescued_Player_CurrentPose
 	INC.b !RAM_SMB3_PeachRescued_CurrentState
@@ -7367,7 +7436,7 @@ CODE_20C860:
 CODE_20C891:
 	RTS
 
-CODE_20C892:
+Ending_MarioAppears:
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer1
 	CMP.b #$01
 	BNE.b CODE_20C8A5
@@ -7387,7 +7456,8 @@ CODE_20C8A5:
 CODE_20C8B1:
 	RTS
 
-CODE_20C8B2:
+
+Ending_LightsOn:
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer1
 	BEQ.b CODE_20C913
 	LDY.b #$30
@@ -7504,7 +7574,7 @@ DATA_20C96F:
 	dw $0000
 	dw $0000
 
-CODE_20C983:
+Ending_WalkToCenter:
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer1
 	BEQ.b CODE_20C990
 	CMP.b #$60
@@ -7545,7 +7615,7 @@ CODE_20C9A5:
 	PLX
 	RTS
 
-CODE_20C9C3:
+Ending_PrincessSpeech:
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer1
 	BNE.b CODE_20C9CA
 	JMP.w CODE_20C9E0
@@ -7553,7 +7623,7 @@ CODE_20C9C3:
 CODE_20C9CA:
 	RTS
 
-CODE_20C9CB:
+Ending_FadeOut:
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer1
 	BNE.b CODE_20C9D8
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
@@ -7574,9 +7644,9 @@ CODE_20C9E0:
 	JSL.l SMB3_ExecutePtr_Absolute
 
 DATA_20C9E6:
-	dw CODE_20CA66
-	dw CODE_20CB23
-	dw CODE_20CB88
+	dw EndText_DrawDiagBox
+	dw EndText_DoPrincessText
+	dw EndText_Wait
 
 PeachTextBoxWindowStripeImage:
 .TopRow:
@@ -7625,7 +7695,8 @@ endif
 	db PeachTextBoxWindowStripeImage_BottomRow-PeachTextBoxWindowStripeImage
 .End:
 
-CODE_20CA66:
+;CODE_20CA66:
+EndText_DrawDiagBox:
 	PHB
 	PHK
 	PLB
@@ -7718,7 +7789,8 @@ cleartable
 DATA_20CB22:
 	db $00
 
-CODE_20CB23:
+;CODE_20CB23:
+EndText_DoPrincessText:
 	PHB
 	PHK
 	PLB
@@ -7845,7 +7917,8 @@ CODE_20CB86:
 	PLB
 	RTS
 
-CODE_20CB88:
+;CODE_20CB88:
+EndText_Wait:
 	LDA.b !RAM_SMB3_PeachRescued_PhaseTimer2
 	BNE.b CODE_20CB92
 	LDA.b #$0F
@@ -8899,12 +8972,16 @@ DATA_20E230:
 	db $D0,$D2,$D2,$D4,$D6,$D6,$D2
 
 Player_Draw:
+;SNES: new\
 	PHX
 	JSL.l CODE_22E000
 	PLX
+;SNES: new/
+
 	LDX.b !RAM_SMB3_Level_Player_CurrentPose
 	LDA.b !RAM_SMB3_Level_Player_XPosLo
 	STA.b $00
+
 	LDA.b !RAM_SMB3_Level_Player_XPosHi
 	STA.b $01
 	REP.b #$20
@@ -10528,7 +10605,7 @@ CODE_20EE72:
 CODE_20EE84:
 	LDA.w $0510
 	BEQ.b CODE_20EE44
-	LDA.b #$A2
+	LDA.b #$A2 ; time up pose
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
 	JSL.l CODE_22E000
 	LDX.b #$06
@@ -10874,7 +10951,7 @@ SNES_DoGFXDMATransfers:
 	
 ;Mario GFX
 	
-	LDA.w $0238
+	LDA.w !SNES_MarioDMA_BankA_Enable
 	BNE.b CODE_20F671
 	JMP.w CODE_20F704
 
@@ -10945,7 +11022,7 @@ CODE_20F671:
 	STX.b DMA[$00].SourceLo
 	STY.b DMA[$00].SizeLo
 	STA.w !REGISTER_DMAEnable
-	STZ.w $0238
+	STZ.w !SNES_MarioDMA_BankA_Enable
 	
 ;battle mode
 CODE_20F704:
@@ -12490,20 +12567,21 @@ DATA_2186BF:
 ;--------------------------------------------------------------------
 
 SPPF_Offsets:
-	dw $0000,$0006,$000C,$0012,$0018,$001E,$0024,$002A
+	dw $0000,$0006,$000C,$0012,$0018,$001E,$0024,$002A ; $00-$07
 	dw $0030,$0036,$003C,$0042,$0048,$004E,$0054,$005A
-	dw $0060,$0066,$006C,$0072,$0078,$007E,$0084,$008A
+	dw $0060,$0066,$006C,$0072,$0078,$007E,$0084,$008A ; $10-$17
 	dw $0090,$0096,$009C,$00A2,$00A8,$00AE,$00B4,$00BA
-	dw $00C0,$00C6,$00CC,$00D2,$00D8,$00DE,$00E4,$00EA
+	dw $00C0,$00C6,$00CC,$00D2,$00D8,$00DE,$00E4,$00EA ; $20-$27
 	dw $00F0,$00F6,$00FC,$0102,$0108,$010E,$0114,$011A
-	dw $0120,$0126,$012C,$0132,$0138,$013E,$0144,$014A
+	dw $0120,$0126,$012C,$0132,$0138,$013E,$0144,$014A ; $30-$37
 	dw $0150,$0156,$015C,$0162,$0168,$016E,$0174,$017A
-	dw $0180,$0186,$018C,$0192,$0198,$019E,$01A4,$01AA
+	dw $0180,$0186,$018C,$0192,$0198,$019E,$01A4,$01AA ; $40-$47
 	dw $01B0,$01B6,$01BC,$01C2,$01C8,$01CE,$01D4,$01DA
-	dw $01E0,$01E6,$01EC,$01F2
+	dw $01E0 ; $50
+	dw $01E6,$01EC,$01F2 ; $51-$53
 
 SPPF_Table:
-	db $00,$02,$10,$04,$06,$08
+	db $00,$02,$10,$04,$06,$08 ; $00
 	db $0A,$0C,$10,$0E,$28,$2A
 	db $2C,$2E,$10,$18,$1A,$1C
 	db $2C,$2E,$10,$18,$1A,$08
@@ -12519,56 +12597,113 @@ SPPF_Table:
 	db $0A,$0C,$10,$0E,$28,$10
 	db $2C,$2E,$10,$18,$1A,$10
 	db $30,$32,$10,$34,$36,$10
-	db $08,$12,$10,$1C,$1E,$10,$2C,$2E,$10,$38,$3A,$10,$30,$30,$10,$32
-	db $32,$10,$34,$34,$10,$36,$36,$10,$38,$38,$10,$3A,$3A,$10,$00,$02
-	db $10,$04,$06,$08,$0A,$0C,$10,$0E,$28,$2A,$2C,$2E,$10,$18,$1A,$1C
-	db $2C,$2E,$10,$A8,$AA,$10,$2C,$2E,$10,$A8,$AC,$10,$00,$02,$04,$06
-	db $08,$0A,$0C,$0E,$38,$3A,$3C,$3E,$18,$1A,$1C,$1E,$20,$22,$24,$26
-	db $28,$2A,$2C,$2E,$30,$32,$10,$34,$36,$10,$24,$28,$2C,$32,$36,$0C
-	db $24,$28,$2C,$32,$36,$0E,$18,$1C,$20,$1A,$1E,$22,$24,$28,$2C,$26
-	db $2A,$2E,$24,$28,$2C,$32,$36,$3A,$00,$00,$10,$02,$02,$10,$04,$04
-	db $10,$06,$06,$10,$08,$08,$10,$0A,$0A,$10,$30,$32,$10,$34,$36,$10
-	db $30,$34,$10,$38,$3C,$10,$00,$02,$10,$04,$06,$08,$00,$02,$10,$0A
-	db $0C,$0E,$00,$02,$10,$20,$22,$24,$30,$32,$10,$34,$36,$10,$26,$18
-	db $10,$1C,$1E,$10,$10,$10,$10,$34,$36,$10,$10,$10,$10,$30,$32,$10
-	db $28,$2A,$10,$2C,$2E,$10,$38,$3A,$10,$3C,$3E,$10,$10,$10,$10,$2E
-	db $2E,$10,$10,$10,$10,$2A,$2C,$10,$28,$2A,$10,$0C,$0E,$26,$28,$2A
-	db $10,$08,$0A,$24,$28,$2A,$10,$00,$02,$3E,$28,$2A,$10,$00,$02,$04
-	db $28,$2A,$10,$00,$02,$06,$28,$2A,$10,$30,$32,$3C,$28,$2A,$10,$34
-	db $36,$3C,$28,$2A,$10,$38,$3A,$3C,$28,$2A,$10,$0C,$1E,$24,$28,$2A
-	db $10,$0C,$2C,$2E,$10,$10,$10,$04,$06,$10,$10,$10,$10,$00,$02,$10
-	db $10,$10,$10,$18,$1A,$10,$10,$10,$10,$20,$22,$10,$10,$10,$10,$1C
-	db $1E,$10,$04,$06,$10,$A8,$AA,$10,$04,$06,$10,$A8,$AC,$10,$28,$2A
-	db $10,$00,$02,$04,$10,$10,$10,$24,$26,$10,$10,$10,$10,$28,$2A,$10
-	db $10,$10,$10,$28,$2E,$10,$10,$10,$10,$24,$2C,$10,$10,$10,$10,$08
-	db $0A,$10,$10,$10,$10,$0C,$0C,$10,$10,$10,$10,$30,$32,$10,$10,$10
-	db $10,$34,$36,$10,$10,$10,$10,$0E,$3E,$10,$18,$1A,$10,$1C,$20,$10
-	db $18,$1A,$10,$1C,$20,$22,$20,$22,$24,$26,$00,$00,$28,$2A,$2C,$2E
-	db $30,$00,$32,$34,$36,$38,$00,$00
+	db $08,$12,$10,$1C,$1E,$10 ; $10
+	db $2C,$2E,$10,$38,$3A,$10
+	db $30,$30,$10,$32,$32,$10
+	db $34,$34,$10,$36,$36,$10
+	db $38,$38,$10,$3A,$3A,$10
+	db $00,$02,$10,$04,$06,$08
+	db $0A,$0C,$10,$0E,$28,$2A
+	db $2C,$2E,$10,$18,$1A,$1C
+	db $2C,$2E,$10,$A8,$AA,$10
+	db $2C,$2E,$10,$A8,$AC,$10
+	db $00,$02,$04,$06,$08,$0A
+	db $0C,$0E,$38,$3A,$3C,$3E
+	db $18,$1A,$1C,$1E,$20,$22
+	db $24,$26,$28,$2A,$2C,$2E
+	db $30,$32,$10,$34,$36,$10
+	db $24,$28,$2C,$32,$36,$0C
+	db $24,$28,$2C,$32,$36,$0E ; $20
+	db $18,$1C,$20,$1A,$1E,$22
+	db $24,$28,$2C,$26,$2A,$2E
+	db $24,$28,$2C,$32,$36,$3A
+	db $00,$00,$10,$02,$02,$10
+	db $04,$04,$10,$06,$06,$10
+	db $08,$08,$10,$0A,$0A,$10
+	db $30,$32,$10,$34,$36,$10 ; $27 - raccoon extra
+	db $30,$34,$10,$38,$3C,$10
+	db $00,$02,$10,$04,$06,$08
+	db $00,$02,$10,$0A,$0C,$0E
+	db $00,$02,$10,$20,$22,$24
+	db $30,$32,$10,$34,$36,$10
+	db $26,$18,$10,$1C,$1E,$10
+	db $10,$10,$10,$34,$36,$10
+	db $10,$10,$10,$30,$32,$10
+	db $28,$2A,$10,$2C,$2E,$10 ; $30
+	db $38,$3A,$10,$3C,$3E,$10
+	db $10,$10,$10,$2E,$2E,$10
+	db $10,$10,$10,$2A,$2C,$10
+	db $28,$2A,$10,$0C,$0E,$26
+	db $28,$2A,$10,$08,$0A,$24
+	db $28,$2A,$10,$00,$02,$3E
+	db $28,$2A,$10,$00,$02,$04
+	db $28,$2A,$10,$00,$02,$06
+	db $28,$2A,$10,$30,$32,$3C
+	db $28,$2A,$10,$34,$36,$3C
+	db $28,$2A,$10,$38,$3A,$3C
+	db $28,$2A,$10,$0C,$1E,$24
+	db $28,$2A,$10,$0C,$2C,$2E
+	db $10,$10,$10,$04,$06,$10
+	db $10,$10,$10,$00,$02,$10
+	db $10,$10,$10,$18,$1A,$10 ; $40
+	db $10,$10,$10,$20,$22,$10
+	db $10,$10,$10,$1C,$1E,$10
+	db $04,$06,$10,$A8,$AA,$10
+	db $04,$06,$10,$A8,$AC,$10
+	db $28,$2A,$10,$00,$02,$04
+	db $10,$10,$10,$24,$26,$10
+	db $10,$10,$10,$28,$2A,$10
+	db $10,$10,$10,$28,$2E,$10
+	db $10,$10,$10,$24,$2C,$10
+	db $10,$10,$10,$08,$0A,$10
+	db $10,$10,$10,$0C,$0C,$10
+	db $10,$10,$10,$30,$32,$10
+	db $10,$10,$10,$34,$36,$10
+	db $10,$10,$10,$0E,$3E,$10
+	db $18,$1A,$10,$1C,$20,$10
+	db $18,$1A,$10,$1C,$20,$22 ; $50
+; new frames added for SNES
+	db $20,$22,$24,$26,$00,$00 ; $51 - timeup pose
+	db $28,$2A,$2C,$2E,$30,$00 ; $52 - pause pose
+	db $32,$34,$36,$38,$00,$00 ; $53 - lives gain pose
 
+;27 - raccoon
+;A2 - timeup pose
+;A4 - pause pose
+;A6 - lives gain pose (bonus game 1up,3up,5up, etc.)
 SNES_PlayerPose_HiOffset:
 	db $00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00
-	db $00,$00,$00,$00,$00,$00,$00,$00
+	db $00,$00,$00,$00,$00,$00,$00,$00 ; $10-$17
 	db $00,$00,$08,$08,$08,$08,$08,$08
-	db $08,$08,$08,$08,$08,$08,$08,$48
+	db $08,$08,$08,$08,$08,$08,$08,$48 ; $20-$27
 	db $08,$10,$10,$10,$10,$10,$10,$10
-	db $10,$10,$10,$10,$18,$18,$18,$18
+	db $10,$10,$10,$10,$18,$18,$18,$18 ; $30-$37
 	db $18,$18,$18,$18,$18,$18,$18,$18
+	db $18,$18,$18,$18,$18,$18,$18,$18 ; $40-$47
 	db $18,$18,$18,$18,$18,$18,$18,$18
-	db $18,$18,$18,$18,$18,$18,$18,$18
-	db $18,$40,$40,$40
+	db $18 ;$50
+; new frames added for SNES
+	db $40,$40,$40 ; $51-$53
 
-DATA_2189C3:
-	db SMB3_Bank3EGraphics_Mario_Small>>8,SMB3_Bank3FGraphics_Mario_Big>>8,SMB3_Bank3FGraphics_Mario_Big>>8
-	db SMB3_Bank3EGraphics_Mario_Raccoon>>8,SMB3_Bank3EGraphics_Mario_Frog>>8,SMB3_Bank3EGraphics_Mario_Tanooki>>8
-	db SMB3_Bank3EGraphics_Mario_Hammer>>8,SMB3_Bank3EGraphics_Mario_Raccoon>>8,SMB3_Bank42Graphics_BG_PeachsRoom1>>8
+;DATA_2189C3:
+SNES_PlayerPose_PageHi:
+	db SMB3_Bank3EGraphics_Mario_Small>>8
+	db SMB3_Bank3FGraphics_Mario_Big>>8
+	db SMB3_Bank3FGraphics_Mario_Big>>8 ; fire
+	db SMB3_Bank3EGraphics_Mario_Raccoon>>8
+	db SMB3_Bank3EGraphics_Mario_Frog>>8
+	db SMB3_Bank3EGraphics_Mario_Tanooki>>8
+	db SMB3_Bank3EGraphics_Mario_Hammer>>8
+	db SMB3_Bank3EGraphics_Mario_Raccoon>>8 ; ?
+	db SMB3_Bank42Graphics_BG_PeachsRoom1>>8 ; letters
 
 	db SMB3_Bank2EGraphics_Luigi_Small>>8,SMB3_Bank3FGraphics_Luigi_Big>>8,SMB3_Bank3FGraphics_Luigi_Big>>8
 	db SMB3_Bank2EGraphics_Luigi_Raccoon>>8,SMB3_Bank2EGraphics_Luigi_Frog>>8,SMB3_Bank2EGraphics_Luigi_Tanooki>>8
 	db SMB3_Bank2EGraphics_Luigi_Hammer>>8,SMB3_Bank3EGraphics_Mario_Raccoon>>8,SMB3_Bank42Graphics_BG_PeachsRoom1>>8
 
-DATA_2189D5:
+;DATA_2189D5:
+SNES_PlayerPose_PageBank:
 	db SMB3_Bank3EGraphics_Mario_Small>>16,SMB3_Bank3FGraphics_Mario_Big>>16,SMB3_Bank3FGraphics_Mario_Big>>16
 	db SMB3_Bank3EGraphics_Mario_Raccoon>>16,SMB3_Bank3EGraphics_Mario_Frog>>16,SMB3_Bank3EGraphics_Mario_Tanooki>>16
 	db SMB3_Bank3EGraphics_Mario_Hammer>>16,SMB3_Bank3EGraphics_Mario_Raccoon>>16,SMB3_Bank42Graphics_BG_PeachsRoom1>>16
@@ -12577,14 +12712,15 @@ DATA_2189D5:
 	db SMB3_Bank2EGraphics_Luigi_Raccoon>>16,SMB3_Bank2EGraphics_Luigi_Frog>>16,SMB3_Bank2EGraphics_Luigi_Tanooki>>16
 	db SMB3_Bank2EGraphics_Luigi_Hammer>>16,SMB3_Bank3EGraphics_Mario_Raccoon>>16,SMB3_Bank42Graphics_BG_PeachsRoom1>>16
 
-DATA_2189E7:;Player_FramePageOff
-	dw $0000,$0040,$0080,$00C0,$0100,$0140,$0180,$01C0
+;DATA_2189E7:
+Player_FramePageOff:
+	dw $0000,$0040,$0080,$00C0,$0100,$0140,$0180,$01C0 ; $00-$07
 	dw $0200,$0240,$0280,$02C0,$0300,$0340,$0380,$03C0
-	dw $0400,$0440,$0480,$04C0,$0500,$0540,$0580,$05C0
+	dw $0400,$0440,$0480,$04C0,$0500,$0540,$0580,$05C0 ; $10-$17
 	dw $0600,$0640,$0680,$06C0,$0700,$0740,$0780,$07C0
-	dw $0800,$0840,$0880,$08C0,$0900,$0940,$0980,$09C0
+	dw $0800,$0840,$0880,$08C0,$0900,$0940,$0980,$09C0 ; $20-$27
 	dw $0A00,$0A40,$0A80,$0AC0,$0B00,$0B40,$0B80,$0BC0
-	dw $0C00,$0C40,$0C80,$0CC0,$0D00,$0D40,$0D80,$0DC0
+	dw $0C00,$0C40,$0C80,$0CC0,$0D00,$0D40,$0D80,$0DC0 ; $30-$37
 	dw $0E00,$0E40,$0E80,$0EC0,$0F00,$0F40,$0F80,$0FC0
 
 ;--------------------------------------------------------------------
@@ -26279,35 +26415,45 @@ CODE_22D4A4:
 ; $0238 - graphics page pointer (bank)
 
 CODE_22E000:
+
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_22E007
-	LDA.b #$09
+	LDA.b #$09 ; luigi offset
 CODE_22E007:
-	STA.b $04
+	STA.b $04 ; current player offset
+
 	LDA.b !RAM_SMB3_Level_Player_CurrentPose
-	LSR
+	LSR ; divide by 2
 	TAX
+
 	LDA.w SNES_PlayerPose_HiOffset,x
 	LDX.b !RAM_SMB3_Level_Player_CurrentPowerUp
+
+; check for special page if high offset is higher than usual \ 
 	CMP.b #$20
 	BCC.b CODE_22E01D
-	LDX.b #$07
+	LDX.b #$07 ; special page: extra raccoon frame?
 	CMP.b #$48
 	BEQ.b CODE_22E01D
-	INX
+	INX ; special page: pause page
 CODE_22E01D:
-	TAY
-	TXA
+;/
+	TAY ; high offset
+
+	TXA ; powerup offset
 	CLC
-	ADC.b $04 ; add luigi offset
+	ADC.b $04 ; add player offset
 	TAX
+
 	TYA ; get value from table back
 	CLC
-	ADC.w DATA_2189C3,x
+	ADC.w SNES_PlayerPose_PageHi,x
 	STA.b $01 ; high
 	STZ.b $00 ; low
-	LDA.w DATA_2189D5,x
-	STA.w $0238 ; bank
+	LDA.w SNES_PlayerPose_PageBank,x
+	STA.w !SNES_MarioDMA_BankA_Enable ; bank
+
+; page offsets are now set.
 	
 	LDA.b #SPPF_Table>>16
 	STA.b $06 ; bank of pose table
@@ -26326,55 +26472,55 @@ CODE_22E01D:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX		
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
-	STA.w $0220
+	STA.w !SNES_MarioDMA_Lo_6000
 	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX	
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
-	STA.w $0222
+	STA.w !SNES_MarioDMA_Lo_6020
 	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX	
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
-	STA.w $0224
+	STA.w !SNES_MarioDMA_Lo_6040
 	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX	
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
-	STA.w $0226
+	STA.w !SNES_MarioDMA_Lo_6060
 	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX	
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
-	STA.w $0228
+	STA.w !SNES_MarioDMA_Lo_6080
 	
 	INY
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX	
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
-	STA.w $022A
+	STA.w !SNES_MarioDMA_Lo_60A0
 	
 	SEP.b #$30
 	RTL
@@ -38364,6 +38510,9 @@ CODE_23C538:
 ;SNES:new/
 	LDA.b $BD
 	STA.w $056C
+
+	; SNES: Player_InAir_OLD setting removed?
+
 	LDA.w !RAM_SMB3_Level_Player_GoalWalkAnimationTimer
 	BNE.b CODE_23C54A
 	LDA.w !RAM_SMB3_Level_Player_DisableControlsTimer
@@ -38385,12 +38534,15 @@ CODE_23C55D:
 	BEQ.b CODE_23C579
 	CPY.b #$04
 	BEQ.b CODE_23C579
+
 	LDA.w !RAM_SMB3_Level_Player_ShowCarryingAnimationFlag
 	ORA.w !RAM_SMB3_Level_Player_SlidingXSpeed
 	ORA.w !RAM_SMB3_Level_Player_InKuriboShoeFlag
 	BNE.b CODE_23C579
+
 	LDA.b $A6
 	BEQ.b CODE_23C587
+
 	LDA.w !RAM_SMB3_Level_Player_IsSwimmingFlag
 	BEQ.b CODE_23C580
 CODE_23C579:
@@ -38555,37 +38707,57 @@ CODE_23C685:
 	BEQ.b CODE_23C694
 	JSL.l CODE_23BF00
 CODE_23C694:
+
 	LDA.b $BD
 	AND.b #$7F
 	STA.b $BD
-	LDX.b #$00
+
+	LDX.b #$00 ; SNES: new: door variable. if 0, this is a DOOR2 tile
+
 	LDY.w $0560
+
 	LDA.b #$43
 	SEC
 	SBC.b $00
 	BEQ.b CODE_23C6AF
+
 	CPY.b #$01
 	BNE.b CODE_23C704
+
 	CMP.b #$01
 	BNE.b CODE_23C704
-	INX
+
+	INX  ; SNES: new, is DOOR1 tile
 CODE_23C6AF:
+
+	; DOOR LOGIC	
+
 	LDA.b !RAM_SMB3_Global_ControllerPress1
 	AND.b #!Joypad_DPadU>>8
 	BEQ.b CODE_23C704
+
 	LDA.b $A6
 	BNE.b CODE_23C704
+
 	LDY.b #$01
+
 	LDA.w $0379
 	BEQ.b CODE_23C6C2
+
 	LDY.b #$03
 CODE_23C6C2:
 	STY.w !Level_JctCtl
+
 	STZ.w $0713
+
 	STZ.b !RAM_SMB3_Level_Player_XSpeed
-	STZ.w $034E
+
+;SNES: new\
+	STZ.w $034E ; door "Graphics buffer"?
+
 	CPX.b #$01
-	BEQ.b CODE_23C704
+	BEQ.b CODE_23C704 ; if DOOR1 tile, branch (no extra animation)
+
 	LDA.b $43
 	STA.b $D9
 	XBA
@@ -38612,7 +38784,11 @@ CODE_23C6E7:
 	PHX
 	JSR.w CODE_23DEB6
 	PLX
+;SNES: new/
 CODE_23C704:
+
+	; VINE CLIMBING LOGIC
+
 	LDA.w !RAM_SMB3_Level_Player_IsSwimmingFlag
 	ORA.w !RAM_SMB3_Level_Player_ShowCarryingAnimationFlag
 	ORA.w !RAM_SMB3_Level_Player_InKuriboShoeFlag
@@ -39640,6 +39816,7 @@ CODE_23CD70:
 
 ;--------------------------------------------------------------------
 
+;Player_SetSpecialFrames
 CODE_23CD71:
 	LDA.b !RAM_SMB3_Level_Player_XSpeed
 	BPL.b CODE_23CD79
@@ -39687,9 +39864,12 @@ CODE_23CDB4:
 CODE_23CDBF:
 	LDA.w !RAM_SMB3_Level_Player_ShowCarryingAnimationFlag
 	BEQ.b CODE_23CDDE
+
 	LDY.b $BA
-	LDA.b $A6
+
+	LDA.b $A6 ; SNES: changed from Player_InAir_OLD to Player_InAir
 	BEQ.b CODE_23CDD1
+
 	LDY.b #$00
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	BNE.b CODE_23CDD1
@@ -42281,6 +42461,7 @@ CODE_23DE37:
 
 ;--------------------------------------------------------------------
 
+;Player_ApplyXVelocity
 CODE_23DE53:
 	LDX.b #$00
 	LDY.b #$40
@@ -63834,6 +64015,7 @@ CODE_278B97:
 	LDA.b #$08
 	BNE.b CODE_278B9D				; Note: This will always branch
 
+;Object_WorldDetectN4:
 CODE_278B9B:
 	LDA.b #$04
 CODE_278B9D:
@@ -64040,15 +64222,18 @@ CODE_278CF2:
 Object_GetAttrAndMoveTiles:
 	LDY.b #$6C
 	JSL.l Object_DetectTile
+
 	ASL
 	ROL
 	ROL
 	AND.b #$03
 	STA.b $00
 	TAY
+
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x
 	CMP.b #!Define_SMB3_SpriteID_NorSpr064_WaterHoppingRedCheepCheep
 	BNE.b CODE_278D12
+
 	LDA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
 	CMP.b #$F0
 	BNE.b CODE_278D12
@@ -64104,6 +64289,7 @@ CODE_278D38:
 CODE_278D63:
 	STA.w $06B7,x
 CODE_278D66:
+
 	LDA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
 	STA.w $1FE1,x
 ;hijacked
@@ -64209,11 +64395,13 @@ CODE_278E00:
 Object_DetectTile:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_278E1B
+
 	JMP.w CODE_278EEB
 
 CODE_278E1B:
 	LDA.w $058B
 	BEQ.b CODE_278E42
+
 	LDA.b $71,x
 	CLC
 	ADC.w DATA_21ADCA,y
@@ -64221,6 +64409,7 @@ CODE_278E1B:
 	SBC.w $0543
 	CMP.b #$A0
 	BCC.b CODE_278E42
+
 	SBC.b #$10
 	AND.b #$F0
 	STA.w $1F79
@@ -66492,7 +66681,7 @@ CODE_279E28:
 ;
 	AND.b #$01
 	TSB.b $02 ; set nametable
-;fin
+;/fin
 	
 	LDY.w $0418
 	
@@ -89784,7 +89973,8 @@ CODE_29E852:
 
 ;--------------------------------------------------------------------
 
-CODE_29E86A:
+;CODE_29E86A
+StatusBar_Fill_PowerMT:
 	LDY.b #$00
 	LDA.b #$01
 	STA.b $0E
@@ -89997,7 +90187,7 @@ CODE_29EA69:
 
 ;CODE_29EAA5
 StatusBar_UpdateValues:
-	JSR.w CODE_29E86A
+	JSR.w StatusBar_Fill_PowerMT
 	JSR.w CODE_29E6E0
 	JSR.w CODE_29E6AA
 	JSL.l CODE_29E7AA
@@ -104349,7 +104539,7 @@ CODE_20E0BE:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0220
@@ -104357,7 +104547,7 @@ CODE_20E0BE:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0222
@@ -104365,7 +104555,7 @@ CODE_20E0BE:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0224
@@ -104373,7 +104563,7 @@ CODE_20E0BE:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0226
@@ -104381,7 +104571,7 @@ CODE_20E0BE:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0228
@@ -104389,7 +104579,7 @@ CODE_20E0BE:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $022A
@@ -104420,7 +104610,7 @@ CODE_20E14D:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $022C
@@ -104428,7 +104618,7 @@ CODE_20E14D:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $022E
@@ -104436,7 +104626,7 @@ CODE_20E14D:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0230
@@ -104444,7 +104634,7 @@ CODE_20E14D:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0232
@@ -104452,7 +104642,7 @@ CODE_20E14D:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0234
@@ -104460,7 +104650,7 @@ CODE_20E14D:
 	LDA.b [$04],y
 	AND.w #$00FF
 	TAX
-	LDA.w DATA_2189E7,x
+	LDA.w Player_FramePageOff,x
 	CLC
 	ADC.b $00
 	STA.w $0236
@@ -104787,6 +104977,7 @@ namespace SMB3_LoadTitleScreenGraphics
 
 Main:
 	REP.b #$20
+
 	LDA.w #SMB3_Bank47Graphics_TitleScreen
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank47Graphics_TitleScreen>>16
@@ -104794,6 +104985,7 @@ Main:
 	LDA.w #SMB3_Bank47Graphics_TitleScreenEnd-SMB3_Bank47Graphics_TitleScreen
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+
 	LDA.w #SMB3_Bank3AGraphics_BG_ToadHouse
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank3AGraphics_BG_ToadHouse>>16
@@ -104801,6 +104993,7 @@ Main:
 	LDA.w #$3000									; Glitch: This should be #$0800!
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+
 	LDA.w #SMB3_Bank3AGraphics_BG_ToadHouse
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank3AGraphics_BG_ToadHouse>>16
@@ -104809,6 +105002,7 @@ Main:
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	LDA.w #$3C00
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main
+
 	LDA.w #SMB3_Bank45Graphics_StatusBar						;\ Note: This loads the status bar graphics
 	STA.b !RAM_SMB3_Global_ScratchRAM0D						;|
 	LDX.b #SMB3_Bank45Graphics_StatusBar>>16					;|
@@ -104817,6 +105011,7 @@ Main:
 	STA.b !RAM_SMB3_Global_ScratchRAM0B						;|
 	LDA.w #$4800									;|
 	JSR.w SMB3_CopyOfDMADataToVRAM_Main						;/
+
 	LDA.w #SMB3_Bank47Graphics_TitleScreen+$0800
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank47Graphics_TitleScreen+$0800>>16
@@ -104825,6 +105020,7 @@ Main:
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	LDA.w #$6400
 	JSR.w SMB3_DMADataToVRAM_Main
+
 	LDA.w #SMB3_Bank40Graphics_Sprite_Global2
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank40Graphics_Sprite_Global2>>16
@@ -104833,6 +105029,7 @@ Main:
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	LDA.w #$6800
 	JSR.w SMB3_DMADataToVRAM_Main
+
 	LDA.w #SMB3_Bank47Graphics_Sprite_TitleScreen1
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank47Graphics_Sprite_TitleScreen1>>16
@@ -104841,6 +105038,7 @@ Main:
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	LDA.w #$6C00
 	JSR.w SMB3_DMADataToVRAM_Main
+
 	LDA.w #SMB3_Bank45Graphics_Sprite_Empty1
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank45Graphics_Sprite_Empty1>>16
@@ -104849,6 +105047,7 @@ Main:
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	LDA.w #$7000
 	JSR.w SMB3_DMADataToVRAM_Main
+
 	LDA.w #SMB3_Bank47Graphics_Sprite_LoadingLetters
 	STA.b !RAM_SMB3_Global_ScratchRAM0D
 	LDX.b #SMB3_Bank47Graphics_Sprite_LoadingLetters>>16
@@ -104857,6 +105056,7 @@ Main:
 	STA.b !RAM_SMB3_Global_ScratchRAM0B
 	LDA.w #$7800
 	JSR.w SMB3_DMADataToVRAM_Main
+
 	SEP.b #$20
 	RTS
 namespace off
@@ -106714,19 +106914,23 @@ Main:
 	LDA.b #$01
 	STA.b !RAM_SMB3_Global_ScratchRAM0E
 	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
 CODE_29E772:
 	LDA.w SMB3_StatusBarPlayerLetterTiles,x
 	STA.w SMB3_StripeImageUploadTable[$02].LowByte,y
-	LDA.b #$22
+	LDA.b #$22 ; tile high
 	STA.w SMB3_StripeImageUploadTable[$02].HighByte,y
 	INX
 	INY
 	INY
 	DEC.b !RAM_SMB3_Global_ScratchRAM0E
 	BPL.b CODE_29E772
+
 	LDA.b #$FF
 	STA.w SMB3_StripeImageUploadTable[$02].LowByte,y
+
 	LDY.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
 	LDA.b #$0F
 	STA.w SMB3_StripeImageUploadTable[$00].LowByte,y
 	LDA.b #$42
@@ -106735,10 +106939,12 @@ CODE_29E772:
 	STA.w SMB3_StripeImageUploadTable[$01].LowByte,y
 	LDA.b #$03
 	STA.w SMB3_StripeImageUploadTable[$01].HighByte,y
+
 	LDA.w !RAM_SMB3_Global_StripeImageUploadIndexLo
 	CLC
 	ADC.b #$08
 	STA.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
 	RTL
 namespace off
 endmacro
@@ -106761,6 +106967,7 @@ Main:
 	STA.w SMB3_StripeImageUploadTable[$02].HighByte,y
 	LDA.b #$FF
 	STA.w SMB3_StripeImageUploadTable[$03].LowByte,y
+
 	LDX.b #$0F
 	TXA
 	STA.w SMB3_StripeImageUploadTable[$00].LowByte,y
@@ -106770,6 +106977,7 @@ Main:
 	STA.w SMB3_StripeImageUploadTable[$01].LowByte,y
 	LDA.b #$01
 	STA.w SMB3_StripeImageUploadTable[$01].HighByte,y
+
 	LDA.w !RAM_SMB3_Global_StripeImageUploadIndexLo
 	CLC
 	ADC.b #$06
@@ -115810,7 +116018,7 @@ CODE_28CBCE:
 CODE_28CBE9:
 	JSR.w CODE_28CED1
 	PHX
-	LDA.b #$A6
+	LDA.b #$A6 ; lives indicator pose
 	STA.b !RAM_SMB3_Level_Player_CurrentPose
 	JSL.l CODE_22E000
 	PLX
@@ -125468,20 +125676,23 @@ Main:
 	AND.b #$F0
 	ADC.b #$0B
 	STA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
-	JSR.w CODE_27D382
+	JSR.w CODE_27D382 ; Remove laser
 	
 	LDY.b #$01
 CODE_27C652:
 	LDA.w !RAM_SMB3_Level_MExtSpr_SpriteID,y
 	BEQ.b CODE_27C65B
+
 	DEY
 	BPL.b CODE_27C652
 CODE_27C65A:
 	RTS
 
 CODE_27C65B:
+	; Enable this brick bust slot (poof style)
 	LDA.b #$01
 	STA.w !RAM_SMB3_Level_MExtSpr_SpriteID,y
+
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
 	SEC
 	SBC.b #$08
@@ -125497,6 +125708,7 @@ CODE_27C65B:
 	
 	LDA.b #$17
 	STA.w !RAM_SMB3_Level_MExtSpr_Table7E1FAE,y
+
 	RTS
 
 Laser_PrepSpritesAndHit:
