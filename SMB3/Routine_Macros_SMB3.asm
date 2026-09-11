@@ -366,8 +366,10 @@ CODE_2082DF:
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$08
 	BNE.b CODE_2082F1
+	
 	LDA.b #$2D
 	JSR.w Video_Do_Update
+	
 CODE_2082F1:
 	LDY.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $0722,y
@@ -376,19 +378,44 @@ CODE_2082F1:
 	LDA.w $0724,y
 	STA.w $0211
 	STA.b $12
+	
+	;SNES: removed\
+;PRG030_8646:
+	;JSR Scroll_Update_Ranges
+	
+	;JSR Map_DrawAndPan	 ; Draw and pan map as necessary
+
+	; Pushes any buffered graphics thru
+	;LDA #$00	 	
+	;JSR Video_Do_Update	
+
+	;LDA Map_DrawPanState
+	;BNE PRG030_8646	 	; If some kind of map drawing/panning activity is occurring, loop around
+	;SNES: removed/
+	
 	LDA.w !RAM_SMB3_Overworld_CurrentProcess
 	BNE.b CODE_208346
+	
+	; Map_Operation = 0 ... the "World X" intro
+	; Used at the beginning of a world, and alternating players
 	LDA.w !RAM_SMB3_Global_OpenReserveBoxFlag
 	BNE.b CODE_208346
-	JSL.l CODE_238000
+	
+	JSL.l CODE_238000 ; Map_IntroAttrSave
+	
 	LDX.b #$0E
+	
+	; SNES: no halfway-aligned video update value
+	
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_20831A
 	INX
 CODE_20831A:
 	TXA
 	JSR.w Video_Do_Update
-	JSL.l CODE_238036
+	
+	JSL.l CODE_238036 ; Map_ConfigWorldIntro
+	
 	LDA.b #$00
 	JSR.w Video_Do_Update
 	
@@ -411,18 +438,30 @@ CODE_20833C:
 	LDY.b #!Define_SMB3_OverworldMusic_MusicBox
 CODE_208343:
 	STY.w !RAM_SMB3_Global_MusicCh1
+	
+;PRG030_86A2
 CODE_208346:
 	STZ.w !RAM_SMB3_Global_OpenReserveBoxFlag
+	
 	LDA.b #$EF
 	STA.w !Vert_Scroll
+	
+	;SNES: new \
 	STZ.w $021A
 	STZ.w $021B
+	;SNES: new /
+	
 	LDA.b #$C0
 	STA.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
+	
 	JSL.l SMB3_OverworldTileAnimations_Main
+	
 	LDA.b #$00
 	STA.l $7E3955
+	
 	JSL.l SNES_Setup_PalData ; get palettes
+	
+;SNES: new \
 	PHB
 	REP.b #$30
 	LDY.w #SMB3_PaletteMirror[$D0].LowByte
@@ -431,8 +470,11 @@ CODE_208346:
 	MVN SMB3_PaletteMirror[$D0].LowByte>>16,DATA_3C8B80>>16
 	SEP.b #$30
 	PLB
+	
 	STZ.w !REGISTER_IRQNMIAndJoypadEnableFlags
+	
 	PHD
+	
 	REP.b #$20
 	LDA.w #DMA[$00].Parameters
 	TCD
@@ -444,10 +486,15 @@ CODE_208346:
 	STA.b DMA[$03].Parameters
 	STA.b DMA[$04].Parameters
 	STA.b DMA[$05].Parameters
-	LDY.b #$08
+	
+	LDY.b #$08 ; set channel
+	
 	LDX.w !RAM_SMB3_Global_CurrentWorld
 	CPX.b #$04
 	BNE.b CODE_2083CA
+	
+; world 5 graphics
+	
 	LDA.w #SMB3_Bank39Graphics_FG_AnimatedOverworldTiles5
 	STA.b DMA[$03].SourceLo
 	LDX.b #SMB3_Bank39Graphics_FG_AnimatedOverworldTiles5>>16
@@ -455,6 +502,7 @@ CODE_208346:
 	LDA.w #$1000
 	STA.b DMA[$03].SizeLo
 	STY.w !REGISTER_DMAEnable
+	
 	LDA.w #$2800
 	STA.w !REGISTER_VRAMAddressLo
 	LDA.w #SMB3_Bank41Graphics_FG_StaticOverworldTiles
@@ -464,6 +512,7 @@ CODE_208346:
 	LDA.w #$3000
 	STA.b DMA[$03].SizeLo
 	STY.w !REGISTER_DMAEnable
+	
 	BRA.b CODE_2083DB
 
 CODE_2083CA:
@@ -474,6 +523,7 @@ CODE_2083CA:
 	LDA.w #$4000
 	STA.b DMA[$03].SizeLo
 	STY.w !REGISTER_DMAEnable
+	
 CODE_2083DB:
 	LDA.w #$5800
 	STA.w !REGISTER_VRAMAddressLo
@@ -490,40 +540,62 @@ CODE_2083DB:
 	STA.b DMA[$05].SizeLo
 	LDX.b #$30
 	STX.w !REGISTER_DMAEnable
+	
 	SEP.b #$20
+	
 	PLD
+	
 	LDA.b #$01
 	STA.w !RAM_SMB3_Global_SpecialLayerBGModeAndTileSizeSettingMirror
+	
 	LDA.b #$11
 	STA.w $020F
+	
 	LDA.b #$09
-	STA.w !RAM_SMB3_Global_BGModeAndTileSizeSettingMirror
+	STA.w !RAM_SMB3_Global_BGModeAndTileSizeSettingMirror	
 	STA.w !REGISTER_BGModeAndTileSizeSetting
+	
 	LDA.b #$17
 	STA.w !RAM_SMB3_Global_MainScreenLayersMirror
+	
 	LDA.b #$03
 	STA.w !RAM_SMB3_Global_OAMSizeAndDataAreaDesignationMirror
+	
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
+	
 	LDA.w !RAM_SMB3_Overworld_EnableDarknessFlag
 	BEQ.b CODE_208452
+	
 	LDA.b #$03
-	STA.w $0291
-	LDA.w !RAM_SMB3_Overworld_CurrentProcess
-	BEQ.b CODE_208452
+	STA.w $0291 ; window type
+	
+	LDA.w !RAM_SMB3_Overworld_CurrentProcess ; Map_Operation
+	BEQ.b CODE_208452 ; jump if WORLD X start box
+	
 	JSL.l CODE_2AF9A9
 	JSL.l SMB3_UpdateDarknessCircleWindowPos_Main
-CODE_20843B:
+	
+;CODE_20843B
+WorldMap_Loop:
+;SNES: new \
 	LDA.b #$0F
-	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
+	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror ; force full brightness
+	
 	LDA.w !RAM_SMB3_Overworld_EnableDarknessFlag
 	BEQ.b CODE_208452
-	LDA.w !RAM_SMB3_Overworld_CurrentProcess
-	BEQ.b CODE_208452
+	
+	LDA.w !RAM_SMB3_Overworld_CurrentProcess ; Map_Operation
+	BEQ.b CODE_208452 ; jump if WORLD X start box
+	
 	LDA.w !RAM_SMB3_Level_PauseMenuStatus
 	BNE.b CODE_208452
+	
 	JSL.l SMB3_UpdateDarknessCircleWindowPos_Main
 CODE_208452:
+;SNES: new /
+
+
 	JSR.w GraphicsBuf_Prep_And_WaitVSync ;overworld spinning
 	JSL.l SMB3_ResetSpriteOAMRt_Main
 	JSL.l SMB3_OverworldTileAnimations_Main
@@ -535,7 +607,7 @@ CODE_208467:
 	JSL.l CODE_29D8E0
 	JSL.l SMB3_DrawWorld5CloudSprite_Main
 	JSL.l CODE_238C1B
-	BRA.b CODE_20843B
+	BRA.b WorldMap_Loop
 
 CODE_208475:
 	JSL.l CODE_2380AB
@@ -554,12 +626,12 @@ CODE_208491:
 	CPY.b #$04
 	BEQ.b CODE_2084A1
 	CPY.b #$0F
-	BCC.b CODE_20843B
+	BCC.b WorldMap_Loop
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $073F,x
 	BEQ.b CODE_208516
 CODE_2084A1:
-	JSL.l CODE_29E2B6
+	JSL.l Palette_FadeOut
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
@@ -880,8 +952,12 @@ CODE_2086FB:
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$08
 	BNE.b CODE_208710
+	
+	; Warp zone special
+	
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
-	STA.w !RAM_SMB3_Global_MusicCh1
+	STA.w !RAM_SMB3_Global_MusicCh1 ; Stop BGM	
+	
 	LDA.w $042A
 	STA.w !RAM_SMB3_Global_CurrentWorld
 	JMP.w CODE_2080B9
@@ -980,7 +1056,7 @@ CODE_20878C:							; Note: Sliding Picture spade game code start
 	STA.l $7E3955
 	STA.w !RAM_SMB3_SlidingPictureGame_CurrentState
 	JSL.l SNES_Setup_PalData
-	JSL.l CODE_29E29D
+	JSL.l Palette_FadeIn
 	LDA.b #$02
 	STA.w $0427
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
@@ -1029,7 +1105,7 @@ CODE_208811:
 	JSL.l SNES_Setup_PalData
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
-	JSL.l CODE_29E29D
+	JSL.l Palette_FadeIn
 CODE_20885B:
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l SMB3_ProcessCardFlipSpadeGame_Main
@@ -1038,7 +1114,7 @@ CODE_20885B:
 	BEQ.b CODE_20885B
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
-	JSL.l CODE_29E2B6
+	JSL.l Palette_FadeOut
 	JMP.w CODE_208F6A
 
 CODE_208876:
@@ -1239,9 +1315,11 @@ CODE_208982:
 	LDA.b #$40
 	STA.w $0612
 	JSL.l CODE_2AB48E ; Background copy to VRAM
+	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	CMP.b #$0F
 	BNE.b CODE_2089BA
+	
 	JMP.w CODE_208A48
 
 CODE_2089BA:
@@ -1322,15 +1400,20 @@ CODE_208A48:
 
 ;PRG030_8B6D
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
+	
 	LDA.w $073D,x
-	BEQ.w CODE_208A53
+	BEQ.w CODE_208A53 	; If player is NOT bound for king's room, jump to PRG030_8B78
+	
 	JMP.w CODE_208FC2
 
 CODE_208A53:
 	STZ.w !RAM_SMB3_Global_CurrentRasterEffect
 	LDA.b #$00
 	STA.l $7E3955
+	
 	JSL.l SNES_Setup_PalData
+	
+;SNES: new \
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	LDA.w $0713
@@ -1345,8 +1428,10 @@ CODE_208A72:
 CODE_208A75:
 	STZ.b $20
 	JSR.w CODE_20966F
+	
 	LDA.b #$FE
 	STA.w $105F
+	
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_208A94
 	LDY.w $0376
@@ -1498,14 +1583,20 @@ CODE_208BC3:
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
 	JSL.l CODE_2AFA63
 	JSL.l CODE_239344
+	
 	LDA.w $1050
 	CMP.b #$38
 	BNE.b CODE_208BC3
+	
 CODE_208BD5:
+	; End of box-out effect (removed in US version)
+
 	STZ.b $20
+	
 	LDX.b #$C0
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_208BE0
+	
 	LDX.b #$80
 CODE_208BE0:
 	STX.w !RAM_SMB3_Global_CurrentVBlankRoutinePath
@@ -1570,7 +1661,7 @@ CODE_208C49:
 CODE_208C50:
 	STZ.w $02D4
 	STZ.w $070F
-	JSL.l CODE_29E2B6
+	JSL.l Palette_FadeOut
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
@@ -1955,7 +2046,7 @@ CODE_208EBA:
 	JSL.l Objects_HandleScrollAndUpdate
 	JSL.l CODE_27BE7E
 	JSL.l Gameplay_UpdateAndDrawMisc
-	JSL.l CODE_27DCA1
+	JSL.l SNES_DoorTransitionAnimation
 	LDA.w $034E
 	CMP.b #$20
 	BCC.b CODE_208E9C
@@ -1963,8 +2054,8 @@ CODE_208EBA:
 
 CODE_208EDB:
 	STZ.w $034E ; reset door animation variable
-	JSL.l SNES_Setup_PalData
 ;/
+	JSL.l SNES_Setup_PalData
 	JML.l HandleLevelJunction
 
 CODE_208EE6:
@@ -1976,15 +2067,20 @@ CODE_208EE6:
 	STZ.w $0781
 	STZ.w $0780
 	JSL.l Player_DoGameplay
+	
 	LDA.b !RAM_SMB3_Level_Player_DeathState
 	CMP.b #$03
 	BEQ.b CODE_208F17
+	
 	JSL.l Objects_HandleScrollAndUpdate
 	JSL.l CODE_27BE7E
 	JSL.l Gameplay_UpdateAndDrawMisc
-	JSL.l CODE_27DCA1
+	
+	JSL.l SNES_DoorTransitionAnimation ; SNES: new
+	
 	LDA.w !RAM_SMB3_Level_RunScrollSpritesFlag
 	BEQ.b CODE_208F17
+	
 	JSL.l AutoScroll_Do
 CODE_208F17:
 	LDA.b $14
@@ -2028,10 +2124,11 @@ CODE_208F57:
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.b #$01
 	STA.w $074A,x
+	
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
 endif
-	JSL.l CODE_29E2B6
+	JSL.l Palette_FadeOut
 CODE_208F6A:
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
@@ -2053,11 +2150,15 @@ CODE_208F7C:
 	JMP.w CODE_208691
 
 CODE_208F95:
+	; Clear $06FF - $0000, excluding $01xx
 	LDY.b #$06
-	JSR.w CODE_2097F2
+	JSR.w Clear_RAM_thru_ZeroPage
+	
 	STZ.w !RAM_SMB3_Level_ShakeLayer1YOffset
+	
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
+	
 	LDA.w $0713
 	BNE.b CODE_208FB8
 
@@ -2066,8 +2167,10 @@ CODE_208F95:
 
 	LDA.b #$A8
 	STA.b !PPU_CTL1_Copy
+	
 	LDA.b #$20
 	STA.w !Update_Select
+	
 	JMP.w SMB3_ProcessPart1OfEnding_Main
 
 CODE_208FB8:
@@ -2134,14 +2237,18 @@ CODE_208FC2:
 	LDX.b #$04
 	STX.w !REGISTER_DMAEnable
 	SEP.b #$20
-	JSL.l CODE_29E29D
+	JSL.l Palette_FadeIn
 CODE_209053:
 	JSR.w GraphicsBuf_Prep_And_WaitVSync
-	JSL.l CODE_29C280
+	JSL.l CineKing_DoWandReturn
 	LDA.b $14
 	BEQ.b CODE_209053
+
+;SNES: new\
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
+
+; fade out (mosaic if world 7 letter)
 	LDA.b #$03
 	STA.w !RAM_SMB3_Global_MosaicSizeAndBGEnableMirror
 CODE_209068:
@@ -2156,11 +2263,17 @@ CODE_209068:
 CODE_20907B:
 	DEC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	BPL.b CODE_209068
+	
+; enable F-blank
 	LDA.b #$80
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	STZ.w !RAM_SMB3_Global_MosaicSizeAndBGEnableMirror
+;SNES: new/
+	
+	
 	LDY.b #$06
-	JSR.w CODE_2097F2
+	JSR.w Clear_RAM_thru_ZeroPage
+	
 	LDX.w !RAM_SMB3_Global_TwoPlayerGameFlag
 	DEX
 CODE_20908F:
@@ -2168,16 +2281,21 @@ CODE_20908F:
 	STZ.w $0713
 	STZ.w $0722,x
 	STZ.w $0724,x
+	
 	DEX
 	BPL.b CODE_20908F
+	
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
+	
 	LDA.b #SMB3_IndividualPlayerData[$00].Score-SMB3_IndividualPlayerData[$00].ReserveSlots
+	
 	CPX.b #$00
 	BEQ.b CODE_2090AA
 	CLC
 	ADC.b #SMB3_IndividualPlayerData[$01].ReserveSlots-SMB3_IndividualPlayerData[$00].ReserveSlots
 CODE_2090AA:
 	TAY
+	
 	LDX.b #$00
 CODE_2090AD:
 	LDA.w !RAM_SMB3_Level_Player_CurrentScoreHi,x
@@ -2186,6 +2304,9 @@ CODE_2090AD:
 	INX
 	CPX.b #$03
 	BNE.b CODE_2090AD
+
+	; SNES: moved stopping music to above?
+	
 	INC.w !RAM_SMB3_Global_CurrentWorld
 	JMP.w CODE_2080B9
 
@@ -2536,7 +2657,7 @@ CODE_2093BE:
 	BPL.b CODE_2093BE
 	SEP.b #$10
 	JSR.w CODE_209594
-	JSL.l CODE_29E29D
+	JSL.l Palette_FadeIn
 	LDA.b #$0F
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	STA.w !REGISTER_ScreenDisplayRegister
@@ -2561,7 +2682,7 @@ CODE_2093F4:
 CODE_209406:
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
-	JSL.l CODE_29E2B6
+	JSL.l Palette_FadeOut
 	LDA.w $0728
 	CMP.b #$09
 	BEQ.b CODE_209419
@@ -2634,7 +2755,7 @@ CODE_209473:
 	JSL.l SNES_Setup_PalData
 	LDA.b #$00
 	STA.l $7E3955
-	JSL.l CODE_29E29D
+	JSL.l Palette_FadeIn
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 CODE_2094AF:
@@ -2648,7 +2769,7 @@ CODE_2094BD:
 	JSL.l CODE_23E190
 	LDA.w $0014
 	BEQ.b CODE_2094AF
-	JSL.l CODE_29E2B6
+	JSL.l Palette_FadeOut
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
 	STA.w !RAM_SMB3_Global_MusicCh1
 	LDA.b #$80
@@ -3143,7 +3264,8 @@ CODE_2097EF:
 
 ;--------------------------------------------------------------------
 
-CODE_2097F2:
+;CODE_2097F2
+Clear_RAM_thru_ZeroPage:
 	STY.b $01
 	LDY.b #$00
 	STY.b $00
@@ -4365,7 +4487,7 @@ CODE_20A2EC:
 	JSL.l SMB3_BattleMode_LoadGFXTilemapsAndPalette_Main
 	LDA.b #$00
 	STA.l $7E3955
-	JSL.l CODE_29E29D
+	JSL.l Palette_FadeIn
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 CODE_20A345:
@@ -4713,7 +4835,8 @@ FlashingTitleScreen3Colors:
 	dw $153B,$15BF,$2A7F,$3F5F
 	dw $08D8,$095D,$1E1F,$32FF
 
-CODE_20B512:
+;CODE_20B512
+TitleState_OpeningSequence:
 	DEC.b !RAM_SMB3_TitleScreen_Mario_ScriptTimer
 	LDA.b !RAM_SMB3_TitleScreen_Mario_ScriptTimer
 	CMP.b #$FF
@@ -4730,7 +4853,7 @@ CODE_20B528:
 	STA.b $B8
 	LDA.b $B7
 	STA.b $B9
-	JSR.w CODE_20B646
+	JSR.w Title_DoEvent
 	JSR.w CODE_20BB4A
 	LDA.b !RAM_SMB3_TitleScreen_Enable3PaletteAnimationFlag
 	BEQ.b CODE_20B53D
@@ -4782,7 +4905,8 @@ endif
 CODE_20B582:
 	RTS
 
-CODE_20B583:
+;CODE_20B583
+Title_IntroSkip:
 	STZ.w !Vert_Scroll
 	STZ.w $0217
 	LDA.b #DATA_2AF1B1
@@ -4809,9 +4933,9 @@ CODE_20B59C:
 	LDA.b #$1D
 	ASL
 	TAX
-	LDA.l DATA_20D2FE,x
+	LDA.l Video_Upd_Table2,x
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.l DATA_20D2FE+$01,x
+	LDA.l Video_Upd_Table2+$01,x
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
 	LDA.b #DATA_20DA7C>>16
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
@@ -4900,14 +5024,15 @@ CODE_20B643:
 	STZ.b !RAM_SMB3_TitleScreen_Luigi_ScriptIndex
 	RTS
 
-CODE_20B646:
+;CODE_20B646
+Title_DoEvent:
 	LDA.b $BC
 	JSL.l SMB3_ExecutePtr_Absolute
 
 DATA_20B64C:
 	dw CODE_20B660
 	dw CODE_20B660
-	dw CODE_20B661
+	dw Title_LoadSMB3
 	dw CODE_20B688
 	dw CODE_20B69D
 	dw CODE_20B6AE
@@ -4919,14 +5044,20 @@ DATA_20B64C:
 CODE_20B660:
 	RTS
 
-CODE_20B661:					; Note: Routine that loads in the title screen logo.
+;CODE_20B661
+Title_LoadSMB3:					; Note: Routine that loads in the title screen logo.
 	LDA.b $BD
 	STA.w $0028
+	
 	INC.b $BD
+	
 	LDA.b $BD
 	CMP.b #$1D
 	BNE.b CODE_20B687
+	
 	STZ.b $BC
+	
+	;SNES: new\
 	REP.b #$20
 	LDX.b #$08
 	LDA.w #$0000
@@ -4940,6 +5071,8 @@ CODE_20B677:
 	LDA.b #$01
 	STA.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 CODE_20B687:
+;SNES: new/
+
 	RTS
 
 CODE_20B688:
@@ -7227,9 +7360,9 @@ CODE_20C749:
 	ASL
 	TAX
 
-	LDA.l DATA_20D2FE,x
+	LDA.l Video_Upd_Table2,x
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.l DATA_20D2FE+$01,x
+	LDA.l Video_Upd_Table2+$01,x
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
 	LDA.b #DATA_20DEFA>>16
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
@@ -8419,7 +8552,8 @@ DATA_20D2DE:
 
 ;Note: Stripe images.
 
-DATA_20D2FE:
+;DATA_20D2FE
+Video_Upd_Table2:
 	dw SMB3_StripeImageUploadTable[$00].LowByte				; 00
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	dw $0000				; 01
@@ -12885,7 +13019,7 @@ DATA_218B01:
 
 ; Note: This is the music set to play when loading a world after starting the game (ie. From leaving a level)
 
-;World_BGM
+;World_BGM_Arrival
 WorldMapMusic:
 ;$218B03
 	db !Define_SMB3_OverworldMusic_World1
@@ -17385,7 +17519,7 @@ PT2_Anim:
 
 ; Note: This is the music set to play when initially loading a world (ie. From the title screen)
 
-;World_BGM_Arrival/World_BGM_Restore
+;World_BGM
 SMB3_InitialWorldMapMusic:
 ;$21CA0B
 	db !Define_SMB3_OverworldMusic_World1
@@ -17968,7 +18102,9 @@ DATA_21D7AD:
 	db $4F,$4F,$4F,$4F,$E7,$4F,$4F,$4F
 
 UNK_21D7B5:
-	db $ED,$4A,$44,$47,$48,$AE,$AF,$B5
+	db $ED ; SNES: changed bottom border byte
+	
+	db $4A,$44,$47,$48,$AE,$AF,$B5
 	db $B6,$DE,$D9,$DC,$DD
 
 ;--------------------------------------------------------------------
@@ -19980,6 +20116,7 @@ UNK_21E8B3:
 
 ; Note: Tables related to tile animations.
 
+;Map_AnimSpeeds
 DATA_21E8E9:		; Note: Seems to be the animation speed of overworld tiles.
 if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
 	db $0D,$0D,$0D,$0D,$19,$19,$19,$19
@@ -28264,10 +28401,12 @@ CODE_2380AB:
 	LDA.w !RAM_SMB3_Overworld_CurrentProcess
 	CMP.b #$0D
 	BNE.b CODE_23810B
+	
 	LDX.w !RAM_SMB3_Global_CurrentWorld
 	LDY.w WorldMapMusic,x
 	CPX.b #$04
 	BNE.b CODE_2380C9
+	
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.b !RAM_SMB3_Overworld_Mario_XPosHi,x
 	BEQ.b CODE_2380C9
@@ -28477,7 +28616,7 @@ CODE_23826F:
 	JSL.l SMB3_ExecutePtr_Long
 
 DATA_238275:
-	dl CODE_2382C5			; 00 Appear on Title card
+	dl MO_WorldXIntro			; 00 Appear on Title card
 	dl CODE_238631			; 01 Initialize player (?)
 	dl CODE_29AC7A			; 02 Kicked back to last completed level on current screen
 	dl CODE_29ADFC			; 03 Kicked back to last completed level on different screen (Part 1)
@@ -28490,7 +28629,7 @@ DATA_238275:
 	dl CODE_23863B			; 0A Beat level (Part 5)
 	dl CODE_2387E4			; 0B Beat level (Part 6)
 	dl CODE_23882E			; 0C Beat level (Part 7)
-	dl CODE_238A4E			; 0D Normal
+	dl MO_NormalMoveEnter			; 0D Normal
 	dl CODE_29A9AE			; 0E Hand pulls Mario into level
 
 ;--------------------------------------------------------------------
@@ -28499,7 +28638,8 @@ DATA_238275:
 
 ;--------------------------------------------------------------------
 
-CODE_2382C5:
+;CODE_2382C5
+MO_WorldXIntro:
 	LDA.w $0728
 	JSL.l SMB3_ExecutePtr_Absolute
 
@@ -28518,7 +28658,7 @@ else
 	LDA.b #$80
 endif
 	STA.w $0711
-	JSL.l CODE_2AF800
+	JSL.l CODE_2AF800 ; SNES: new
 CODE_2382E3:
 	DEC.w $0711
 	BNE.b CODE_2382EE
@@ -29300,7 +29440,7 @@ CODE_238884:
 
 DATA_23888B:
 	dl CODE_238A0E
-	dl CODE_238A4E
+	dl MO_NormalMoveEnter
 
 ;--------------------------------------------------------------------
 
@@ -29588,7 +29728,8 @@ CODE_238A2D:
 
 ;--------------------------------------------------------------------
 
-CODE_238A4E:
+;CODE_238A4E
+MO_NormalMoveEnter:
 	LDA.b #$00
 	STA.l $7E396D
 	STA.l !RAM_SMB3_Overworld_DontDestroyEnteredSpriteFlag
@@ -30060,6 +30201,7 @@ CODE_238DD7:
 
 ;--------------------------------------------------------------------
 
+;Map_GetTile
 SMB3_GetOverworldTilePlayerIsOn:
 .Main:
 ;$238DD8
@@ -30067,31 +30209,40 @@ SMB3_GetOverworldTilePlayerIsOn:
 	LDA.b !RAM_SMB3_Overworld_Mario_XPosHi,x
 	ASL
 	TAY
+	
+	;SNES: new\
 	LDA.b #$7E2000>>16
 	STA.b $30
+	;SNES: new/
+	
 	LDA.w Tile_Mem_Addr,y
-	STA.b $2E
+	STA.b $2E	
 	LDA.w Tile_Mem_Addr+$01,y
-	INC
+	INC ; SNES: increase A instead of variable
 	STA.b $2F
+	
 	LDA.b !RAM_SMB3_Overworld_Mario_XPosLo,x
 	LSR
 	LSR
 	LSR
 	LSR
 	STA.b $00
+	
 	LDA.b !RAM_SMB3_Overworld_Mario_YPosLo,x
 	SEC
 	SBC.b #$10
 	AND.b #$F0
 	ORA.b $00
+	
 	TAY
+	
 	LDA.b [$2E],y
 	STA.b !RAM_SMB3_Global_CurrentlyProcessedMap16TileLo
+	
 	RTL
 
 ;--------------------------------------------------------------------
-
+	; FIXME: Anyone want to claim this?  (Exact same routine appears in PRG011 @ $B6F6)
 CODE_238E05:
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.b $4B,x
@@ -32391,7 +32542,8 @@ CODE_239C32:
 
 ; Note: Unreferenced routine?
 
-CODE_239CAA:
+;CODE_239CAA
+Roulette_DoFadeOut:
 	LDA.w $101C
 	BEQ.b CODE_239CB2
 	DEC.w $101C
@@ -34808,8 +34960,8 @@ CODE_23AD08:
 ;--------------------------------------------------------------------
 
 ; Note: Routine for handling the lava object?
-
-CODE_23AD09:
+;CODE_23AD09
+LoadLevel_Lava:
 	LDY.b #$00
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	STA.b $02
@@ -35333,7 +35485,8 @@ CODE_23B06C:
 
 ;--------------------------------------------------------------------
 
-CODE_23B074:
+;CODE_23B074
+LoadLevel_DonutLifts:
 	LDA.w $0706
 	AND.b #$0F
 	TAX
@@ -36110,7 +36263,7 @@ CODE_23B4DD:
 CODE_23B4E5:
 	LDA.w DATA_21A6AA,x
 	STA.b [$2E],y
-	JSL.l CODE_2A89DC
+	JSL.l SNES_DrawAdditionalSlopeTiles
 	LDA.b $00
 	STA.b $2E
 	LDA.b $01
@@ -36395,6 +36548,7 @@ CODE_23B6B7:
 	STA.b $04
 	BEQ.b CODE_23B6DF
 	
+	; Midground tiles behind slope
 CODE_23B6C0:
 	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
@@ -36408,10 +36562,12 @@ CODE_23B6C0:
 	BEQ.b CODE_23B6D7
 ;/
 CODE_23B6D2:
+
 	LDA.w LL_SlopeMidGround,x
 	STA.b [$2E],y
 CODE_23B6D7:
 	JSL.l LoadLevel_NextColumn
+	
 	DEC.b $04
 	BNE.b CODE_23B6C0
 	
@@ -36424,19 +36580,22 @@ CODE_23B6DF:
 	;X = 0
 	PHX
 	LDX.b #$04
-	JSL.l CODE_2A89DC
+	JSL.l SNES_DrawAdditionalSlopeTiles
 	PLX
 CODE_23B6EF:
 ;/
 	JSL.l LoadLevel_NextColumn
+	
 	LDA.w LL_225SlopesT2B_Lower,x
 	STA.b [$2E],y
+	
 ;SNES_start
 	CMP.b #$9F
 	BNE.b CODE_23B700
-	JSL.l CODE_2A89DC
+	JSL.l SNES_DrawAdditionalSlopeTiles
 CODE_23B700:
 ;SNES_fin
+
 	LDA.b $00
 	STA.b $2E
 	LDA.b $01
@@ -37421,7 +37580,7 @@ CODE_23BDA1:
 	BNE.b CODE_23BDAD
 	PHX
 	LDX.b #$02
-	JSL.l CODE_2A89DC
+	JSL.l SNES_DrawAdditionalSlopeTiles
 	PLX
 CODE_23BDAD:
 	CMP.b #$99
@@ -37914,7 +38073,7 @@ CODE_23C0D2:
 	LDA.b #$FF
 	STA.w !RAM_SMB3_Level_Player_FlightTimer
 CODE_23C108:
-	JSR.w CODE_23C1C9
+	JSR.w LevelInit_EnableSlopes
 CODE_23C10B:
 	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
 	BEQ.b CODE_23C130
@@ -38042,8 +38201,10 @@ CODE_23C19F:
 CODE_23C1BF:
 	STA.w $0571
 	STY.w $0377
-	JSL.l CODE_23C227
-CODE_23C1C9:
+	JSL.l CODE_23C227 ; SNES: jump to sub instead of jump? will drop down and enable slopes here
+	
+;CODE_23C1C9
+LevelInit_EnableSlopes:
 	LDY.b #$01
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	CMP.b #$03
@@ -38074,7 +38235,7 @@ CODE_23C1E7:
 	STA.w $0561
 	JSR.w CODE_23C467
 	JSR.w CODE_23C10B
-	JSR.w CODE_23C1C9
+	JSR.w LevelInit_EnableSlopes
 	LDA.w !RAM_SMB3_Level_Player_BoardAirshipAnimationState
 	BEQ.b CODE_23C215
 	LDA.b #$00
@@ -47051,7 +47212,7 @@ DATA_24895A:
 	dl SMB3_ConstructedPlainResizableObj2C_VerticalScreenScrollingPipe_Main
 	dl LoadLevel_LittleCloudSolidRun
 	dl SNESLoadLevel_BonusGenerator ; bonus room generator
-	dl CODE_2A8394 ; giant bush
+	dl SNESLoadLevel_GiantBush ; giant bush
 
 ;--------------------------------------------------------------------
 
@@ -47385,7 +47546,7 @@ DATA_24AE00:
 	dl CODE_23BD06
 	dl LoadLevel_CloudRun
 	dl SNESLoadLevel_BonusGenerator
-	dl CODE_2AB753
+	dl SNESLoadLevel_TunnelEdge
 	dl CODE_2AB787
 
 ;--------------------------------------------------------------------
@@ -47651,7 +47812,7 @@ SMB3_ProcessSnowySkyPlainResizableObjects:
 	JSL.l SMB3_ExecutePtr_Long
 
 DATA_24E6B2:
-	dl CODE_24E7F9
+	dl LoadLevel_LongWoodBlock
 	dl CODE_24E821
 	dl CODE_24E821
 	dl CODE_24E876
@@ -47696,17 +47857,17 @@ DATA_24E6B2:
 	dl LoadLevel_TopDecoBlocks
 	dl CODE_23AABC
 	dl CODE_23A790
-	dl CODE_24E978
-	dl CODE_24E978
-	dl CODE_24E978
-	dl CODE_23B074
+	dl LoadLevel_IceBlocks
+	dl LoadLevel_IceBlocks
+	dl LoadLevel_IceBlocks
+	dl LoadLevel_DonutLifts
 	dl CODE_23B04A
 	dl CODE_23B04A
 	dl CODE_23B042
 	dl CODE_24E99F
 	dl CODE_23B028
-	dl CODE_24EA6D
-	dl CODE_2AB77C
+	dl LoadLevel_Muncher17
+	dl SNESLoadLevel_SnowPlatformTiles
 
 ;--------------------------------------------------------------------
 
@@ -47780,7 +47941,8 @@ CODE_24E7E8:
 
 ;--------------------------------------------------------------------
 
-CODE_24E7F9:
+;CODE_24E7F9
+LoadLevel_LongWoodBlock:
 	JSR.w CODE_24EA81
 	LDY.w $0700
 	LDA.b #$4A
@@ -48017,7 +48179,7 @@ CODE_24E95E:
 DATA_24E975:
 	db $3A,$56,$55
 
-CODE_24E978:
+LoadLevel_IceBlocks:
 	LDA.w $0706
 	PHA
 	SEC
@@ -48193,7 +48355,8 @@ CODE_24EA6C:
 
 ;--------------------------------------------------------------------
 
-CODE_24EA6D:
+;CODE_24EA6D
+LoadLevel_Muncher17:
 	JSR.w CODE_24EA81
 	LDY.w $0700
 CODE_24EA73:
@@ -48527,10 +48690,10 @@ DATA_25894C:
 	dl CODE_23B042
 	dl CODE_258BCE
 	dl CODE_258DC4
-	dl CODE_23B074
+	dl LoadLevel_DonutLifts
 	dl CODE_258C62
-	dl CODE_258DD9
-	dl CODE_2A85CF
+	dl LoadLevel_WaterFill
+	dl SNESLoadLevel_THTileGen
 
 ;--------------------------------------------------------------------
 
@@ -49171,7 +49334,8 @@ CODE_258DCD:
 
 ;--------------------------------------------------------------------
 
-CODE_258DD9:
+;CODE_258DD9
+LoadLevel_WaterFill:
 	LDY.b #$00
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	STA.b $02
@@ -49729,8 +49893,8 @@ DATA_25B087:
 	dl CODE_25B6CF
 	dl CODE_23A811
 	dl CODE_23A91B
-	dl CODE_23AD09
-	dl CODE_2A8598
+	dl LoadLevel_Lava
+	dl SNESLoadLevel_GiantEdge
 
 ;--------------------------------------------------------------------
 
@@ -50823,7 +50987,7 @@ DATA_25D55D:
 	dl CODE_23A91B
 	dl SNESLoadLevel_BonusGenerator
 	dl CODE_2A8483
-	dl CODE_2AB753
+	dl SNESLoadLevel_TunnelEdge
 
 ;--------------------------------------------------------------------
 
@@ -53664,7 +53828,7 @@ DATA_2688AE:
 	dl CODE_268B66
 	dl CODE_268B8D
 	dl CODE_268B8D
-	dl CODE_23AD09
+	dl LoadLevel_Lava
 	dl CODE_23B04A
 	dl CODE_23B04A
 	dl CODE_23AC19
@@ -53674,7 +53838,7 @@ DATA_2688AE:
 	dl CODE_23AC80
 	dl CODE_23ACAF
 	dl CODE_268ABB
-	dl CODE_23B074
+	dl LoadLevel_DonutLifts
 
 ;--------------------------------------------------------------------
 
@@ -54367,7 +54531,7 @@ DATA_26B062:
 	dl CODE_26B620
 	dl CODE_26B655
 	dl CODE_26B66F
-	dl CODE_26B849
+	dl LoadLevel_InvisibleSolid
 	dl CODE_2A838C
 	dl CODE_2A8338
 
@@ -55409,7 +55573,8 @@ CODE_26B840:
 
 ;--------------------------------------------------------------------
 
-CODE_26B849:
+;CODE_26B849
+LoadLevel_InvisibleSolid:
 	LDA.w $0706
 	AND.b #$0F
 	TAX
@@ -72656,7 +72821,8 @@ CODE_27DC97:
 
 ;--------------------------------------------------------------------
 
-CODE_27DCA1:
+;CODE_27DCA1
+SNES_DoorTransitionAnimation:
 	LDA.w $034E
 	BNE.b CODE_27DCA7
 	RTL
@@ -85415,7 +85581,8 @@ SMB3_ProcessOverworldStaticObjects:
 
 ;--------------------------------------------------------------------
 
-CODE_29C280:
+;CODE_29C280
+CineKing_DoWandReturn:
 	LDA.w $0711
 	BEQ.b CODE_29C288
 	DEC.w $0711
@@ -85445,8 +85612,8 @@ DATA_29C2B3:
 	dw CODE_29C2BD
 	dw CODE_29C43A
 	dw CODE_29C4BA
-	dw CODE_29C312
-	dw CODE_29C350
+	dw TAndK_FadeOutAndGetItem
+	dw TAndK_WaitForA
 
 ;--------------------------------------------------------------------
 
@@ -85501,9 +85668,11 @@ endif
 
 ;--------------------------------------------------------------------
 
-CODE_29C312:
+;CODE_29C312
+TAndK_FadeOutAndGetItem:
 	LDA.w $0711
 	BEQ.b CODE_29C31D
+	
 	LSR
 	BNE.b CODE_29C34F
 	JMP.w Palette_PrepareFadeOutTK
@@ -85514,6 +85683,7 @@ CODE_29C31D:
 	BNE.b CODE_29C34F
 	DEC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	BNE.b CODE_29C34F
+	
 	JSR.w CODE_29CCF8
 	LDA.b #$01
 	STA.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
@@ -85534,7 +85704,9 @@ CODE_29C34F:
 
 ;--------------------------------------------------------------------
 
-CODE_29C350:
+;CODE_29C350
+TAndK_WaitForA:
+
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$06
 	BEQ.b CODE_29C36B
@@ -85551,6 +85723,9 @@ CODE_29C359:
 	DEY
 	BNE.b CODE_29C359
 CODE_29C36B:
+
+;SNES:new \ fade routine
+
 	LDA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	CMP.b #$0F
 	BEQ.b CODE_29C395
@@ -85578,8 +85753,11 @@ CODE_29C37A:
 CODE_29C392:
 	STY.w !RAM_SMB3_Global_MusicCh1
 CODE_29C395:
+;SNES:new/
+
 	LDA.w $0711
 	BEQ.b CODE_29C3A5
+	
 	LSR
 	BNE.b CODE_29C3A2
 	LDA.b #!Define_SMB3_LevelMusic_MusicFade
@@ -86241,7 +86419,7 @@ SNES_Setup_PalData:
 
 ;$0000 - no special palette
 DATA_29C799:
-	dw $1000
+	dw $1000 ; overworld
 	dw DATA_3C9000
 	dw DATA_3C9580
 	dw DATA_3C9B00
@@ -86257,9 +86435,9 @@ DATA_29C799:
 	dw DATA_3C9160
 	dw DATA_3C9420
 	dw $2000
-	dw $2001
+	dw $2001 ; $10
 	dw $2002
-	dw $3000
+	dw $3000 ; battle mode
 
 DATA_29C7BF:
 	dw DATA_3C9E00,DATA_3C9E80,DATA_3C9E00,DATA_3C9F00
@@ -86336,7 +86514,7 @@ SNES_Setup_PalData_B:
 	CMP.w #$2000
 	BEQ.b CODE_29C8A9
 	CMP.w #$3000
-	BEQ.b CODE_29C89F
+	BEQ.b CODE_29C89F ; branch if battle mode
 	
 ;check if throne room
 	
@@ -86772,27 +86950,31 @@ CODE_29CC14:
 	AND.w #$00FF
 	CMP.w #$0004
 	BNE.b CODE_29CC59
+	
+; world 5 palette condition
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	AND.w #$00FF
 	TAX
-	LDA.l $7E3977,x
+	LDA.l $7E3977,x ; check for Map_Entered_XHi
 	AND.w #$00FF
 	BEQ.b CODE_29CC42
+; this is beyond the first screen, use the special palette
 	LDA.w #$0009
 	BRA.b CODE_29CC5F
 
 CODE_29CC42:
+; on first screen
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	AND.w #$00FF
 	TAY
-	LDA.w $0047,y
+	LDA.w $0047,y ; World_Map_X
 	AND.w #$00FF
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_U|!ROM_SMAS_J1) != $00
 	CMP.w #$00E0
 else
 	CMP.w #$00E1
 endif
-	BCC.b CODE_29CC59
+	BCC.b CODE_29CC59 ; if player is a tile beyond the tower level, use a custom palette
 	LDA.w #$0009
 	BRA.b CODE_29CC5F
 
@@ -87490,7 +87672,8 @@ Palette_PrepareFadeOutTK_Entry:
 
 ; Todo: Unreferrenced routine.
 
-CODE_29D2A0:
+;CODE_29D2A0
+Palette_DoFadeInTK:
 	LDA.w $101C
 	BEQ.b CODE_29D2A8
 	DEC.w $101C
@@ -88280,7 +88463,7 @@ CODE_29DABC:
 
 CODE_29DABD:
 	JSL.l SMB3_DrawPlayerLetterOnStatusBar_Main
-	JSR.w CODE_29E6AA
+	JSR.w StatusBar_Fill_Lives
 	LDX.b $08
 	LDA.w $1F4A
 	CMP.b #$F0
@@ -88983,15 +89166,17 @@ CODE_29DFA1:
 
 ; Note: Something related to warping from a pipe in level?
 
-; palette fade removed: performed prior
+; SNES: palette fade removed here.
 
 HandleLevelJunction:
 	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
+	
 	LDA.w !RAM_SMB3_Global_FrameCounter
 	AND.b #$01
 	BNE.b HandleLevelJunction
 	DEC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	BNE.b HandleLevelJunction
+	
 	LDA.b #$80
 	STA.w !REGISTER_ScreenDisplayRegister
 	
@@ -89347,6 +89532,9 @@ LevelJct_SpecialToadHouse:
 
 ;CODE_29E24A
 Palette_PrepareFadeOut_Entry:
+
+	;SNES: removed all NES code for fading.
+
 	LDA.b #$04
 	STA.w $101D ; 
 	STA.w $101C
@@ -89358,7 +89546,8 @@ Palette_PrepareFadeOut_Entry:
 
 ;--------------------------------------------------------------------
 
-CODE_29E256:
+;CODE_29E256
+Palette_DoFadeIn:
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$01
 	BNE.b CODE_29E26A
@@ -89384,7 +89573,10 @@ CODE_29E273:
 
 ;--------------------------------------------------------------------
 
-CODE_29E274:
+; NOTE: unused code.
+
+;CODE_29E274
+Palette_DoFadeOut:
 	LDA.w $101E
 	BNE.b CODE_29E294
 	LDA.w $101C
@@ -89395,9 +89587,14 @@ CODE_29E281:
 	BEQ.b CODE_29E294
 	LDA.w $101C
 	BNE.b CODE_29E293
+	
 	LDA.b #$04
 	STA.w $101C
+	
 	DEC.w $101D
+	
+	;SNES: removed all NES code for palette adjustment.
+	
 CODE_29E293:
 	RTS
 
@@ -89409,23 +89606,24 @@ CODE_29E294:
 
 ;--------------------------------------------------------------------
 
-;SNES: new palette fade out routine?
-CODE_29E29D:
-	JSR.w Palette_PrepareFadeOut_Entry
+;CODE_29E29D
+Palette_FadeIn:
+	JSR.w Palette_PrepareFadeOut_Entry ; SNES: no Palette_PrepareFadeIn	(e.g. setting CLC)
 	LDA.b #$80
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
 	LDA.b #$00
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 CODE_29E2A9:
 	JSL.l GraphicsBuf_Prep_And_WaitVSync_Long
-	JSR.w CODE_29E256
+	JSR.w Palette_DoFadeIn
 	LDA.w $101D
 	BNE.b CODE_29E2A9
 	RTL
 
 ;--------------------------------------------------------------------
 
-CODE_29E2B6:
+;CODE_29E2B6
+Palette_FadeOut:
 	JSL.l Palette_PrepareFadeOut
 	LDA.b #$A0
 	STA.w !REGISTER_IRQNMIAndJoypadEnableFlags
@@ -89458,7 +89656,8 @@ CODE_29E2E7:
 
 ; Todo: Unreferrenced routine.
 
-CODE_29E2F2:
+;CODE_29E2F2:
+Map_EnterLevel_Effect:
 	PHB
 	LDA.b #SMB3_MainDataBank_Main>>16
 	PHA
@@ -89528,7 +89727,7 @@ CODE_29E37D:
 	DEY
 	BPL.b CODE_29E328
 CODE_29E380:
-	JSR.w CODE_29E3B7
+	JSR.w Border_Do
 	INC.w $104F
 	LDA.w $104F
 	AND.b #$03
@@ -89555,7 +89754,8 @@ CODE_29E3B5:
 	PLB
 	RTL
 
-CODE_29E3B7:
+;CODE_29E3B7:
+Border_Do:
 	LDA.w $104F
 	JSL.l SMB3_ExecutePtr_Absolute
 
@@ -89897,22 +90097,25 @@ CODE_29E663:
 
 ;--------------------------------------------------------------------
 
-CODE_29E6AA:
+;CODE_29E6AA
+StatusBar_Fill_Lives:
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDY.b #$00
 	LDA.w !RAM_SMB3_Level_Player_MariosLives,x
 	CMP.b #$FF
 	BNE.b CODE_29E6BA
-	LDA.b #$90
+	
+	LDA.b #$90 ; SNES: new, use "0" tile
 	BRA.b CODE_29E6D0
 
 CODE_29E6BA:
-	CMP.b #$63
+	CMP.b #$63 ; SNES: 99 is the cap value, not 100
 	BMI.b CODE_29E6C3
-	LDA.b #$62
+	
+	LDA.b #$62 ; SNES: set to 98
 	STA.w !RAM_SMB3_Level_Player_MariosLives,x
 CODE_29E6C3:
-	INC
+	INC ; SNES: increase
 CODE_29E6C4:
 	CMP.b #$0A
 	BMI.b CODE_29E6CE
@@ -90309,7 +90512,7 @@ CODE_29EA69:
 StatusBar_UpdateValues:
 	JSR.w StatusBar_Fill_PowerMT
 	JSR.w CODE_29E6E0
-	JSR.w CODE_29E6AA
+	JSR.w StatusBar_Fill_Lives
 	JSL.l CODE_29E7AA
 	JSR.w SMB3_UpdateLevelTimer_Main
 
@@ -92757,7 +92960,8 @@ CODE_2A838C:
 
 ;--------------------------------------------------------------------
 
-CODE_2A8394:
+;CODE_2A8394
+SNESLoadLevel_GiantBush:
 	PHB
 	PHK
 	PLB
@@ -93024,7 +93228,8 @@ CODE_2A8576:
 
 ;--------------------------------------------------------------------
 
-CODE_2A8598:
+;CODE_2A8598
+SNESLoadLevel_GiantEdge:
 	PHB
 	PHK
 	PLB
@@ -93056,12 +93261,14 @@ DATA_2A85CB:
 
 ;--------------------------------------------------------------------
 
-CODE_2A85CF:
+;CODE_2A85CF
+SNESLoadLevel_THTileGen:
 	PHB
 	PHK
 	PLB
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo]
 	TAX
+	
 	REP.b #$20
 	INC.b !RAM_SMB3_Level_LevelDataPtrLo
 	LDA.b $2E
@@ -93069,16 +93276,21 @@ CODE_2A85CF:
 	LDA.w #$0001
 	STA.b $DB
 	SEP.b #$20
+	
 	LDA.b $30
 	STA.b $DA
+	
 	LDA.w $0706
 	AND.b #$0F
 	STA.b $03
+	
 	LDY.w $0700
 	TXA
 	BEQ.b CODE_2A8648
+	
 	CPX.b #$04
 	BNE.b CODE_2A8615
+	
 	REP.b #$20
 	DEC.b $D8
 	DEC.b $D8
@@ -93106,8 +93318,10 @@ CODE_2A8615:
 	STA.b [$D8],y
 	JSR.w CODE_2A8AD2
 	JSR.w CODE_2A86F5
+	
 	CPX.b #$04
 	BNE.b CODE_2A8653
+	
 	LDA.b #$48
 	STA.b [$D8],y
 	REP.b #$20
@@ -93717,27 +93931,36 @@ DATA_2A89D7:
 DATA_2A89DA:
 	db $08,$0A
 
-CODE_2A89DC:
+;CODE_2A89DC
+SNES_DrawAdditionalSlopeTiles:
 	PHB
 	PHK
 	PLB
+	
 	PHX
 	PHY
+	
+; tile A
+	
 	REP.b #$20
 	LDA.b $2E
 	STA.b $D8
 	SEP.b #$20
+	
 	LDA.b $30
 	STA.b $DA
+	
 	REP.b #$20
 	INY
 	TYA
 	AND.w #$000F
 	BNE.b CODE_2A89FE
+	
 	LDA.b $D8
 	CLC
 	ADC.w #$01A0
 	STA.b $D8
+	
 CODE_2A89FE:
 	SEP.b #$20
 	LDA.b [$D8],y
@@ -93748,6 +93971,9 @@ CODE_2A89FE:
 	STA.b [$D8],y
 	JSR.w CODE_2A8AD2
 CODE_2A8A0E:
+
+; tile B
+
 	PLY
 	PLX
 	PHX
@@ -93762,12 +93988,17 @@ CODE_2A8A0E:
 	TYA
 	AND.b #$0F
 	BNE.b CODE_2A8A31
-	REP.b #$20
+	
+	; warning: danger of storing into invalid memory!
+	; the original game stores into memory position $7E1EAF from LoadLevel_Slope225T2B in W105L, which fortunately is unused RAM.
+	
+	REP.b #$20	
 	LDA.b $D8
 	SEC
 	SBC.w #$01A0
-	STA.b $D8
+	STA.b $D8	
 	SEP.b #$20
+	
 CODE_2A8A31:
 	DEY
 	LDA.b [$D8],y
@@ -93782,9 +94013,12 @@ CODE_2A8A31:
 	CMP.b #$0D
 	BEQ.b CODE_2A8A50
 	LDA.w DATA_2A89D7,x
-	STA.b [$D8],y
+	STA.b [$D8],y ; store 
 	JSR.w CODE_2A8AD2
 CODE_2A8A50:
+
+; tile C
+
 	PLY
 	PHY
 	LDA.b [$2E],y
@@ -93805,12 +94039,14 @@ CODE_2A8A5E:
 	TYA
 	AND.b #$0F
 	BNE.b CODE_2A8A7E
-	REP.b #$20
+	
+	REP.b #$20	
 	LDA.b $D8
 	CLC
 	ADC.w #$01A0
-	STA.b $D8
+	STA.b $D8	
 	SEP.b #$20
+	
 CODE_2A8A7E:
 	LDX.b #$03
 	LDA.b [$D8],y
@@ -93821,12 +94057,14 @@ CODE_2A8A7E:
 	TYA
 	AND.b #$0F
 	BNE.b CODE_2A8A9B
+	
 	REP.b #$20
 	LDA.b $D8
 	SEC
 	SBC.w #$01A0
-	STA.b $D8
+	STA.b $D8	
 	SEP.b #$20
+	
 CODE_2A8A9B:
 	BRA.b CODE_2A8A9F
 
@@ -93838,29 +94076,41 @@ CODE_2A8A9F:
 	STA.b [$D8],y
 	JSR.w CODE_2A8AD2
 CODE_2A8AA8:
+
+; tile D
+
 	TYA
 	AND.b #$0F
 	BNE.b CODE_2A8AB9
-	REP.b #$20
+	
+	REP.b #$20	
 	LDA.b $D8
 	SEC
 	SBC.w #$01A0
 	STA.b $D8
 	SEP.b #$20
+	
 CODE_2A8AB9:
 	DEY
+	
 	LDA.b [$2E],y
 	CMP.b #$9F
 	BNE.b CODE_2A8ACE
+	
 	LDA.b [$D8],y
 	CMP.b #$86
 	BNE.b CODE_2A8ACE
+	
 	LDA.w DATA_2A89DA
 	STA.b [$D8],y
 	JSR.w CODE_2A8AD2
 CODE_2A8ACE:
+
+; end
+
 	PLY
 	PLX
+	
 	PLB
 	RTL
 
@@ -99761,7 +100011,8 @@ CODE_2AB73A:
 
 ;--------------------------------------------------------------------
 
-CODE_2AB753:
+;CODE_2AB753
+SNESLoadLevel_TunnelEdge:
 	PHX
 	LDA.b $30
 	STA.b $DA
@@ -99786,7 +100037,8 @@ DATA_2AB778:
 
 ;--------------------------------------------------------------------
 
-CODE_2AB77C:
+;CODE_2AB77C
+SNESLoadLevel_SnowPlatformTiles:
 	LDY.w $0700
 	LDA.b #$23
 	STA.b [$2E],y
@@ -102492,9 +102744,9 @@ else
 	LDA.b #$20							;\ Optimization: Why even bother indexing this table?
 	ASL								;|
 	TAX								;/
-	LDA.l DATA_20D2FE,x
+	LDA.l Video_Upd_Table2,x
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.l DATA_20D2FE+$01,x
+	LDA.l Video_Upd_Table2+$01,x
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
 endif
 	LDA.b #SMB3_StripeImage20_CheckerFloor_Main>>16
@@ -102511,9 +102763,9 @@ endif
 	LDA.b #$1F							;\ Optimization: More unnecessary indexing.
 	ASL								;|
 	TAX								;/
-	LDA.l DATA_20D2FE,x
+	LDA.l Video_Upd_Table2,x
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.l DATA_20D2FE+$01,x
+	LDA.l Video_Upd_Table2+$01,x
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
 	LDA.b #SMB3_StripeImage1F_CurtainShadow_Main>>16
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
@@ -102825,6 +103077,7 @@ DATA_20B0EF:
 DATA_20B0F5:
 	db $03,$03,$06,$12,$11,$00
 
+;Do_Title_Screen
 Main:
 	LDA.b #$11
 	STA.w !RAM_SMB3_Global_MainScreenLayersMirror
@@ -102865,17 +103118,21 @@ CODE_20B12D:
 CODE_20B14B:
 	LDA.b #$FF
 	STA.b !RAM_SMB3_TitleScreen_NewSpriteIndex
+	
 	LDA.b #$A0
 	STA.b !RAM_SMB3_TitleScreen_Mario_YPosLo
 	STA.b !RAM_SMB3_TitleScreen_Luigi_YPosLo
+	
 	LDA.b #$F0
 	STA.b !RAM_SMB3_TitleScreen_Mario_XPosLo
 	STZ.b !RAM_SMB3_TitleScreen_Luigi_XPosLo
 	LDA.b #$01
 	STA.b !RAM_SMB3_TitleScreen_Mario_GFXSet
 	STA.b !RAM_SMB3_TitleScreen_Luigi_GFXSet
+	
 	LDA.b #$88
 	STA.w !RAM_SMB3_Global_RandomByte01
+	
 	LDA.b #$00
 	STA.l $7F0000
 	STA.l $7F0001
@@ -102889,9 +103146,9 @@ CODE_20B14B:
 	LDA.b #$1D
 	ASL
 	TAX
-	LDA.l DATA_20D2FE,x
+	LDA.l Video_Upd_Table2,x
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.l DATA_20D2FE+$01,x
+	LDA.l Video_Upd_Table2+$01,x
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
 	LDA.b #DATA_20DA7C>>16
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
@@ -104096,11 +104353,11 @@ Main:
 	LDA.b $28
 	ASL
 	TAX
-	LDA.l DATA_20D2FE,x
+	LDA.l Video_Upd_Table2,x
 	STA.b !RAM_SMB3_Global_StripeImageDataLo
-	LDA.l DATA_20D2FE+$01,x
+	LDA.l Video_Upd_Table2+$01,x
 	STA.b !RAM_SMB3_Global_StripeImageDataHi
-	LDA.b #DATA_20D2FE>>16
+	LDA.b #Video_Upd_Table2>>16
 	STA.b !RAM_SMB3_Global_StripeImageDataBank
 	LDA.b #$01
 	STA.b $1C
@@ -105185,6 +105442,7 @@ endmacro
 ;#############################################################################################################
 ;#############################################################################################################
 
+;Title_DoState
 macro ROUTINE_SMB3_HandleCurrentTitleScreenProcess(Address)
 namespace SMB3_HandleCurrentTitleScreenProcess
 %InsertMacroAtXPosition(<Address>)
@@ -105199,12 +105457,12 @@ Main:
 
 CODE_20B3AD:
 	dw SMB3_TitleScreenState00_CurtainRise_Main
-	dw CODE_20B512					; Note: Handle title screen animations
+	dw TitleState_OpeningSequence					; Note: Handle title screen animations
 	dw CODE_20B76C					; Initialize player select?
 	dw CODE_20B79B					; Player select
 	dw CODE_20B8DE					; Initialize selection 1?
 	dw CODE_20B660					; Initialize selection 2?
-	dw CODE_20B583					; Jump to player select
+	dw Title_IntroSkip					; Jump to player select
 	dw CODE_20B940					; Debug mode
 namespace off
 endmacro
@@ -107842,10 +108100,12 @@ Main:
 	LDX.w !RAM_SMB3_Global_CurrentWorld
 	CPX.b #$07
 	BNE.b CODE_29BD4D
+	;world 8
 	LDY.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w !RAM_SMB3_Overworld_Mario_XPosHi,y
 	CMP.b #$03
 	BNE.b CODE_29BD4D
+	;screen 4
 	LDA.b #$FF
 	STA.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 	BRA.b CODE_29BD70
@@ -107882,6 +108142,7 @@ CODE_29BD7F:
 	LDX.w !RAM_SMB3_Global_CurrentWorld
 	CPX.b #$04
 	BNE.b CODE_29BD8C
+	; if world 5, use special index
 	LDA.b #$04
 	STA.b $00
 CODE_29BD8C:
@@ -112943,6 +113204,7 @@ CODE_289614:
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	CMP.b #$02
 	BNE.b CODE_289627
+	
 	LDA.b $4D,x
 	CMP.w $0771,x
 	BCC.b CODE_28964D
@@ -112963,7 +113225,7 @@ CODE_28962E:
 	LDY.w !RAM_SMB3_Global_CurrentWorld
 	CPY.b #$02
 	BEQ.b CODE_28964A
-	JSR.w CODE_2896C5
+	JSR.w Object_CalcHomingVels
 	LDA.b #$20
 CODE_28964A:
 	STA.w $0518,x
@@ -112976,7 +113238,11 @@ macro ROUTINE_RT01_SMB3_NorSpr00E_KoopaKid_Status02(Address)
 namespace SMB3_NorSpr00E_KoopaKid_Status02
 %InsertMacroAtXPosition(<Address>)
 
+;PRG001_B02E
 CODE_28965C:
+
+	; All Koopalings except Wendy and Lemmy...
+
 	LDA.w $0679,x
 	ASL
 	ROL
@@ -113019,15 +113285,18 @@ CODE_28968C:
 	STA.w !RAM_SMB3_Level_ExtSpr_XSpeed,y
 	LDA.b #$FF
 	STA.w $06D1,y
-	LDA.w $04E2
+	
+	LDA.w $04E2 ; SNES note: SndCur_Level1 never set?
 	AND.b #$80
 	BNE.b CODE_2896C4
+	
 	LDA.b #!Define_SMAS_Sound0060_CarryItemToGoal
 	STA.w !RAM_SMB3_Global_SoundCh1
 CODE_2896C4:
 	RTS
 
-CODE_2896C5:
+;CODE_2896C5
+Object_CalcHomingVels:
 	LDA.b #$14
 	STA.b $01
 	TXA
