@@ -7222,7 +7222,8 @@ CODE_20C749:
 	STA.w $0218
 	JSR.w SMB3_UploadCurtainTilemap_Main
 
-	LDA.b #$51
+    ; Entry $55 of Video_Upd_Table2
+	LDA.b #$51 ; SNES: changed to 51
 	ASL
 	TAX
 
@@ -7700,11 +7701,14 @@ EndText_DrawDiagBox:
 	PHB
 	PHK
 	PLB
+
 	LDX.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
 	LDA.b $A5
 	STA.w SMB3_StripeImageUploadTable[$00].LowByte,x
 	LDA.b $A4
 	STA.w SMB3_StripeImageUploadTable[$00].HighByte,x
+
 	CLC
 	ADC.b #$20
 	STA.b $A4
@@ -7732,28 +7736,39 @@ CODE_20CA91:
 	BPL.b CODE_20CA91
 	LDA.b #$FF
 	STA.w SMB3_StripeImageUploadTable[$02].LowByte,x
+
 	INX
 	INX
 	INX
 	INX
 	STX.w !RAM_SMB3_Global_StripeImageUploadIndexLo
+
 	INC.b !RAM_SMB3_PeachRescued_TextBoxStripeImageIndex
+
 	LDA.b !RAM_SMB3_PeachRescued_TextBoxStripeImageIndex
 	CMP.b #PeachTextBoxWindowRowIndex_End-PeachTextBoxWindowRowIndex
 	BCC.b CODE_20CAC6
+
 	LDY.b #$00
+
+    ; This basically just amounts to a zero; kind of strange?
 	LDA.w DATA_20CB22,y
 	STA.b !RAM_SMB3_PeachRescued_TextIndex
+
 	LDA.b #$50
 	STA.b $A5
+
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
 	LDA.b #$E7
 else
 	LDA.b #$E9
 endif
 	STA.b $A4
+
+    ; EndText_Timer = $10
 	LDA.b #$10
 	STA.b !RAM_SMB3_PeachRescued_WaitBeforeDisplayingText
+    ;
 	INC.b !RAM_SMB3_PeachRescued_CurrentTextBoxState
 CODE_20CAC6:
 	PLB
@@ -11567,54 +11582,81 @@ CODE_20FB1D:
 
 ;--------------------------------------------------------------------
 
+;Read_Joypads
 SMB3_PollJoypadInputs:
 .Main:
 ;$20FB5F
 	STZ.w !REGISTER_JoypadSerialPort1
+	
+	; player 1
+
 	LDA.l !SRAM_SMAS_Global_Controller1PluggedInFlag
 	TAX
+
 	LDA.w !REGISTER_Joypad1Lo,x
 	STA.b !RAM_SMB3_Global_ScratchRAM00
+
 	LDA.w !REGISTER_Joypad1Hi,x
 	STA.b !RAM_SMB3_Global_ScratchRAM01
+
 	LDA.b !RAM_SMB3_Global_ScratchRAM00
 	STA.b !RAM_SMB3_Global_ControllerHold2P1
+
 	TAY
 	EOR.b !RAM_SMB3_Global_P1CtrlDisableHi
 	AND.b !RAM_SMB3_Global_ControllerHold2P1
 	STA.b !RAM_SMB3_Global_ControllerPress2P1
+
 	STY.b !RAM_SMB3_Global_P1CtrlDisableHi
+
 	LDA.b !RAM_SMB3_Global_ScratchRAM01
 	STA.b !RAM_SMB3_Global_ControllerHold1P1
 	STA.b !RAM_SMB3_Global_ControllerHold1
+
 	TAY
 	EOR.b !RAM_SMB3_Global_P1CtrlDisableLo
 	AND.b !RAM_SMB3_Global_ControllerHold1P1
 	STA.b !RAM_SMB3_Global_ControllerPress1P1
 	STA.b !RAM_SMB3_Global_ControllerPress1
+
 	STY.b !RAM_SMB3_Global_P1CtrlDisableLo
+	
+	; player 2
+
 	LDA.l !SRAM_SMAS_Global_Controller2PluggedInFlag
 	TAX
+
 	LDA.w !REGISTER_Joypad1Lo,x
 	STA.b !RAM_SMB3_Global_ScratchRAM00
+
 	LDA.w !REGISTER_Joypad1Hi,x
 	STA.b !RAM_SMB3_Global_ScratchRAM01
+
 	LDA.b !RAM_SMB3_Global_ScratchRAM00
 	STA.b !RAM_SMB3_Global_ControllerHold2P2
+
 	TAY
 	EOR.b !RAM_SMB3_Global_P2CtrlDisableHi
 	AND.b !RAM_SMB3_Global_ControllerHold2P2
 	STA.b !RAM_SMB3_Global_ControllerPress2P2
+
 	STY.b !RAM_SMB3_Global_P2CtrlDisableHi
+
 	LDA.b !RAM_SMB3_Global_ScratchRAM01
 	STA.b !RAM_SMB3_Global_ControllerHold1P2
+
 	TAY
 	EOR.b !RAM_SMB3_Global_P2CtrlDisableLo
 	AND.b !RAM_SMB3_Global_ControllerHold1P2
 	STA.b !RAM_SMB3_Global_ControllerPress1P2
+
 	STY.b !RAM_SMB3_Global_P2CtrlDisableLo
+
+; set main controller vars from p2 if luigi
+
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_20FBC5
+; luigi
 	LDA.b !RAM_SMB3_Global_ControllerHold1P2
 	STA.b !RAM_SMB3_Global_ControllerHold1
 	LDA.b !RAM_SMB3_Global_ControllerPress1P2
@@ -14858,6 +14900,7 @@ DATA_21AF6B:
 
 ;--------------------------------------------------------------------
 
+;21AF6E
 SprRamOffsets:
 	dw $0080,$01D0,$00B0,$01A0
 	dw $00E0,$0170,$0110,$0140
@@ -38089,10 +38132,13 @@ CODE_23C260:
 Player_Update:
 	LDA.w $0578
 	BEQ.b CODE_23C2C2
+
 	CMP.b #$0F
 	BMI.b CODE_23C286
+
 	CMP.b #$80
 	BNE.b CODE_23C276
+
 	INC.w !RAM_SMB3_Level_Player_InKuriboShoeFlag
 	STZ.w !RAM_SMB3_Level_Player_IsTanookiStatueTimer
 	BRA.b CODE_23C2BA
@@ -38109,6 +38155,8 @@ CODE_23C281:
 CODE_23C286:
 	AND.b #$0F
 	TAY
+
+;SNES: new\ ;????
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	CMP.b #$02
 	BEQ.b CODE_23C293
@@ -38138,6 +38186,8 @@ CODE_23C2A4:
 	PLX
 	PLY
 CODE_23C2BA:
+;SNES: new/
+
 	LDA.b #$00
 	STA.w $0578
 	JSR.w CODE_23C467
@@ -38372,29 +38422,38 @@ CODE_23C463:
 	JSR.w CODE_23C467
 	RTL
 
+;Level_SetPlayerPUpPal
 CODE_23C467:
 ;$23C467
 	LDY.b #$07
+;SNES\ : check for fire luigi
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_23C477
+
+;luigi
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	CMP.b #$02
 	BNE.b CODE_23C477
+; fire luigi
 	INY
 	BRA.b CODE_23C48A
 
 CODE_23C477:
+;SNES/
 	LDA.w !RAM_SMB3_Level_Player_IsTanookiStatueTimer
 	BNE.b CODE_23C48A
+
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	TAY
 	CMP.b #$03
 	BEQ.b CODE_23C487
+
 	CMP.b #$02
 	BPL.b CODE_23C48A
 CODE_23C487:
 	LDY.w !RAM_SMB3_Level_Player_CurrentCharacter
 CODE_23C48A:
+;SNES:\ palette update
 	PHX
 	REP.b #$30
 	TYA
@@ -38419,6 +38478,7 @@ CODE_23C4A6:
 	PLX
 	LDA.b #$01
 	STA.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
+;SNES:/
 	RTS
 
 ;--------------------------------------------------------------------
@@ -65174,11 +65234,14 @@ Object_BumpOffOthers:
 	ADC.b !RAM_SMB3_Global_FrameCounter
 	LSR
 	BCS.b CODE_2793E0
+
 	JSL.l SMB3_CheckIfNormalSpriteOffScreen_Main
 	BNE.b CODE_2793E0
+
 	JSL.l CODE_27A43A
 	TXA
 	BEQ.b CODE_2793E0
+
 	DEX
 CODE_2793A9:
 ;hijacked
@@ -65471,12 +65534,16 @@ CODE_2795B0:
 Player_KickObject:
 	LDA.w $0571
 	BNE.b CODE_2795B0
+
 	LDA.b #!Define_SMAS_Sound0060_KickShell
 	STA.w !RAM_SMB3_Global_SoundCh1
+
 	LDA.b #$0C
 	STA.w !RAM_SMB3_Level_Player_KickAnimationTimer
+
 	LDA.b #$10
 	STA.w $0520,x
+
 	LDA.w !RAM_SMB3_Level_NorSpr_SpriteID,x	; sprite hijack
 	CMP.b #!Define_SMB3_SpriteID_NorSpr050_BobOmb
 	BEQ.b CODE_2795D2
@@ -65485,8 +65552,10 @@ Player_KickObject:
 CODE_2795D2:
 	LDA.b #$02
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
+
 	LDA.b #$E0
 	STA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
+
 	JSL.l SMB3_CheckPlayerPositionRelativeToSprite_X
 	LDA.w DATA_21AFC1,y
 	STA.b !RAM_SMB3_Level_NorSpr_XSpeed,x
@@ -66219,6 +66288,7 @@ CODE_279AE7:
 
 CODE_279AEC:
 	INC.w $1CF6,x
+;Object_SetShellState
 CODE_279AEF:
 	LDA.b #$03
 	STA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
@@ -66226,6 +66296,7 @@ CODE_279AEF:
 	STA.w $06A6,x
 	RTS
 
+;Object_HoldKickOrHurtPlayer
 CODE_279AFA:
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,x
 	CMP.b #$03
@@ -67203,33 +67274,46 @@ CODE_27A19E:
 	LDY.b #$07
 CODE_27A1A1:
 	STY.b $06
+
 	LDX.b $9B
+
 	LDA.w !RAM_SMB3_Global_RandomByte02,x
 	AND.b #$07
 	CLC
 	ADC.b $06
 	TAY
+
 	LDA.w DATA_21AFFB,y
 	TAY
 	STY.b $08
+
 	LDA.w !RAM_SMB3_Level_NorSpr_CurrentStatus,y
 	BEQ.b CODE_27A1D2
+
 CODE_27A1B9:
 	LDY.b $06
 	DEY
 	BPL.b CODE_27A1A1
+
+;SNES:\
 	JSR.w CODE_27A203
 	BCS.b CODE_27A1F2
+;SNES;/
 	LDX.b #$20
+
 	LDA.w !RAM_SMB3_Global_RandomByte02
 	BPL.b CODE_27A1CC
-	LDX.b #$30
+
+	LDX.b #$30 ; SNES: changed from #$24
 CODE_27A1CC:
+;SNES:\
 	STX.b $D8
 	STZ.b $D9
+;SNES:/
 	BRA.b CODE_27A1F2
 
 CODE_27A1D2:
+; Object slot is dead/empty...
 	TYA
 	CLC
 	ADC.w $055D
@@ -67590,6 +67674,7 @@ CODE_27A412:
 
 ; Note: Routine that gets sprite to sprite clipping values?
 
+;27A413
 Object_CalcBoundBox:
 ;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -67617,6 +67702,7 @@ Object_CalcBoundBox:
 
 ; Note: Routine that gets sprite to sprite clipping values?
 
+;Object_CalcBoundBox2
 CODE_27A43A:
 ;hijacked
 	LDY.w !RAM_SMB3_Level_NorSpr_SpriteID,x
@@ -68155,6 +68241,7 @@ CODE_27A7C5:
 
 ;--------------------------------------------------------------------
 
+;Object_ApplyYVel
 CODE_27A7D9:
 	LDA.b !RAM_SMB3_Level_NorSpr_YSpeed,x
 	BMI.b CODE_27A7E5
@@ -68200,6 +68287,7 @@ CODE_27A806:
 
 ;--------------------------------------------------------------------
 
+;Object_AnySprOffscreen
 SMB3_CheckIfNormalSpriteOffScreen:
 .Main:
 ;$27A860
@@ -69369,7 +69457,7 @@ CODE_27B55B:
 
 CODE_27B55E:
 	SEP.b #$20
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	REP.b #$10
 	LDY.b $C6,x
 	LDA.b $01
@@ -71646,7 +71734,7 @@ CODE_27C5CD:
 	BMI.b CODE_27C5D6
 CODE_27C5D1:
 	SEP.b #$20
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 
 CODE_27C5D6:
 	LDA.w !RAM_SMB3_Level_ExtSpr_SpriteID,x
@@ -71716,7 +71804,7 @@ if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
 	INC.w !RAM_SMB3_Level_ExtSpr_YSpeed,x
 endif
 CODE_27C7CC:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
@@ -71746,7 +71834,7 @@ CODE_27C7F2:
 	STA.b $D8
 	SEP.b #$20
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.b #$4A
 	STA.w SMB3_OAMBuffer[$00].Tile,y
 	LDA.b #$06
@@ -71828,7 +71916,7 @@ CODE_27C8A1:
 	LDA.w !RAM_SMB3_Level_ExtSpr_YSpeed,x
 	CMP.b #$20
 	BMI.b CODE_27C8B6
-	JSR.w CODE_27D382
+	JSR.w SpecialObj_Remove
 	INC.w !RAM_SMB3_Global_CoinsToGive
 	JSR.w CODE_278ADB
 	LDA.b #$89
@@ -71846,7 +71934,7 @@ CODE_27C8B6:
 	STA.b $D8
 	SEP.b #$20
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].XDisp,y
 	CLC
 	ADC.b #$04
@@ -71936,15 +72024,19 @@ CODE_27CD7A:
 
 ;--------------------------------------------------------------------
 
-CODE_27CE16:
+;CODE_27CE16
+SObj_SetSpriteXYRelative:
+
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	SEC
 	SBC.w $0543
 	STA.w SMB3_OAMBuffer[$00].YDisp,y
+
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
 	SEC
 	SBC.w $0210
 	STA.w SMB3_OAMBuffer[$00].XDisp,y
+
 	RTS
 
 ;--------------------------------------------------------------------
@@ -71955,7 +72047,7 @@ CODE_27CE16:
 ;--------------------------------------------------------------------
 
 CODE_27CF49:
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
 	STA.w SMB3_OAMBuffer[$02].YDisp,y
 	CLC
@@ -71988,7 +72080,7 @@ if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
 	JSR.w CODE_27CC21
 endif
 CODE_27D234:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BEQ.b CODE_27D23A
 	RTS
 
@@ -72094,7 +72186,9 @@ CODE_27D2F3:
 	LDA.w $06C7,x
 	AND.b #$0F
 	BNE.b CODE_27D35A
-CODE_27D305:
+
+;CODE_27D305
+SObj_PlayerCollide:
 	TXA
 	CLC
 	ADC.b !RAM_SMB3_Global_FrameCounter
@@ -72157,7 +72251,7 @@ endif
 	STA.w $02E3
 	LDA.b #$01
 	STA.w $02E4
-	BRA.b CODE_27D382
+	BRA.b SpecialObj_Remove
 
 CODE_27D378:
 	LDA.w !RAM_SMB3_Level_Player_StarPowerTimer
@@ -72165,7 +72259,8 @@ CODE_27D378:
 	JSL.l Player_GetHurt
 	RTS
 
-CODE_27D382:
+;CODE_27D382
+SpecialObj_Remove:
 	LDA.b #!Define_SMB3_SpriteID_ExtSpr00_NoSprite
 	STA.w !RAM_SMB3_Level_ExtSpr_SpriteID,x
 CODE_27D387:
@@ -72282,15 +72377,21 @@ CODE_27D410:
 
 ;--------------------------------------------------------------------
 
-CODE_27D72B:
+;CODE_27D72B
+SObj_GetSprRAMOffChkVScreen:
+;SNES: new\
+
 	REP.b #$10
 	LDA.b #$07
 	STA.b $DA
 	STX.b $D8
 	STZ.b $D9
+
+; first loop: find random vacant slots
 CODE_27D735:
 	LDA.b #$00
 	XBA
+
 	REP.b #$20
 	LDA.b $D8
 	AND.w #$00FF
@@ -72300,6 +72401,7 @@ CODE_27D735:
 	STA.b $C6,x
 	TAY
 	SEP.b #$20
+
 	LDA.b $D8
 	INC
 	AND.b #$07
@@ -72312,15 +72414,21 @@ CODE_27D735:
 CODE_27D75C:
 	DEC.b $DA
 	BPL.b CODE_27D735
+
+; second loop: a finer search that goes through all of the sprite's slots (1-8)
 	LDY.w #$0080
 CODE_27D763:
 	STY.b $C6,x
+; check if two adjacent sprites have a similar Y position.
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
 	CMP.w SMB3_OAMBuffer[$01].YDisp,y
 	BNE.b CODE_27D771
-	CMP.b #$F0
-	BEQ.b CODE_27D786
+	CMP.b #$F0 ; if empty Y position, branch. this is an empty OAM object. 
+	BEQ.b CODE_27D786 
 CODE_27D771:
+
+; go to next
+
 	REP.b #$20
 	TYA
 	CLC
@@ -72329,11 +72437,15 @@ CODE_27D771:
 	SEP.b #$20
 	CPY.w #$0200
 	BNE.b CODE_27D763
+
+ ; not found. invalid OAM index set.
 	LDA.b #$00
 	STA.b $C6,x
 	STA.b $C7,x
 CODE_27D786:
 	SEP.b #$10
+;SNES: new/
+
 	LDA.b $0D
 	RTS
 
@@ -72561,7 +72673,7 @@ CODE_27DCB5:
 	BCS.b CODE_27DD11
 	JSR.w CODE_27DD67
 	LDX.b #$00
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	REP.b #$10
 	LDY.b $C6
 	LDX.w #$0000
@@ -73543,7 +73655,7 @@ CODE_288CA1:
 SMB3_NorSpr00B_1upMushroom_Status02:
 .Main:
 ;$288CA2
-	JSR.w CODE_288EC5
+	JSR.w PowerUp_DoRaise
 	LDA.w $0518,x
 	BNE.b CODE_288CD3
 	LDA.b $9C
@@ -73612,7 +73724,7 @@ SMB3_NorSpr00C_BouncingPowerUps_Status02:
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	STA.w $0769,x
 CODE_288D17:
-	JSR.w CODE_288EC5
+	JSR.w PowerUp_DoRaise
 	LDA.w $0518,x
 	BNE.b CODE_288D42
 	LDA.b $9C
@@ -73720,7 +73832,7 @@ CODE_288DBA:
 SMB3_NorSpr00D_Mushroom_Status02:
 .Main:
 ;$288DBD
-	JSR.w CODE_288EC5
+	JSR.w PowerUp_DoRaise
 	LDA.w $0518,x
 	BNE.b CODE_288DF0
 	LDA.b $9C
@@ -73861,7 +73973,8 @@ CODE_288EBF:
 
 ;--------------------------------------------------------------------
 
-CODE_288EC5:
+;CODE_288EC5:
+PowerUp_DoRaise:
 	LDA.w $0518,x
 	BNE.b CODE_288ECD
 	BRL.w CODE_288F89
@@ -73869,8 +73982,10 @@ CODE_288EC5:
 CODE_288ECD:
 	CMP.b #$2D
 	BNE.b CODE_288ED6
+
 	LDA.b #!Define_SMAS_Sound0063_HitItemBlock
 	STA.w !RAM_SMB3_Global_SoundCh3
+
 CODE_288ED6:
 	BCC.b CODE_288EDB
 	BRL.w CODE_288F88
@@ -73878,12 +73993,16 @@ CODE_288ED6:
 CODE_288EDB:
 	LDA.b #$08
 	STA.w $1A4F,x
+
 	DEC.w $0689,x
 	BPL.b CODE_288EFB
+
 	LDA.b #$02
 	STA.w $0689,x
+
 	LDA.b $9C
 	BNE.b CODE_288EFB
+
 	LDA.b $71,x
 	SEC
 	SBC.b #$01
@@ -73891,6 +74010,7 @@ CODE_288EDB:
 	LDA.b $56,x
 	SBC.b #$00
 	STA.b $56,x
+
 CODE_288EFB:
 	REP.b #$20
 	LDA.b $C6,x
@@ -74081,7 +74201,7 @@ SMB3_NorSpr019_FireFlower_Status02:
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	STA.w $0769,x
 CODE_289031:
-	JSR.w CODE_288EC5
+	JSR.w PowerUp_DoRaise
 	LDA.w $0518,x
 	BNE.b CODE_289053
 	LDA.b $9C
@@ -114628,19 +114748,26 @@ namespace SMB3_NorSpr034_ToadHouseToad_Status01
 Main:
 	LDY.b !RAM_SMB3_Level_NorSpr_YPosHi,x
 	BEQ.b CODE_28C0E5
+
 	LDA.w !RAM_SMB3_Overworld_OWSprIDBeingEntered
 	BEQ.b CODE_28C0E5
+
 	INY
 CODE_28C0E5:
 	STY.b !RAM_SMB3_NorSpr034_ToadHouseToad_MessageToDisplay,x
+
 	LDA.b #$01
 	STA.b !RAM_SMB3_Level_NorSpr_YPosHi,x
+
 	STA.w !RAM_SMB3_Level_FreezeTimeLimitFlag
-	LDA.b #$76
+
+	LDA.b #$76 ; SNES: shorter freeze timer
 	STA.w !RAM_SMB3_Level_Player_FreezePlayerTimer
+
 	STZ.b $A8
 	STZ.w !RAM_SMB3_Level_Player_BehindLayer1Timer
 	STZ.w $02D4
+
 	LDA.b #$50
 	STA.w $070B
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
@@ -121726,6 +121853,7 @@ CODE_2998AC:
 	JSL.l CODE_27A7D9
 	JSL.l Object_HitTest
 	BCC.b CODE_299928
+
 	LDA.b !RAM_SMB3_Level_Player_OnScreenYPos
 	CLC
 	ADC.b #$18
@@ -123991,7 +124119,7 @@ CODE_27D19F:
 	AND.b #$C0
 	BEQ.b CODE_27D1BA
 CODE_27D1B7:
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 
 CODE_27D1BA:
 	LDA.w $0679,y
@@ -124165,7 +124293,7 @@ CODE_27D4BB:
 	SBC.b #$00
 	CMP.b #$10
 	BCS.b CODE_27D50A
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 
 CODE_27D50A:
 	RTS
@@ -124276,7 +124404,7 @@ CODE_27D5AE:
 	JSR.w SMB3_UpdateExtendedSpritePosition_X
 	JSR.w SMB3_UpdateExtendedSpritePosition_Y
 CODE_27D5B4:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BEQ.b CODE_27D5BC
 	BRL.w CODE_27D674
 
@@ -124290,7 +124418,7 @@ CODE_27D5BC:
 	STA.b $D8
 	SEP.b #$20
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
 	CLC
 	ADC.b #$08
@@ -124370,13 +124498,13 @@ CODE_27D637:
 	PHA
 	LDA.b #$10
 	STA.w !RAM_SMB3_Level_Player_StarPowerTimer
-	JSR.w CODE_27D305
+	JSR.w SObj_PlayerCollide
 	PLA
 	STA.w !RAM_SMB3_Level_Player_StarPowerTimer
 	RTS
 
 CODE_27D671:
-	JMP.w CODE_27D305
+	JMP.w SObj_PlayerCollide
 
 CODE_27D674:
 	RTS
@@ -124502,7 +124630,7 @@ CODE_27D0BE:
 	BNE.b CODE_27D0DC
 	INC.w $06BD,x
 CODE_27D0DC:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BEQ.b CODE_27D0E4
 	BRL.w CODE_27D170
 
@@ -124536,7 +124664,7 @@ CODE_27D0E4:
 	LDY.w DATA_21C7DA,x
 	PLX
 CODE_27D115:
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
@@ -124586,7 +124714,7 @@ CODE_27D170:
 
 CODE_27D173:
 	SEP.b #$10
-	JMP.w CODE_27D305
+	JMP.w SObj_PlayerCollide
 namespace off
 endmacro
 
@@ -124608,7 +124736,7 @@ Main:
 CODE_27CF7A:
 	JSR.w SMB3_UpdateExtendedSpritePosition_X
 CODE_27CF7D:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -124677,7 +124805,7 @@ CODE_27CFEC:
 	SEP.b #$10
 	LDA.w $06C7,x
 	BNE.b CODE_27D012
-	JMP.w CODE_27D305
+	JMP.w SObj_PlayerCollide
 
 CODE_27D012:
 	RTS
@@ -124697,7 +124825,7 @@ Main:
 	JSR.w SMB3_UpdateExtendedSpritePosition_X
 	JSR.w SMB3_UpdateExtendedSpritePosition_Y
 CODE_27CE35:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -124726,7 +124854,7 @@ CODE_27CE61:
 	AND.w #$00FF
 	TAX
 	SEP.b #$20
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
 	CLC
 	ADC.b #$08
@@ -124770,7 +124898,7 @@ CODE_27CEAF:
 	STA.w SMB3_OAMTileSizeBuffer[$01].Slot,y
 	PLY
 	SEP.b #$10
-	JMP.w CODE_27D305
+	JMP.w SObj_PlayerCollide
 
 ADDR_27CEC8:							; Optimization: Unused RTS
 	RTS
@@ -124789,7 +124917,7 @@ Main:
 	BNE.b CODE_27CED0
 	JSR.w CODE_27CC1B
 CODE_27CED0:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -124868,8 +124996,8 @@ Main:
 CODE_27CD8D:
 	JSR.w SMB3_UpdateExtendedSpritePosition_Y
 CODE_27CD90:
-	JSR.w CODE_27D305
-	JSR.w CODE_27D72B
+	JSR.w SObj_PlayerCollide
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BNE.b CODE_27CE15
 	LDA.w !RAM_SMB3_Level_ExtSpr_XSpeed,x
 	AND.b #$80
@@ -124912,7 +125040,7 @@ CODE_27CDE5:
 	AND.w #$00FF
 	TAX
 	SEP.b #$20
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
@@ -124952,7 +125080,7 @@ Main:
 	DEC.w !RAM_SMB3_Level_ExtSpr_YSpeed,x
 	DEC.w !RAM_SMB3_Level_ExtSpr_YSpeed,x
 CODE_27CC46:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BNE.b CODE_27CC30
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
@@ -125123,7 +125251,7 @@ Main:
 	JSR.w SMB3_UpdateExtendedSpritePosition_X
 	JSR.w SMB3_UpdateExtendedSpritePosition_Y
 CODE_27C939:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -125133,7 +125261,7 @@ CODE_27C939:
 	STA.b $D8
 	SEP.b #$20
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
@@ -125171,7 +125299,7 @@ CODE_27C991:
 	RTS
 
 CODE_27C992:
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 namespace off
 endmacro
 
@@ -125187,7 +125315,7 @@ Main:
 	BNE.b CODE_27CBB7
 	LDA.w $06D1,x
 	BNE.b CODE_27CB80
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 
 CODE_27CB80:
 	LDA.w $06C7,x
@@ -125227,7 +125355,7 @@ CODE_27CBB7:
 	TAY
 	LDA.w DATA_21C731,y
 	STA.b $00
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -125237,7 +125365,7 @@ CODE_27CBB7:
 	STA.b $D8
 	SEP.b #$20
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
 	CLC
 	ADC.b #$08
@@ -125323,7 +125451,7 @@ CODE_27CAF9:
 CODE_27CB05:
 	LDA.w $0597,x
 	BNE.b CODE_27CB0D
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 
 CODE_27CB0D:
 	CMP.b #$30
@@ -125334,7 +125462,7 @@ CODE_27CB0D:
 	AND.b #$02
 	BNE.b CODE_27CB73
 CODE_27CB1A:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -125344,7 +125472,7 @@ CODE_27CB1A:
 	STA.b $D8
 	SEP.b #$20
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
@@ -125376,7 +125504,7 @@ CODE_27CB4D:
 	STA.w SMB3_OAMTileSizeBuffer[$00].Slot,y
 	STA.w SMB3_OAMTileSizeBuffer[$01].Slot,y
 	SEP.b #$10
-	JMP.w CODE_27D305
+	JMP.w SObj_PlayerCollide
 
 CODE_27CB73:
 	RTS
@@ -125435,7 +125563,7 @@ CODE_27C9E3:
 	ADC.b #$05
 	STA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 CODE_27C9F6:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BEQ.b CODE_27C9FC
 	RTS
 
@@ -125518,7 +125646,7 @@ CODE_27CA8A:
 	STA.w SMB3_OAMTileSizeBuffer[$03].Slot,y
 	SEP.b #$10
 	LDX.b $9B
-	JMP.w CODE_27D305
+	JMP.w SObj_PlayerCollide
 
 CODE_27CAAD:						; Optimization: Unused RTS
 	RTS
@@ -125576,7 +125704,7 @@ CODE_27C723:
 	AND.b #$02
 	BNE.b CODE_27C7A1
 CODE_27C730:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -125587,7 +125715,7 @@ CODE_27C730:
 	SEP.b #$20
 	REP.b #$10
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
 	REP.b #$20
@@ -125629,14 +125757,14 @@ CODE_27C775:
 	LDX.b $9B
 	AND.b #$01
 	BNE.b CODE_27C7A1
-	JMP.w CODE_27D305
+	JMP.w SObj_PlayerCollide
 
 CODE_27C7A1:
 	SEP.b #$20
 	RTS
 
 CODE_27C7A4:
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 namespace off
 endmacro
 
@@ -125649,12 +125777,18 @@ namespace SMB3_ExtSpr15_Laser
 ;SObj_Laser
 Main:
 	JSR.w Laser_PrepSpritesAndHit
+
 	LDA.b $9C
 	BNE.b CODE_27C65A
+
+    ; Y += 8
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	CLC
 	ADC.b #$08
 	STA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
+
+    ; X += 8
+;SNES: new: \use 16-bit X pos
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -125665,19 +125799,30 @@ Main:
 	STA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
 	XBA
 	STA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
+;SNES/
+
 	JSR.w SObj_CheckHitSolid
 	BCC.b CODE_27C65A
+
+    ; Laser hit floor!
+
+    ; Align Y
+
 	LDA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
 	AND.b #$F0
 	CLC
 	ADC.b #$05
 	STA.w !RAM_SMB3_Level_ExtSpr_YPosLo,x
+
+    ; Align X
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
 	AND.b #$F0
 	ADC.b #$0B
 	STA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
-	JSR.w CODE_27D382 ; Remove laser
+
+	JSR.w SpecialObj_Remove ; Remove laser
 	
+    ; Generate puff via "brick bust" puff (atypical, but whatever)
 	LDY.b #$01
 CODE_27C652:
 	LDA.w !RAM_SMB3_Level_MExtSpr_SpriteID,y
@@ -125712,7 +125857,9 @@ CODE_27C65B:
 	RTS
 
 Laser_PrepSpritesAndHit:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
+
+;SNES\
 	LDA.b !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosLo,x
@@ -125721,18 +125868,27 @@ Laser_PrepSpritesAndHit:
 	SBC.w $0210
 	STA.b $D8
 	SEP.b #$20
-	LDY.b $C6,x
-	JSR.w CODE_27CE16
+
+	LDY.b !Object_SprRAM,x
+;SNES/
+	JSR.w SObj_SetSpriteXYRelative
+
+;SNES\
 	LDA.w SMB3_OAMBuffer[$00].XDisp,y
 	STA.w SMB3_OAMBuffer[$01].XDisp,y
 	LDA.w SMB3_OAMBuffer[$00].YDisp,y
 	CLC
 	ADC.b #$08
 	STA.w SMB3_OAMBuffer[$01].YDisp,y
+;SNES/
+
+    ; Set laser pattern
 	LDA.b #$4A
 	STA.w SMB3_OAMBuffer[$00].Tile,y
 	INC
 	STA.w SMB3_OAMBuffer[$01].Tile,y
+
+    ; Use rotating color attributes
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	LSR
 	LSR
@@ -125741,18 +125897,24 @@ Laser_PrepSpritesAndHit:
 	ORA.b #$21
 	STA.w SMB3_OAMBuffer[$00].Prop,y
 	STA.w SMB3_OAMBuffer[$01].Prop,y
+
+;SNES\
 	REP.b #$20
 	TYA
 	LSR
 	LSR
 	TAY
 	SEP.b #$20
+
 	LDA.b $D9
 	AND.b #$01
 	STA.w SMB3_OAMTileSizeBuffer[$00].Slot,y
 	STA.w SMB3_OAMTileSizeBuffer[$01].Slot,y
+
 	SEP.b #$10
-	JMP.w CODE_27D305
+;SNES/
+
+	JMP.w SObj_PlayerCollide
 
 ADDR_27C6D5:							; Optimization: Unused RTS
 	RTS
@@ -125769,7 +125931,7 @@ namespace SMB3_ExtSpr16_SmokePuff
 Main:
 	LDA.w $06C7,x
 	BNE.b CODE_27D67D
-	JMP.w CODE_27D382
+	JMP.w SpecialObj_Remove
 
 CODE_27D67D:
 	CMP.b #$18
@@ -125781,7 +125943,7 @@ CODE_27D686:
 	BNE.b CODE_27D68D
 	DEC.w $06C7,x
 CODE_27D68D:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BNE.b SMB3_ExtSprXX_EnemyFireball_CODE_27D674
 	LDA.w !RAM_SMB3_Level_ExtSpr_XPosHi,x
 	XBA
@@ -125888,7 +126050,7 @@ Main:
 	BRA.b CODE_27E063
 
 CODE_27E018:
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	BNE.b CODE_27E063
 	LDA.w $06BD,x
 	CMP.b #$03
@@ -125909,7 +126071,7 @@ CODE_27E018:
 	STA.b $D8
 	SEP.b #$20
 	LDY.b $C6,x
-	JSR.w CODE_27CE16
+	JSR.w SObj_SetSpriteXYRelative
 	LDA.b $DA
 	STA.w SMB3_OAMBuffer[$00].Tile,y
 	LDA.b $DB
@@ -125995,7 +126157,7 @@ CODE_27E06D:
 	STA.b $0A
 	LDA.w DATA_27E176,y
 	STA.b $0B
-	JSR.w CODE_27D72B
+	JSR.w SObj_GetSprRAMOffChkVScreen
 	REP.b #$10
 	LDY.b $C6,x
 	LDA.b $00
@@ -126529,6 +126691,7 @@ CODE_27D8C0:
 	LDA.b #!Define_SMAS_Sound0060_HitHead
 	STA.w !RAM_SMB3_Global_SoundCh1
 	
+    ; This is a laser!
 	LDA.b #!Define_SMB3_SpriteID_ExtSpr15_Laser
 	STA.w !RAM_SMB3_Level_ExtSpr_SpriteID,y
 	

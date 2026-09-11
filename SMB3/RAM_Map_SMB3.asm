@@ -4,6 +4,7 @@
 !Video_Upd_AddrL = $000036 ; !RAM_SMB3_Global_StripeImageDataLo 
 !Video_Upd_AddrH = $000037 ; !RAM_SMB3_Global_StripeImageDataHi
 !SNES_Video_Upd_AddrB = $000038 ; !RAM_SMB3_Global_StripeImageDataBank
+!Object_SprRAM = $0000C6
 !PPU_CTL1_Copy = $0000FF
 !Update_Select = $000100 ; !RAM_SMB3_Global_CurrentVBlankRoutinePath
 !Vert_Scroll = $000216
