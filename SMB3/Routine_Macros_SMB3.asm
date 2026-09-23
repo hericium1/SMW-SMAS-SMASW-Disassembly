@@ -4700,21 +4700,18 @@ CODE_20B76C:
 	INC.b !RAM_SMB3_TitleScreen_CurrentState
 	RTS
 
-DATA_20B798:
+if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
+DATA_20B798:	
+endif	
 	db $8F,$9F,$AF
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	db $BF
-endif
-
+	
 CODE_20B79B:
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
 	BNE.b CODE_20B7B8
 	LDX.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
 	LDA.b !RAM_SMB3_TitleScreen_FileASelectedWorld,x
-	STA.l !SRAM_SMAS_Global_InitialSelectedWorld
-	BRA CODE_20B7B8
-	fill $0D
+	STA.l !SRAM_SMAS_Global_InitialSelectedWorld	
 else
 	LDA.b !RAM_SMB3_Global_ControllerHold1P2
 	AND.b #!Joypad_X|(!Joypad_Y>>8)|!Joypad_A|(!Joypad_B>>8)
@@ -4722,6 +4719,7 @@ else
 	BNE.b CODE_20B7A8
 	NOP #5
 CODE_20B7A8:
+endif
 	DEC.b !RAM_SMB3_TitleScreen_WaitBeforeRestartingTitleScreenTimerLo
 	BNE.b CODE_20B7B8
 	LDA.b #$60
@@ -4730,7 +4728,7 @@ CODE_20B7A8:
 	BNE.b CODE_20B7B8
 	LDA.b #$FF
 	STA.b !RAM_SMB3_TitleScreen_ResetTitleScreenFlag
-endif
+
 CODE_20B7B8:
 	JSR.w CODE_20C51D
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
@@ -4739,7 +4737,11 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	JMP.w CODE_20B839
 else
 	BRA $07
-	fill $07
+if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+DATA_20B798:
+	db $8F,$9F,$AF,$BF
+endif
+	fill $03
 endif
 
 CODE_20B7C4:
