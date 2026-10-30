@@ -1463,9 +1463,9 @@ CODE_208A53:
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	LDA.w $0713
 	BEQ.b CODE_208A75
-	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag
+	LDA.w !RAM_SMB3_Level_IsVerticalLevelFlag ;???
 	BNE.b CODE_208A72
-	LDA.b #$0F
+	LDA.b #$0F 
 	STA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 CODE_208A72:
 	JMP.w CODE_208BD5
@@ -1815,6 +1815,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) == $00
 	BEQ.b Level_MainLoop
 	JSL.l CODE_2A841C
 endif
+
+;	LEVEL MAIN LOOP BEGIN!
+
 Level_MainLoop:
 ;level spinning
 	JSR.w GraphicsBuf_Prep_And_WaitVSync	;enter spinning
@@ -1828,16 +1831,17 @@ Level_MainLoop:
 	STA.w !RAM_SMB3_Global_MusicCh1
 CODE_208D05:
 	STZ.w !RAM_SMB3_Global_MusicRegisterBackup
-CODE_208D08:
+CODE_208D08: ; PRG030_8DF4
 	LDA.w !RAM_SMB3_Level_FreezeTimeLimitFlag
-	BMI.b CODE_208D4F	
-	
-	;begin animations
+	BMI.b CODE_208D4F		
 	
 	LDY.w !RAM_SMB3_Global_TilesetFromHeader
 	CPY.b #$05
 	BNE.b CODE_208D36
 
+	
+	; PLANT INFESTATION ALTERNATE ANIMATION
+	
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$07
 	BNE.b CODE_208D31
@@ -1851,7 +1855,7 @@ CODE_208D08:
 CODE_208D27:
 	TAY
 	LDA.w PlantInfest_PatTablePerACnt,y
-	STA.w $0245
+	STA.w $0245 ; SNES: store as index
 	STZ.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 CODE_208D31:
 	JSR.w SMB3_LevelTileAnimations_Main
@@ -1880,11 +1884,14 @@ CODE_208D51:
 	BNE.b CODE_208D77
 	
 	; AIRSHIP ONLY
-	
+
+;SNES\	
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
-	CMP.b #$15	;if airship?
+	CMP.b #$15	;if airship, rather than tank
 	BNE.b CODE_208D90
 	LDY.w $0246
+;SNES/
+	
 	LDA.b !RAM_SMB3_Global_FrameCounter
 	AND.b #$03
 	BNE.b CODE_208D72
@@ -1913,7 +1920,7 @@ CODE_208D77:
 ;SNES: new \ 
 	CMP.w $0245
 	BEQ.b CODE_208D8A
-	STZ.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
+	STZ.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex ; reset slices
 CODE_208D8A:
 ; /
 	STA.w $0245
@@ -4878,6 +4885,7 @@ DATA_20B47D:
 	db $15,$02,$34,$00,$02,$42,$90,$00
 	db $65,$01,$F0,$00,$FF
 
+;Title_3Glow
 SMB3_HandleTitleScreen3PaletteAnimation:
 .Main:
 ;$00B49A
@@ -5344,8 +5352,9 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	db $BF
 endif
 
-;Title_Do1P2PMenu
-CODE_20B79B:
+
+;CODE_20B79B
+Title_Do1P2PMenu:
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
 	BNE.b +
@@ -5590,6 +5599,7 @@ endif
 CODE_20B8A7:
 	LDA.b #!Define_SMAS_Sound0063_Correct
 	STA.w !RAM_SMB3_Global_SoundCh3
+	
 	LDA.w SMB3_OAMBuffer[$3C].YDisp
 	STA.b $BD
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
@@ -5600,18 +5610,25 @@ endif
 
 CODE_20B8BB:
 	JSR.w SMB3_WaitForVBlankDuringCutscene_Main
+	
 	INC.b !RAM_SMB3_TitleScreen_WaitBeforeRestartingTitleScreenTimerHi
+	
 	LDY.b #$F8
+	
 	LDA.b !RAM_SMB3_TitleScreen_WaitBeforeRestartingTitleScreenTimerHi
 	AND.b #$18
 	BEQ.b CODE_20B8CA
+	
 	LDY.b $BD
 CODE_20B8CA:
 	STY.w SMB3_OAMBuffer[$3C].YDisp
+	
 	JSR.w SMB3_HandleTitleScreen3PaletteAnimation_Main
-	LDA.w $04E2
-	BNE.b CODE_20B8BB
-	INC.b !RAM_SMB3_TitleScreen_CurrentState
+		
+	LDA.w $04E2  ; SNES note: SndCur_Level1 never set?
+	BNE.b CODE_20B8BB ; If the "gling" sound has not ended, loop!
+	
+	INC.b !RAM_SMB3_TitleScreen_CurrentState ; Title_State++
 CODE_20B8D7:
 	RTS
 
@@ -5620,10 +5637,13 @@ CODE_20B8D8:
 	STA.w !RAM_SMB3_Global_SoundCh3
 	RTS
 
+;Title_PrepForWorldMap
 CODE_20B8DE:
-	STZ.w $0747
+	STZ.w $0747 ;  Mario starts as small on world map
 	STZ.w $0748
 	INC.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
+	
+	;SNES: new\
 	LDA.w !RAM_SMB3_Global_CurrentWorld
 	ASL
 	TAX
@@ -5665,6 +5685,7 @@ CODE_20B936:
 	DEX
 	BPL.b CODE_20B936
 	SEP.b #$20
+;SNES: new/
 	RTS
 
 ;--------------------------------------------------------------------
@@ -8193,7 +8214,7 @@ CODE_20CF66:
 
 DATA_20CF6E:
 	dw CODE_20D117
-	dw CODE_20D154
+	dw Ending2_CommitPicture
 
 ;--------------------------------------------------------------------
 
@@ -8438,8 +8459,8 @@ DATA_20D0C1:
 	dw CODE_20D0FF
 	dw CODE_20D112
 	dw CODE_20D0D7
-	dw CODE_20D146
-	dw CODE_20D14F
+	dw Ending2_PrepEndPic
+	dw Ending2_SetFlag2
 	dw CODE_20D15C
 	dw SMB3_WorldRollCallState07_DrawSprites_Main ; 
 	dw CODE_20D1E6
@@ -8528,7 +8549,8 @@ ADDR_20D13C:
 
 ;--------------------------------------------------------------------
 
-CODE_20D146:
+;CODE_20D146
+Ending2_PrepEndPic:
 	INC.b !RAM_SMB3_WorldRollcall_CurrentState
 	LDA.b #$0C
 	STA.b $44
@@ -8537,17 +8559,21 @@ CODE_20D146:
 
 ;--------------------------------------------------------------------
 
-CODE_20D14F:
+;CODE_20D14F
+Ending2_SetFlag2:
 	LDA.b #$02
 	STA.b $C2
 	RTS
 
 ;--------------------------------------------------------------------
 
-CODE_20D154:
+;CODE_20D154
+Ending2_CommitPicture:
 	INC.b $43
+	;SNES:new\
 	LDA.b #$80
 	STA.w $02D3
+	;SNES:new/
 	RTS
 
 ;--------------------------------------------------------------------
@@ -11288,6 +11314,8 @@ CODE_20F671:
 	STA.w !REGISTER_DMAEnable
 	STZ.w !SNES_MarioDMA_BankA_Enable
 	
+;_________________
+	
 ;battle mode
 CODE_20F704:
 	LDA.w $072B
@@ -11337,10 +11365,12 @@ CODE_20F755:
 CODE_20F777:
 	SEP.b #$20
 	REP.b #$10
+CODE_20F77B:
+;_________________
 	
 ; course clear tilemap
 	
-CODE_20F77B:
+
 	LDA.w $02D1
 	BPL.b CODE_20F7CD
 	
@@ -11376,9 +11406,11 @@ CODE_20F77B:
 	STA.w $02D1
 	JMP.w CODE_20F924 ; skip the rest of the dmas
 
-; animations (regular)
-	
 CODE_20F7CD:
+
+;_________________
+; animations (regular)
+
 	LDX.w $023E ; check DMA buffer
 	BEQ.b CODE_20F7EF
 	STX.w !REGISTER_VRAMAddressLo
@@ -11392,13 +11424,15 @@ CODE_20F7CD:
 	STA.w !REGISTER_DMAEnable
 	STZ.w $023E
 	STZ.w $023F
+CODE_20F7EF:
+;_________________
 
 ;animation override (overworld)
 	
-CODE_20F7EF:
 	SEP.b #$10
 	LDA.w $02D3
-	BMI.b CODE_20F850
+	BMI.b CODE_20F850 ; if ending activated, branch
+	
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	BNE.b CODE_20F82E	;if non-zero (non-world map)
 
@@ -11426,9 +11460,12 @@ CODE_20F7EF:
 	STA.w !REGISTER_DMAEnable
 CODE_20F82B:
 	JMP.w CODE_20F924
+	
+;_________________
 
+; level animation DMAs start
 CODE_20F82E:
-	CMP.b #$07
+	CMP.b #$07 ; skip if toad house
 	BEQ.b CODE_20F82B
 	CMP.b #$0F
 	BCC.b CODE_20F849
@@ -11450,10 +11487,12 @@ CODE_20F849:
 	
 ; animation override
 CODE_20F850:
-	
-	REP.b #$20
+
+;_________________
 	
 	;? blocks
+	
+	REP.b #$20		
 	LDA.w #$2980	
 	STA.w !REGISTER_VRAMAddressLo
 	SEP.b #$20
@@ -11473,6 +11512,8 @@ CODE_20F850:
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
 	
+;_________________
+
 	; coins
 	REP.b #$20
 	LDA.w #$2DC0
@@ -11488,6 +11529,9 @@ CODE_20F850:
 		
 	INC.w !RAM_SMB3_Level_CoinAndQuestionBlockAnimationFrameIndex	
 	
+;_________________
+;pile-driver's block
+	
 	LDX.w $0245
 	BMI.b CODE_20F8C9
 	BEQ.b CODE_20F8A8
@@ -11497,8 +11541,6 @@ CODE_20F850:
 	STX.w $02B2
 CODE_20F8A5:
 	LDX.w $02B2
-	
-	;pile-driver's block
 	
 CODE_20F8A8:
 	REP.b #$20
@@ -11514,10 +11556,13 @@ CODE_20F8A8:
 	LDY.b #$80
 	STY.b DMA[$00].SizeLo
 	LDA.b #$01
-	STA.w !REGISTER_DMAEnable
-	
-	
+	STA.w !REGISTER_DMAEnable		
 CODE_20F8C9:
+
+;_________________
+
+	;layer 3 water
+
 	LDX.b #$00  ; first index
 	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
 	CMP.b #$01
@@ -11535,7 +11580,7 @@ CODE_20F8E4:
 	STX.w $0004
 	REP.b #$20
 	
-	;layer 3 water
+
 	
 	LDA.w #$5A00
 	STA.w !REGISTER_VRAMAddressLo
@@ -11565,6 +11610,7 @@ CODE_20F909:
 	LDA.b #$01
 	STA.w !REGISTER_DMAEnable
 	
+;_________________
 	
 ; fin animation override
 	
@@ -17627,12 +17673,14 @@ DATA_21C9B0:
 ;--------------------------------------------------------------------
 
 PT2_Anim:
-	db $01,$02,$03,$04,$60,$58,$00,$32
-	db $70,$58,$02,$32,$80,$58,$04,$32
-	db $90,$58,$06,$32,$A0,$58,$08,$32
-	db $60,$60,$01,$32,$70,$60,$03,$32
-	db $80,$60,$05,$32,$90,$60,$07,$32
-	db $A0,$60,$09,$32
+	db $01,$02,$03,$04
+	
+;PAUSE_Sprites
+	db $60,$58,$00,$32,$70,$58,$02,$32
+	db $80,$58,$04,$32,$90,$58,$06,$32
+	db $A0,$58,$08,$32,$60,$60,$01,$32
+	db $70,$60,$03,$32,$80,$60,$05,$32
+	db $90,$60,$07,$32,$A0,$60,$09,$32
 
 ;--------------------------------------------------------------------
 
@@ -28789,7 +28837,7 @@ DATA_238275:
 	dl CODE_29AE52			; 04 Kicked back to last completed level on different screen (Part 2)
 	dl CODE_29AEAA			; 05 Kicked back to last completed level on different screen (Part 3)
 	dl CODE_23863B			; 06 Beat level (Part 1)
-	dl CODE_29AF05			; 07 Beat level (Part 2)
+	dl MO_DoLevelClear			; 07 Beat level (Part 2)
 	dl CODE_238652			; 08 Beat level (Part 3)
 	dl CODE_29B17F			; 09 Beat level (Part 4)
 	dl CODE_23863B			; 0A Beat level (Part 5)
@@ -31260,58 +31308,65 @@ CODE_239344:
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	CMP.b #$0F
 	BNE.b CODE_23934E
-	JSR.w CODE_23934F
+	JSR.w BonusGame_HostDraw
 CODE_23934E:
 	RTL
 
-CODE_23934F:
+;CODE_23934F
+BonusGame_HostDraw:
 	LDA.w $1034
 	JSL.l SMB3_ExecutePtr_Absolute
 
 DATA_239345:
-	dw CODE_23935E
+	dw HostToad_Draw
 	dw CODE_239362
-	dw CODE_23936B
-	dw CODE_23936F
+	dw HostTroopa_Draw
+	dw HostHammerBro_Draw
 
 ;--------------------------------------------------------------------
 
-CODE_23935E:
-	JSR.w CODE_239373
+;CODE_23935E
+HostToad_Draw:
+	JSR.w HostToad_DrawSprites
 	RTS
 
 ;--------------------------------------------------------------------
 
 CODE_239362:
-	JSR.w CODE_2393BC
+	JSR.w HostTroopa_DrawSprites
 	LDA.b #$3F
 	JSR.w CODE_239410
 	RTS
 
 ;--------------------------------------------------------------------
 
-CODE_23936B:
-	JSR.w CODE_2393BC
+;CODE_23936B
+HostTroopa_Draw:
+	JSR.w HostTroopa_DrawSprites
 	RTS
 
 ;--------------------------------------------------------------------
 
-CODE_23936F:
-	JSR.w CODE_2393E6
+;CODE_23936F
+HostHammerBro_Draw:
+	JSR.w HostHammerBro_DrawSprites
 	RTS
 
 ;--------------------------------------------------------------------
 
 ; Note: Routine that draws the spade level toad.
 
-CODE_239373:
+;CODE_239373
+HostToad_DrawSprites:
 	LDA.b #$94
 	STA.b $0A
+	
 	LDY.b #$00
 	LDX.b #$0A
 CODE_23937B:
+
 	LDA.w DATA_219737,x
-	STA.w SMB3_OAMBuffer[$04].XDisp,y
+	STA.w SMB3_OAMBuffer[$04].XDisp,y	
 	STA.w SMB3_OAMBuffer[$05].XDisp,y
 	LDA.w DATA_21972C,x
 	STA.w SMB3_OAMBuffer[$04].YDisp,y
@@ -31346,7 +31401,8 @@ CODE_23937B:
 
 ;--------------------------------------------------------------------
 
-CODE_2393BC:
+;CODE_2393BC
+HostTroopa_DrawSprites:
 	LDA.b #$99
 	STA.b $0A
 	LDY.b #$00
@@ -31372,7 +31428,8 @@ CODE_2393C4:
 
 ;--------------------------------------------------------------------
 
-CODE_2393E6:
+;CODE_2393E6
+HostHammerBro_DrawSprites:
 	LDA.b #$AF
 	STA.b $0A
 	LDY.b #$00
@@ -31460,10 +31517,11 @@ CODE_239485:
 
 ;--------------------------------------------------------------------
 
+;BonusGame_Do
 SMB3_ProcessSpadeGameIntro:
 .Main:
 ;$239486
-	JSR.w CODE_23934F
+	JSR.w BonusGame_HostDraw
 	LDA.w !RAM_SMB3_SpadeGame_CurrentState
 	CMP.b #$07
 	BCC.b CODE_23949E
@@ -38234,11 +38292,12 @@ Level_Initialize:
 
 CODE_23C0D2:
 	STA.w $0561
-;SNES:
+;SNES:\
 	LDA.b #$50
 ;/
 	STA.b $C4
 	STZ.b $C5
+	
 	LDX.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.w $0747,x
 	STA.b !RAM_SMB3_Level_Player_CurrentPowerUp
@@ -40627,58 +40686,80 @@ CODE_23CFDA:
 	LDY.w $05FC
 	BEQ.b CODE_23D00A
 	BMI.b CODE_23D00A
+	
 	LDA.w !RAM_SMB3_Level_AutoscrollLayerXPosLo
 	PHA
+	
 	SEC
 	SBC.w $0210
 	STA.w $0781
+	
 	PLA
-	STA.w $0210
-	STA.w $0212
+	STA.w $0210	
+	STA.w $0212 ; SNES: L2
+	
 	LDA.w !RAM_SMB3_Level_AutoscrollLayerXPosHi
-	STA.b $12
-	STA.w $0211
+	STA.b $12	
+	STA.w $0211 ; SNES: additional	
+	
+;SNES: L2\
 	LSR
 	STA.w $0213
 	ROR.w $0212
+;/
+	
 	LDA.w $1A07
 	STA.b $25
+	
 	JMP.w CODE_23D0FA
 
 CODE_23D00A:
+
+	; No raster effects or horizontal auto scroll not desired
+
 	LDA.b !RAM_SMB3_Level_Player_XPosLo
 	SEC
 	SBC.w $0210
 	BPL.b CODE_23D052
+	
 	LDA.b $12
 	STA.b $00
+	
 	LDA.b #$80
 	CLC
 	ADC.w $0210
 	STA.b $01
 	BCC.b CODE_23D022
+	
 	INC.b $00
+	
 CODE_23D022:
 	LDA.b $43
 	CMP.b $00
 	BMI.b CODE_23D093
+	
 	LDA.b !RAM_SMB3_Level_Player_XPosLo
 	SEC
 	SBC.b $01
 	BEQ.b CODE_23D093
 	BMI.b CODE_23D093
+	
 	STA.w $0781
+	
 	CLC
 	ADC.w $0210
 	STA.w $0210
 	BCC.b CODE_23D042
 	INC.b $12
 	INC.w $0211
+	
 CODE_23D042:
 	STZ.b $25
+	
 	LDA.b $12
 	CMP.b !RAM_SMB3_Level_ScreensInLvl
 	BMI.b CODE_23D093
+	
 	STZ.w $0210
 	STZ.w $0781
 	BRA.b CODE_23D093
@@ -40686,21 +40767,26 @@ CODE_23D042:
 CODE_23D052:
 	LDA.b $12
 	STA.b $00
+	
 	LDA.b #$70
 	CLC
 	ADC.w $0210
 	STA.b $01
 	BCC.b CODE_23D062
 	INC.b $00
+	
 CODE_23D062:
 	LDA.b $00
 	CMP.b $43
 	BMI.b CODE_23D093
+	
 	LDA.b !RAM_SMB3_Level_Player_XPosLo
 	SEC
 	SBC.b $01
 	BPL.b CODE_23D093
+	
 	STA.w $0781
+	
 	CLC
 	ADC.w $0210
 	STA.w $0210
@@ -40710,12 +40796,16 @@ CODE_23D062:
 CODE_23D080:
 	LDA.b #$01
 	STA.b $25
+	
 	LDA.b $12
 	BPL.b CODE_23D093
+	
 	STZ.b $12
 	STZ.w $0210
 	STZ.w $0211
 	STZ.w $0781
+	
+;SNES: new \
 CODE_23D093:
 	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
 	CMP.b #$0B
@@ -40732,14 +40822,24 @@ CODE_23D0A2:
 	ADC.w $0354
 	STA.w $0354
 CODE_23D0B0:
+;/
+
+;SNES: set l2 x pos
 	REP.b #$20
 	LDA.w $0210
 	LSR
 	STA.w $0212
 	SEP.b #$20
+;/
+;SNES:\	
 	LDA.w !RAM_SMB3_Level_Player_GoalWalkAnimationTimer
 	BNE.b CODE_23D0FA
+;SNES:/
+	
+;PRG008_B1CE
+	
 	LDA.b !RAM_SMB3_Level_Player_OnScreenXPos
+	
 	LDY.b !RAM_SMB3_Level_Player_XSpeed
 	BMI.b CODE_23D0CF
 	CMP.b #$E8
@@ -41214,6 +41314,7 @@ CODE_23D35D:
 
 ;--------------------------------------------------------------------
 
+;Player_DetectSolids
 CODE_23D364:
 if !Define_Global_ROMToAssemble&(!ROM_SMAS_J1|!ROM_SMAS_J2|!ROM_SMB3_J) != $00
 	STZ.w !RAM_SMB3_Level_Player_HitCeilingFlag
@@ -41228,10 +41329,13 @@ endif
 CODE_23D36F:
 	LDA.w DATA_21AD82
 	STA.b $52
+	
 	LDA.w DATA_21AD82+$01
 	STA.b $53
+	
 	LDA.w $0563
 	BEQ.b CODE_23D396
+	
 	LDA.w !RAM_SMB3_Global_TilesetFromHeader
 	CMP.b #$03
 	BEQ.b CODE_23D393
@@ -65862,22 +65966,31 @@ ObjectKill_SetShellKillVars:
 CODE_279545:
 	LDA.w !RAM_SMB3_Level_MExtSpr_SpriteID
 	STA.w !RAM_SMB3_Level_MExtSpr_SpriteID+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_YPosLo
 	STA.w !RAM_SMB3_Level_MExtSpr_YPosLo+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_Table7E1FAB
 	STA.w !RAM_SMB3_Level_MExtSpr_Table7E1FAB+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_XPosLo
 	STA.w !RAM_SMB3_Level_MExtSpr_XPosLo+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_Table7E1FA5
 	STA.w !RAM_SMB3_Level_MExtSpr_Table7E1FA5+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_Table7E1FA8
 	STA.w !RAM_SMB3_Level_MExtSpr_Table7E1FA8+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_Table7E1FAE
 	STA.w !RAM_SMB3_Level_MExtSpr_Table7E1FAE+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_Table7E1FB1
 	STA.w !RAM_SMB3_Level_MExtSpr_Table7E1FB1+$01
+	
 	LDA.b !RAM_SMB3_Level_MExtSpr_Table7E00DF
 	STA.b !RAM_SMB3_Level_MExtSpr_Table7E00DF+$01
+	
 	LDA.w !RAM_SMB3_Level_MExtSpr_XPosHi
 	STA.w !RAM_SMB3_Level_MExtSpr_XPosHi+$01
 	RTL
@@ -69483,7 +69596,7 @@ Gameplay_UpdateAndDrawMisc:
 	JSR.w SMB3_ProcessExtendedSprites_Main
 	JSR.w SMB3_ProcessShooterSprites_Main
 	JSR.w SMB3_ProcessPlayerFireballs_Main
-	JSL.l CODE_29D713
+	JSL.l SNES_LevelBGPaletteAnimations ; SNES: new
 	LDA.b !RAM_SMB3_Level_Player_CurrentPowerUp
 	CMP.b #$06
 	BEQ.b CODE_27B2C5
@@ -83161,7 +83274,8 @@ CODE_29AEFE:
 UNK_29AF01:
 	db $00,$00,$00,$00
 
-CODE_29AF05:
+;CODE_29AF05
+MO_DoLevelClear:
 	JSL.l SMB3_GetOverworldTilePlayerIsOn_Main
 	LDX.b #$04
 CODE_29AF0B:
@@ -83209,8 +83323,10 @@ CODE_29AF48:
 CODE_29AF4B:
 	CPY.b #$00
 	BNE.b CODE_29AF61
+;SNES: new\
 	LDA.l $7E3995
 	BNE.b CODE_29AF48
+;SNES: new/
 	LDA.b #$07
 	STA.b $20
 	LDA.b #!Define_SMAS_Sound0063_OverworldSwitchBlockEjection
@@ -83235,8 +83351,10 @@ CODE_29AF74:
 	CMP.b #$0A
 	BNE.b CODE_29AF45
 
+;PRG011_AA58
 CODE_29AF80:
 	STZ.b $20
+;SNES:\
 	LDA.l $7E3995
 	BEQ.b CODE_29AF91
 	LDA.b #$04
@@ -83245,6 +83363,7 @@ CODE_29AF80:
 	JMP.w CODE_29B0F6
 
 CODE_29AF91:
+;SNES:/
 	LDY.w !RAM_SMB3_Level_Player_CurrentCharacter
 	LDA.b #$7E2000>>16
 	STA.b $30
@@ -83276,6 +83395,7 @@ CODE_29AF91:
 	TAX
 	LDA.w !RAM_SMB3_Level_Player_CurrentCharacter
 	BEQ.b CODE_29AFC8
+	
 	INX
 CODE_29AFC8:
 	PLA
@@ -88254,13 +88374,20 @@ DATA_29D6F3:
 DATA_29D703:
 	dw $2997,$2D93,$2D91,$2D8F,$31AE,$2D8F,$2D91,$2D93
 
-CODE_29D713:
+;CODE_29D713
+SNES_LevelBGPaletteAnimations:
 	PHB
 	PHK
 	PLB
+	
+;---
+	
 	LDA.w $0350
 	CMP.b #$06
 	BNE.b CODE_29D74A
+	
+; castle background
+	
 	LDA.w $0356
 	INC
 	STA.w $0356
@@ -88284,8 +88411,14 @@ CODE_29D713:
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 CODE_29D74A:
+	
+;---
+
 	CMP.b #$14
 	BNE.b CODE_29D772
+	
+; ice save background
+	
 	INC.w $0356
 	LDA.w $0356
 	AND.b #$38
@@ -88305,12 +88438,18 @@ CODE_29D762:
 	BNE.b CODE_29D762
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
+
+;---
+	
 CODE_29D772:
 	CMP.b #$16
 	BEQ.b CODE_29D77A
 	CMP.b #$1E
 	BNE.b CODE_29D7A5
 CODE_29D77A:
+
+; cliffs and waterfalls background
+
 	INC.w $0356
 	LDA.w $0356
 	AND.b #$18
@@ -88330,8 +88469,14 @@ CODE_29D77A:
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 CODE_29D7A5:
+
+;---
+
 	CMP.b #$17
 	BNE.b CODE_29D7D1
+	
+; toad house background
+
 	INC.w $0356
 	LDA.w $0356
 	AND.b #$38
@@ -88348,8 +88493,14 @@ CODE_29D7A5:
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 CODE_29D7D1:
+
+;---
+
 	CMP.b #$1C
 	BNE.b CODE_29D815
+	
+; forest and stars background
+	
 	INC.w $0356
 	LDA.w $0356
 	AND.b #$30
@@ -88374,8 +88525,14 @@ CODE_29D7D1:
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 CODE_29D815:
+
+;---
+
 	CMP.b #$1D
 	BNE.b CODE_29D859
+	
+; hills in sky, night background
+	
 	INC.w $0356
 	LDA.w $0356
 	AND.b #$30
@@ -88400,8 +88557,14 @@ CODE_29D815:
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 CODE_29D859:
+
+;---
+
 	CMP.b #$1F
 	BNE.b CODE_29D8AD
+	
+; dungeon cell, reddening
+	
 	INC.w $0356
 	LDA.w $0356
 	AND.b #$38
@@ -88440,6 +88603,9 @@ CODE_29D89A:
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_UpdateEntirePaletteFlag
 CODE_29D8AD:
+
+;---
+
 	PLB
 	RTL
 
@@ -103493,6 +103659,7 @@ endif
 	STA.b !RAM_SMB3_TitleScreen_WaitBeforeMovingCurtainUpTimer
 CODE_20B1AA:
 	JSR.w SMB3_WaitForVBlankDuringCutscene_Main
+;fade in\
 CODE_20B1AD:
 	INC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	LDA.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
@@ -103509,6 +103676,7 @@ if !Define_Global_ROMToAssemble&(!ROM_SMASW_E|!ROM_SMAS_E|!ROM_SMB3_E) != $00
 	STA.w !RAM_SMB3_Global_MusicCh1
 endif
 	BRA.b CODE_20B1AD
+;/
 
 CODE_20B1BA:
 	LDA.b #$0F
@@ -103572,10 +103740,12 @@ CODE_20B21C:
 	LDA.b !RAM_SMB3_TitleScreen_ResetTitleScreenFlag
 	BEQ.b CODE_20B23D
 CODE_20B223:
+;SNES:\ fade out during reset
 	DEC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	BMI.b CODE_20B22C
 	JSR.w SMB3_WaitForVBlankDuringCutscene_Main
 	BRA.b CODE_20B223
+;SNES:/
 
 CODE_20B22C:
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
@@ -103601,11 +103771,13 @@ CODE_20B245:
 	DEX
 	BPL.b CODE_20B245
 
+; SNES: perform fade
 CODE_20B24A:
 	DEC.b !RAM_SMB3_Global_ScreenDisplayRegisterMirror
 	BMI.b CODE_20B253
 	JSR.w SMB3_WaitForVBlankDuringCutscene_Main
 	BRA.b CODE_20B24A
+;SNES:/
 
 CODE_20B253:
 	LDA.b #$80
@@ -104011,7 +104183,7 @@ CODE_20F049:
 CODE_20F050:
 	CMP.b #$20
 	BNE.b CODE_20F057
-	JMP.w CODE_20F18C
+	JMP.w UpdSel_Title
 
 CODE_20F057:
 	CMP.b #$95
@@ -104181,7 +104353,8 @@ CODE_20F16C:
 	CLI
 	JMP.w CODE_20F0AC
 
-CODE_20F18C:
+;CODE_20F18C
+UpdSel_Title:
 	JSR.w SNES_DoGFXDMATransfers
 	LDA.w !RAM_SMB3_Global_WaitForVBlankFlag
 	BNE.b CODE_20F1B4
@@ -104202,9 +104375,11 @@ CODE_20F19D:
 CODE_20F1B2:
 	STZ.b $28
 CODE_20F1B4:
+;SNES:new\
 	JSR.w CODE_20CFD9
 	JSR.w CODE_20F20B
 	JSR.w CODE_20FBC6
+;SNES:new/
 	JMP.w CODE_20F0AC
 
 CODE_20F1C0:
@@ -105838,7 +106013,7 @@ CODE_20B3AD:
 	dw SMB3_TitleScreenState00_CurtainRise_Main
 	dw TitleState_OpeningSequence					; Note: Handle title screen animations
 	dw CODE_20B76C					; Initialize player select?
-	dw CODE_20B79B					; Player select
+	dw Title_Do1P2PMenu					; Player select
 	dw CODE_20B8DE					; Initialize selection 1?
 	dw CODE_20B660					; Initialize selection 2?
 	dw Title_IntroSkip					; Jump to player select
@@ -107187,9 +107362,12 @@ Main:
 	STZ.w $0703
 	STZ.w $0701
 	STZ.w $0702
+	
 	LDA.b #$7E2000>>16
 	STA.b $30
+	
 	LDY.b #$00
+	
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	STA.w !RAM_SMB3_Level_SublevelLevelDataLo
 	INY
@@ -107208,8 +107386,10 @@ Main:
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	STA.w !RAM_SMB3_Level_SublevelSpriteDataBank
 	INY
+	
 	LDA.w !Level_JctCtl
 	BNE.b CODE_209939
+	
 	LDA.b [!RAM_SMB3_Level_LevelDataPtrLo],y
 	AND.b #$E0
 	LSR
@@ -107526,6 +107706,7 @@ CODE_209B19:
 	LDA.w !RAM_SMB3_Level_GraphicsAndPaletteSettingFromHeader
 	CMP.b #$07
 	BNE.b CODE_209B29
+	; toad house: set timer to 0
 	STZ.w !RAM_SMB3_Level_TimerHundreds
 	STZ.w !RAM_SMB3_Level_TimerTens
 	STZ.w !RAM_SMB3_Level_TimerOnes
@@ -108554,16 +108735,20 @@ CODE_29BD8C:
 	ASL
 	TAY
 	REP.b #$20
+	
 	LDA.w #$0200 ; upload one row at a time
 	STA.w $02CA	;size.
+	
 	LDA.w $0240 ;source lo
 	CLC
 	ADC.w DATA_21E925,y
 	STA.w $0240 ;source lo
+	
 	LDA.w #$2000 ; dest VRAM
 	CLC
 	ADC.w DATA_21E935,y
 	STA.w $023E
+	
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 CODE_29BDCB:
@@ -108598,21 +108783,28 @@ CODE_20A04F:
 	STA.w $0241
 	LDA.w DATA_21CA1E,x
 	STA.w $0240 ;source lo
+	
 	LDA.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 	ASL
 	TAY
+	
 	REP.b #$20
+	
 	LDA.w #$0200 ; upload one row at a time
-	STA.w $02CA 
+	STA.w $02CA
+	
 	LDA.w $0240 ;source lo
 	CLC
 	ADC.w DATA_21E925,y
 	STA.w $0240 ;source lo
+	
 	LDA.w #$2800	;VRAM index
 	CLC
 	ADC.w DATA_21E935,y
 	STA.w $023E
+	
 	SEP.b #$20
+	
 	INC.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 CODE_20A08A:
 	RTS
@@ -108635,28 +108827,34 @@ Main:
 	RTS
 
 CODE_20A09A:
-	LDX.w $0246
+	LDX.w $0246 ; frame index
 	LDA.w DATA_21CA23,x
 	STA.w $0242
 	LDA.w DATA_21CA26,x
 	STA.w $0241
 	LDA.w DATA_21CA29,x
 	STA.w $0240
+	
 	LDA.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 	ASL
 	ASL
 	TAY
+	
 	REP.b #$20
+	
 	LDA.w #$0400 ; upload two rows at a time
 	STA.w $02CA
+	
 	LDA.w $0240
 	CLC
 	ADC.w DATA_21E925,y
 	STA.w $0240
+	
 	LDA.w #$2800	;VRAM index
 	CLC
 	ADC.w DATA_21E935,y
 	STA.w $023E
+	
 	SEP.b #$20
 	INC.w !RAM_SMB3_Global_AnimatedFGTileAnimationFrameIndex
 CODE_20A0D6:
@@ -112471,6 +112669,9 @@ ADDR_20A1BF:								; Note: Unreferenced code
 	LDA.b #$7F0000>>16
 	STA.b $02
 	;entry
+;LZ2?
+;$00,$01,$02, destination address;
+;$08,$09,$0A, 
 CODE_20A1CF:
 	REP.b #$10
 	LDY.w #$0000
