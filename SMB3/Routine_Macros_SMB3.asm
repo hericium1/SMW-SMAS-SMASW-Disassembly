@@ -128895,7 +128895,10 @@ CODE_008CBF:
 	STA.l !SRAM_SMAS_Global_SaveFileIndexLo
 	TAX
 CODE_008CC7:
-	LDY.w #$0104
+; standalone: new size\
+	LDY.w #(PremadeSaveFileDataEnd-PremadeSaveFileData)-2
+; standalone: new size/
+
 	STZ.b !RAM_SMB3_Global_ScratchRAM00
 	STX.b !RAM_SMB3_Global_ScratchRAM02
 	SEP.b #$20
@@ -128910,6 +128913,7 @@ CODE_008CD8:
 	INX
 	DEY
 	BNE.b CODE_008CD8
+
 	REP.b #$21
 	LDA.b !RAM_SMB3_Global_ScratchRAM00
 	ADC.l !SRAM_SMAS_Global_SaveFileBaseOffset,x
@@ -128920,11 +128924,12 @@ CODE_008CF7:
 	LDA.l !SRAM_SMAS_Global_SaveFileIndexLo
 	INC
 	STA.l !SRAM_SMAS_Global_SaveFileIndexLo
-	CMP.w #$0003
+	CMP.w #$0003 ; new loop amount
 	BCS.b CODE_008D12
 	BRA.b CODE_008CC7
 
 CODE_008D07:
+; checksum mismatch, create premade
 	REP.b #$30
 	LDX.b !RAM_SMB3_Global_ScratchRAM02
 	JSR.w CODE_008D41
@@ -128932,15 +128937,19 @@ CODE_008D07:
 	BRA.b CODE_008CF7
 
 CODE_008D12:
+; standalone: fin
 	SEP.b #$30
 	PLB
 	RTL
 
 CODE_008D41:
-	LDA.w #$0104
+; premade creation
+	LDA.w #(PremadeSaveFileDataEnd-PremadeSaveFileData)-2
 	STA.b !RAM_SMB3_Global_ScratchRAM04
+
 	LDY.w #$0000
 	STZ.b !RAM_SMB3_Global_ScratchRAM00
+
 	SEP.b #$20
 CODE_008D59:
 	LDA.w PremadeSaveFileData,y
@@ -128968,6 +128977,12 @@ CODE_008D59:
 	RTS
 
 PremadeSaveFileData:
+	; old SMAS data, may be used for anything
+	db $FF,$FF,$FF,$04,$04,$00,$FF,$00,$00,$FF,$FF,$FF,$04,$00,$FF,$00
+	db $00,$FF,$FF,$05,$00,$00,$00,$00,$00,$00
+
+PremadeSaveFileDataSMB3Start:
+
 	db $FF,$FF,$04,$04,$70,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$D0,$C0,$A0,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$00
@@ -128985,6 +129000,7 @@ PremadeSaveFileData:
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$FF,$00,$00
+PremadeSaveFileDataEnd:
 namespace off
 endmacro
 
@@ -128996,7 +129012,9 @@ namespace SMB3_SaveFileLocations
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	dw $0000,$0106,$020C
+	dw (PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*0)
+	dw (PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*1)
+	dw (PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*2)
 namespace off
 endmacro
 

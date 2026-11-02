@@ -9933,13 +9933,16 @@ CODE_008CBF:
 	STA.l !SRAM_SMAS_Global_SaveFileIndexLo
 	TAX
 CODE_008CC7:
-	AND.w #$0003
+
+	AND.w #$0003 ; index for file?
 	ASL
 	TAY
+
 	LDA.w SMAS_PremadeSaveFileDataOffsets_DATA_008D99,y
 	DEC
 	DEC
 	TAY
+
 	STZ.b !RAM_SMAS_Global_ScratchRAM00
 	STX.b !RAM_SMAS_Global_ScratchRAM02
 	SEP.b #$20
@@ -9954,6 +9957,7 @@ CODE_008CD8:
 	INX
 	DEY
 	BNE.b CODE_008CD8
+
 	REP.b #$21
 	LDA.b !RAM_SMAS_Global_ScratchRAM00
 	ADC.l !SRAM_SMAS_Global_SaveFileBaseOffset,x
@@ -9969,6 +9973,7 @@ CODE_008CF7:
 	BRA.b CODE_008CC7
 
 CODE_008D07:
+; checksum mismatch, create premade
 	REP.b #$30
 	LDX.b !RAM_SMAS_Global_ScratchRAM02
 	JSR.w CODE_008D41
@@ -10089,16 +10094,20 @@ CODE_008D3E:
 	RTS
 
 CODE_008D41:
+
 	LDA.l !SRAM_SMAS_Global_SaveFileIndexLo
 	AND.w #$0003
 	ASL
 	TAY
+
 	LDA.w SMAS_PremadeSaveFileDataOffsets_DATA_008D99,y
 	DEC
 	DEC
 	STA.b !RAM_SMAS_Global_ScratchRAM0E
+
 	LDA.w SMAS_PremadeSaveFileDataOffsets_DATA_008D91,y
 	TAY
+
 	STZ.b !RAM_SMAS_Global_ScratchRAM00
 	SEP.b #$20
 CODE_008D59:
