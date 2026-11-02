@@ -129012,9 +129012,9 @@ namespace SMB3_SaveFileLocations
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	dw (PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*0)
-	dw (PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*1)
-	dw (PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*2)
+	dw $001A;(PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*0)
+	dw $013A;(PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*1)
+	dw $025A;(PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*2)
 namespace off
 endmacro
 
