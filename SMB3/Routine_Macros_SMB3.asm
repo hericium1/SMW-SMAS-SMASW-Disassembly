@@ -4700,21 +4700,18 @@ CODE_20B76C:
 	INC.b !RAM_SMB3_TitleScreen_CurrentState
 	RTS
 
-DATA_20B798:
+if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
+DATA_20B798:	
+endif	
 	db $8F,$9F,$AF
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-	db $BF
-endif
-
+	
 CODE_20B79B:
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
 	BNE.b CODE_20B7B8
 	LDX.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
 	LDA.b !RAM_SMB3_TitleScreen_FileASelectedWorld,x
-	STA.l !SRAM_SMAS_Global_InitialSelectedWorld
-	BRA CODE_20B7B8
-	fill $0D
+	STA.l !SRAM_SMAS_Global_InitialSelectedWorld	
 else
 	LDA.b !RAM_SMB3_Global_ControllerHold1P2
 	AND.b #!Joypad_X|(!Joypad_Y>>8)|!Joypad_A|(!Joypad_B>>8)
@@ -4722,6 +4719,7 @@ else
 	BNE.b CODE_20B7A8
 	NOP #5
 CODE_20B7A8:
+endif
 	DEC.b !RAM_SMB3_TitleScreen_WaitBeforeRestartingTitleScreenTimerLo
 	BNE.b CODE_20B7B8
 	LDA.b #$60
@@ -4730,7 +4728,7 @@ CODE_20B7A8:
 	BNE.b CODE_20B7B8
 	LDA.b #$FF
 	STA.b !RAM_SMB3_TitleScreen_ResetTitleScreenFlag
-endif
+
 CODE_20B7B8:
 	JSR.w CODE_20C51D
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
@@ -4739,7 +4737,11 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	JMP.w CODE_20B839
 else
 	BRA $07
-	fill $07
+if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+DATA_20B798:
+	db $8F,$9F,$AF,$BF
+endif
+	fill $03
 endif
 
 CODE_20B7C4:
@@ -128890,13 +128892,14 @@ CODE_008C9D:
 
 CODE_008CBF:
 	LDA.w #$0000
-	STA.l !SRAM_SMAS_Global_SaveFileIndexLo
-		
+	STA.l !SRAM_SMAS_Global_SaveFileIndexLo	
 CODE_008CC7:
+
 	ASL
 	TAX
 	LDA.l SMB3_SaveFileLocations_Main,x
-	TAX
+	
+	TAX	
 
 	LDY.w #$0104
 	
@@ -128941,7 +128944,7 @@ CODE_008D12:
 	RTL
 
 CODE_008D41:
-	LDA.w #$0120-2
+	LDA.w #$0104
 	STA.b !RAM_SMB3_Global_ScratchRAM04
 	LDY.w #$0000
 	STZ.b !RAM_SMB3_Global_ScratchRAM00
@@ -128970,13 +128973,14 @@ CODE_008D59:
 	INX
 	INX
 	RTS
+	
 
+	; old SMAS data, may be used for anything
+;	db $FF,$FF,$FF,$04,$04,$00,$FF,$00,$00,$FF,$FF,$FF,$04,$00,$FF,$00
+;	db $00,$FF,$FF,$05,$00,$00,$00,$00,$00,$00
+
+	; SMB3
 PremadeSaveFileData:
-; old SMAS data, may be used for anything
-	db $FF,$FF,$FF,$04,$04,$00,$FF,$00,$00,$FF,$FF,$FF,$04,$00,$FF,$00
-	db $00,$FF,$FF,$05,$00,$00,$00,$00,$00,$00
-
-;SMB3 start
 	db $FF,$FF,$04,$04,$70,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$D0,$C0,$A0,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$00
