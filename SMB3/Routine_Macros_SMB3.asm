@@ -4700,18 +4700,21 @@ CODE_20B76C:
 	INC.b !RAM_SMB3_TitleScreen_CurrentState
 	RTS
 
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
-DATA_20B798:	
-endif	
+DATA_20B798:
 	db $8F,$9F,$AF
-	
+if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
+	db $BF
+endif
+
 CODE_20B79B:
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
 	LDA.b !RAM_SMB3_TitleScreen_FileSelectProcess
 	BNE.b CODE_20B7B8
 	LDX.w !RAM_SMB3_TitleScreen_MenuSelectionIndex
 	LDA.b !RAM_SMB3_TitleScreen_FileASelectedWorld,x
-	STA.l !SRAM_SMAS_Global_InitialSelectedWorld	
+	STA.l !SRAM_SMAS_Global_InitialSelectedWorld
+	BRA CODE_20B7B8
+	fill $0D
 else
 	LDA.b !RAM_SMB3_Global_ControllerHold1P2
 	AND.b #!Joypad_X|(!Joypad_Y>>8)|!Joypad_A|(!Joypad_B>>8)
@@ -4719,7 +4722,6 @@ else
 	BNE.b CODE_20B7A8
 	NOP #5
 CODE_20B7A8:
-endif
 	DEC.b !RAM_SMB3_TitleScreen_WaitBeforeRestartingTitleScreenTimerLo
 	BNE.b CODE_20B7B8
 	LDA.b #$60
@@ -4728,7 +4730,7 @@ endif
 	BNE.b CODE_20B7B8
 	LDA.b #$FF
 	STA.b !RAM_SMB3_TitleScreen_ResetTitleScreenFlag
-
+endif
 CODE_20B7B8:
 	JSR.w CODE_20C51D
 if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
@@ -4737,11 +4739,7 @@ if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) == $00
 	JMP.w CODE_20B839
 else
 	BRA $07
-if !Define_Global_ROMToAssemble&(!ROM_SMB3_U|!ROM_SMB3_E|!ROM_SMB3_J) != $00
-DATA_20B798:
-	db $8F,$9F,$AF,$BF
-endif
-	fill $03
+	fill $07
 endif
 
 CODE_20B7C4:
@@ -128893,13 +128891,16 @@ CODE_008C9D:
 CODE_008CBF:
 	LDA.w #$0000
 	STA.l !SRAM_SMAS_Global_SaveFileIndexLo
-	TAX
+		
 CODE_008CC7:
-; standalone: new size\
-	LDY.w #(PremadeSaveFileDataEnd-PremadeSaveFileData)-2
-; standalone: new size/
+	ASL
+	TAX
+	LDA.l SMB3_SaveFileLocations_Main,x
+	TAX
 
-	STZ.b !RAM_SMB3_Global_ScratchRAM00
+	LDY.w #$0104
+	
+	STZ.b !RAM_SMB3_Global_ScratchRAM00	
 	STX.b !RAM_SMB3_Global_ScratchRAM02
 	SEP.b #$20
 CODE_008CD8:
@@ -128913,7 +128914,6 @@ CODE_008CD8:
 	INX
 	DEY
 	BNE.b CODE_008CD8
-
 	REP.b #$21
 	LDA.b !RAM_SMB3_Global_ScratchRAM00
 	ADC.l !SRAM_SMAS_Global_SaveFileBaseOffset,x
@@ -128924,12 +128924,11 @@ CODE_008CF7:
 	LDA.l !SRAM_SMAS_Global_SaveFileIndexLo
 	INC
 	STA.l !SRAM_SMAS_Global_SaveFileIndexLo
-	CMP.w #$0003 ; new loop amount
+	CMP.w #$0003
 	BCS.b CODE_008D12
 	BRA.b CODE_008CC7
 
 CODE_008D07:
-; checksum mismatch, create premade
 	REP.b #$30
 	LDX.b !RAM_SMB3_Global_ScratchRAM02
 	JSR.w CODE_008D41
@@ -128937,19 +128936,15 @@ CODE_008D07:
 	BRA.b CODE_008CF7
 
 CODE_008D12:
-; standalone: fin
 	SEP.b #$30
 	PLB
 	RTL
 
 CODE_008D41:
-; premade creation
-	LDA.w #(PremadeSaveFileDataEnd-PremadeSaveFileData)-2
+	LDA.w #$0120-2
 	STA.b !RAM_SMB3_Global_ScratchRAM04
-
 	LDY.w #$0000
 	STZ.b !RAM_SMB3_Global_ScratchRAM00
-
 	SEP.b #$20
 CODE_008D59:
 	LDA.w PremadeSaveFileData,y
@@ -128977,12 +128972,11 @@ CODE_008D59:
 	RTS
 
 PremadeSaveFileData:
-	; old SMAS data, may be used for anything
+; old SMAS data, may be used for anything
 	db $FF,$FF,$FF,$04,$04,$00,$FF,$00,$00,$FF,$FF,$FF,$04,$00,$FF,$00
 	db $00,$FF,$FF,$05,$00,$00,$00,$00,$00,$00
 
-PremadeSaveFileDataSMB3Start:
-
+;SMB3 start
 	db $FF,$FF,$04,$04,$70,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$D0,$C0,$A0,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$01,$00
@@ -129000,7 +128994,6 @@ PremadeSaveFileDataSMB3Start:
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
 	db $00,$00,$00,$FF,$00,$00
-PremadeSaveFileDataEnd:
 namespace off
 endmacro
 
@@ -129012,9 +129005,7 @@ namespace SMB3_SaveFileLocations
 %InsertMacroAtXPosition(<Address>)
 
 Main:
-	dw $001A;(PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*0)
-	dw $013A;(PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*1)
-	dw $025A;(PremadeSaveFileDataSMB3Start-PremadeSaveFileData)+((PremadeSaveFileDataEnd-PremadeSaveFileData)*2)
+	dw $001A,$013A,$025A
 namespace off
 endmacro
 
