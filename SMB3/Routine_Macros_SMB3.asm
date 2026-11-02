@@ -11965,6 +11965,8 @@ CODE_20FBC5:
 
 ;--------------------------------------------------------------------
 
+; normal bg position update routine?
+
 CODE_20FBC6:
 	LDA.w $0210
 	STA.w !REGISTER_BG1HorizScrollOffset
@@ -12084,24 +12086,30 @@ CODE_20FCB3:
 
 ;--------------------------------------------------------------------
 
+; vertical 
 CODE_20FCC0:
 	LDA.w $0210
 	STA.w !REGISTER_BG1HorizScrollOffset
 	LDA.w $0211
 	STA.w !REGISTER_BG1HorizScrollOffset
+	
 	LDA.w !Vert_Scroll
 	CLC
 	ADC.w !RAM_SMB3_Level_ShakeLayer1YOffset ; 
 	STA.w !REGISTER_BG1VertScrollOffset
 	STA.b $02
+	
 	LDA.w $0217
 	STA.w !REGISTER_BG1VertScrollOffset
 	STA.b $03
+	
 	LDA.w !RAM_SMB3_Level_Layer3BGFromHeader
 	CMP.b #$03
 	BEQ.b CODE_20FCED
+	
 	CMP.b #$04
 	BEQ.b CODE_20FCED
+	
 	BRA.b CODE_20FD26
 
 CODE_20FCED:
@@ -104292,7 +104300,7 @@ CODE_20F0F8:
 	STZ.b $28
 CODE_20F0FA:
 	JSR.w CODE_20F20B
-	JSR.w CODE_20FBC6
+	JSR.w CODE_20FBC6 ; 
 	LDA.w !REGISTER_IRQEnable
 	LDA.b #$C0
 	STA.w !REGISTER_VCountTimerLo
